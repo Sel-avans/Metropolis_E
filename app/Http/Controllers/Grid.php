@@ -6,6 +6,7 @@ namespace App\Http\Controllers;
 use App\Http\Controllers\TileType;
 use App\Http\Controllers\TileMark;
 
+
 class Grid{
 
     private $width = 0;
@@ -54,7 +55,9 @@ class Grid{
                     $tileType = $node->getTileType()->value;
                     $tileMark = $node->getTileMark()->value;
                     $gridId = $node->getGridId();
-                    echo "<div class='grid-item tile-$tileType colour-$tileMark' data-grid-id='$gridId'>";
+                    
+                    // HIER ZIT DE MAGIC: data-x='$x' en data-y='$y' zijn toegevoegd!
+                    echo "<div class='grid-item tile-$tileType colour-$tileMark' data-grid-id='$gridId' data-x='$x' data-y='$y'>";
                     echo "</div>";
                 }
             }
@@ -62,6 +65,5 @@ class Grid{
 
         echo "</div>";
         echo "</div>";
-
     }
 }
