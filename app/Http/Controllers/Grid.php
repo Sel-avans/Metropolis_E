@@ -2,7 +2,7 @@
 
 namespace App\Http\Controllers;
 
-require_once __DIR__ . "/Node.php";
+
 use App\Http\Controllers\TileType;
 use App\Http\Controllers\TileMark;
 
