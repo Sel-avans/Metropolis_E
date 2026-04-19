@@ -2,7 +2,7 @@
 
 use App\Http\Controllers\ProfileController;
 use Illuminate\Support\Facades\Route;
-use App\Models\Destination;
+use App\Models\CityFunction;
 use App\Models\GridState;
 use Illuminate\Http\Request;
 
@@ -12,9 +12,14 @@ Route::get('/', function () {
 });
 
 Route::get('/grid', function () {
-    $destinations = Destination::all();
-    $savedCells = \App\Models\GridState::with('destination')->get();
-    return view('gridView', compact('destinations', 'savedCells'));
+    
+    $functions = \App\Models\CityFunction::all();
+    
+    
+    $savedCells = \App\Models\GridState::with('cityFunction')->get();
+    
+    
+    return view('gridView', compact('functions', 'savedCells'));
 });
 
 Route::get('/dashboard', function () {
@@ -38,13 +43,14 @@ Route::post('/save-cell', function (Request $request) {
     $validated = $request->validate([
         'x' => 'required|integer',
         'y' => 'required|integer',
-        'destination_id' => 'required|integer|exists:destinations,id'
+        'city_function_id' => 'required|exists:city_functions,id'
     ]);
 
     
     GridState::updateOrCreate(
         ['x' => $validated['x'], 'y' => $validated['y']],
-        ['destination_id' => $validated['destination_id']]
+        
+        ['city_function_id' => $validated['city_function_id']] 
     );
 
     return response()->json(['status' => 'success']);

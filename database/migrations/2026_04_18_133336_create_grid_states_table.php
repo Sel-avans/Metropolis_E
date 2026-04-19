@@ -16,7 +16,7 @@ return new class extends Migration
             $table->integer('x');
             $table->integer('y');
             $table->timestamps();
-            $table->foreignId('destination_id')->constrained()->onDelete('cascade');
+            $table->foreignId('city_function_id')->constrained()->onDelete('cascade');
             $table->unique(['x', 'y']);
         });
     }
