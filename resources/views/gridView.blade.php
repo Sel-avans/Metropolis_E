@@ -61,7 +61,7 @@
             width: 100%; 
             max-width: 75vh; 
             aspect-ratio: 1 / 1; /* Houdt het complete grid altijd in de vorm van een perfect vierkant */
-            background-color: white; 
+            background-color: #eeeeee; 
             border: 2px solid black;
             margin: 0 auto; /* Zet het grid netjes in het midden */
         }
@@ -73,7 +73,7 @@
             justify-content: center;
             align-items: center;
             width: 100%;
-            height: 100%; /* Vult het vierkante grid netjes op */
+            height: 100%; 
             cursor: pointer;
         }
     </style>
@@ -81,7 +81,7 @@
 <body>
     <div class="page-layout">
         
-    <aside class="library-panel" style="background-color: #f4f4f4; padding: 20px; border-radius: 10px; width: 200px;">
+<aside class="library-panel">
     <h2 style="color: #333; margin-top: 0;">Functies</h2>
     
     <div class="library-grid">
@@ -93,9 +93,9 @@
                  data-image="{{ asset($function->image) }}"
                  style="background-color: white; border: 1px solid #ccc; padding: 10px; margin-bottom: 10px; cursor: grab; text-align: center; border-radius: 5px;">
                 
-                <img src="{{ asset($function->image) }}" alt="{{ $function->name }}" style="width: 50px; height: 50px; object-fit: contain;">
+                <img src="{{ asset($function->image) }}" alt="{{ $function->name }}" style="width: 50px; height: 50px; object-fit: contain; pointer-events: none;">
                 
-                <p class="library-name" style="margin: 5px 0 0 0; font-weight: bold; color: #333;">{{ $function->name }}</p>
+                <p style="margin: 5px 0 0 0; font-weight: bold; color: #333;">{{ $function->name }}</p>
             </div>
         @endforeach
     </div>
@@ -112,45 +112,83 @@
         </main>
     </div>
 
-    <script>
-    // We selecteren de bibliotheek items en de grid vakjes
+<script>
     const draggables = document.querySelectorAll('.library-item');
     const cells = document.querySelectorAll('.grid-item, .grid-cell');
 
-    let draggedData = { id: null, name: null, image: null };
+    let draggedData = { 
+        id: null, 
+        image: null,
+        sourceX: null, 
+        sourceY: null 
+    };
 
-    // 1. Sleep-logica
+    // 1. Slepen vanuit de Library (Nieuwe items)
     draggables.forEach(item => {
         item.addEventListener('dragstart', () => {
             draggedData.id = item.getAttribute('data-id');
-            draggedData.name = item.getAttribute('data-name');
             draggedData.image = item.getAttribute('data-image'); 
+            draggedData.sourceX = null; 
+            draggedData.sourceY = null;
             item.style.opacity = '0.5';
         });
         item.addEventListener('dragend', () => item.style.opacity = '1');
     });
 
-    // 2. Drop-logica
+    // 2. Functie om een grid-vakje sleepbaar te maken
+    function enableGridDrag(cell) {
+        cell.setAttribute('draggable', 'true');
+        cell.addEventListener('dragstart', (e) => {
+            const img = cell.querySelector('img');
+            if (!img) return;
+
+            draggedData.id = cell.getAttribute('data-function-id');
+            draggedData.image = img.getAttribute('src');
+            draggedData.sourceX = cell.getAttribute('data-col') || cell.getAttribute('data-x');
+            draggedData.sourceY = cell.getAttribute('data-row') || cell.getAttribute('data-y');
+            
+            cell.style.opacity = '0.5';
+        });
+        cell.addEventListener('dragend', () => cell.style.opacity = '1');
+    }
+
+    // 3. Drop logica (Verplaatsen of Plakken)
     cells.forEach(cell => {
         cell.addEventListener('dragover', e => e.preventDefault()); 
 
         cell.addEventListener('drop', async (e) => {
             e.preventDefault();
 
-            // We checken alle mogelijke namen voor de coördinaten (x/y of col/row)
-            const x = cell.getAttribute('data-col') || cell.getAttribute('data-x');
-            const y = cell.getAttribute('data-row') || cell.getAttribute('data-y');
+            const targetX = cell.getAttribute('data-col') || cell.getAttribute('data-x');
+            const targetY = cell.getAttribute('data-row') || cell.getAttribute('data-y');
 
-            if (!x || !y) {
-                console.error("Fout: Dit grid-vakje heeft geen coördinaten!", cell);
+            if (!targetX || !targetY || !draggedData.id) {
+                console.warn("Drop mislukt: missende data", {targetX, targetY, id: draggedData.id});
                 return;
             }
 
-            // Directe visuele feedback met het plaatje
+            // STAP A: Als we verplaatsen (sourceX is gevuld), maak de oude cel leeg
+            if (draggedData.sourceX !== null && draggedData.sourceY !== null) {
+                const sourceCell = document.querySelector(
+                    `.grid-item[data-col="${draggedData.sourceX}"][data-row="${draggedData.sourceY}"], 
+                     .grid-cell[data-col="${draggedData.sourceX}"][data-row="${draggedData.sourceY}"],
+                     .grid-item[data-x="${draggedData.sourceX}"][data-y="${draggedData.sourceY}"],
+                     .grid-cell[data-x="${draggedData.sourceX}"][data-y="${draggedData.sourceY}"]`
+                );
+                if (sourceCell) {
+                    sourceCell.innerHTML = '';
+                    sourceCell.removeAttribute('draggable');
+                    sourceCell.removeAttribute('data-function-id');
+                }
+            }
+
+            // STAP B: Vul de nieuwe cel
             cell.innerHTML = `<img src="${draggedData.image}" style="width: 100%; height: 100%; object-fit: cover;">`;
             cell.style.backgroundColor = "transparent";
+            cell.setAttribute('data-function-id', draggedData.id);
+            enableGridDrag(cell); // Maak deze cel nu ook sleepbaar
 
-            // Opslaan in de database (Autosave)
+            // STAP C: Database Update (Autosave)
             try {
                 const response = await fetch('/save-cell', {
                     method: 'POST',
@@ -158,20 +196,26 @@
                         'Content-Type': 'application/json',
                         'X-CSRF-TOKEN': '{{ csrf_token() }}'
                     },
-                    body: JSON.stringify({ x: x, y: y, city_function_id: draggedData.id })
+                    body: JSON.stringify({
+                        x: targetX,
+                        y: targetY,
+                        city_function_id: draggedData.id,
+                        oldX: draggedData.sourceX,
+                        oldY: draggedData.sourceY
+                    })
                 });
-                if (response.ok) console.log("Opgeslagen!");
+                
+                const result = await response.json();
+                console.log("Server response:", result);
             } catch (error) {
-                console.error("Opslaan mislukt:", error);
+                console.error("Autosave error:", error);
             }
         });
     });
 
-    // 3. Inladen bij refresh (De 'savedCells' maar één keer declareren!)
+    // 4. Inladen bij start
     const savedCells = @json($savedCells);
-    
     savedCells.forEach(cell => {
-        // Zoek het vakje op alle mogelijke manieren (flexibel voor verschillende controllers)
         const gridItem = document.querySelector(
             `.grid-item[data-col="${cell.x}"][data-row="${cell.y}"], 
              .grid-cell[data-col="${cell.x}"][data-row="${cell.y}"],
@@ -182,25 +226,11 @@
         if (gridItem && cell.city_function) {
             gridItem.innerHTML = `<img src="/${cell.city_function.image}" style="width: 100%; height: 100%; object-fit: cover;">`;
             gridItem.style.backgroundColor = "transparent";
+            gridItem.setAttribute('data-function-id', cell.city_function_id);
+            enableGridDrag(gridItem); // Zorg dat opgeslagen items ook gesleept kunnen worden
         }
     });
 </script>
-    <script>
-        // Haal de opgeslagen cellen uit Laravel en geef ze aan JavaScript
-        const savedCells = @json($savedCells);
 
-        // Loop door elke opgeslagen cel heen
-        savedCells.forEach(cell => {
-            // Zoek het juiste vakje op basis van X en Y
-            const gridItem = document.querySelector(`.grid-item[data-x="${cell.x}"][data-y="${cell.y}"]`);
-            
-            if (gridItem && cell.city_function) {
-                gridItem.innerText = cell.destination.name;
-                gridItem.style.backgroundColor = cell.destination.color;
-                gridItem.style.color = "white";
-                gridItem.style.fontWeight = "bold";
-            }
-        });
-    </script>
 </body>
 </html>
