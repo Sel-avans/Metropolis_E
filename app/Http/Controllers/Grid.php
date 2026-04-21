@@ -9,10 +9,10 @@ use App\Http\Controllers\TileMark;
 
 class Grid{
 
-    private $width = 0;
-    private $height = 0;
-    private $totalCells = 0;
-    private const MAX_SIZE = 9;
+    public $width = 0;
+    public $height = 0;
+    public $totalCells = 0;
+    public const MAX_SIZE = 9;
     private $grid = [[]];
 
 
@@ -43,8 +43,9 @@ class Grid{
         return $this->height;
     }
 
-    public function paintGrid(){
+    public function paintGrid($name = "Default grid"){
         echo "<div class='container'>";
+        echo "<h3 class='grid-header'>$name</h3>";
         echo "<div class='grid' style='grid-template-columns: repeat({$this->width}, minmax(60px, 1fr)); grid-template-rows: repeat({$this->height}, minmax(60px, 1fr));'>";
 
         for($x = 0; $x < $this->width; $x++){

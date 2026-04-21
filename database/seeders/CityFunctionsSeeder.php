@@ -11,7 +11,7 @@ class CityFunctionsSeeder extends Seeder
     {
         $functions = [
             ['name' => 'Woningen', 'category' => 'wonen', 'image' => 'images/house.png'],
-            ['name' => 'Park / Groen', 'category' => 'natuur', 'image' => 'images/park.png'],
+            ['name' => 'Park', 'category' => 'natuur', 'image' => 'images/park.png'],
             ['name' => 'School', 'category' => 'onderwijs', 'image' => 'images/school.png'],
             ['name' => 'Supermarkt', 'category' => 'voorziening', 'image' => 'images/supermarkt.png'],
             ['name' => 'Ziekenhuis', 'category' => 'zorg', 'image' => 'images/ziekenhuis.png'],

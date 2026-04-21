@@ -6,14 +6,6 @@ use Illuminate\Database\Eloquent\Model;
 
 class CityFunction extends Model
 {
-    protected $fillable = [
-        'name',
-        'image',
-        'category_id'
-    ];
-
-    public function category()
-    {
-        return $this->belongsTo(Category::class);
-    }
+    
+    protected $fillable = ['name', 'category', 'image'];
 }

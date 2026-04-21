@@ -24,46 +24,56 @@
             max-width: 1200px;
         }
 
-        /* De Bibliotheek aan de linkerkant */
-        .library { 
+        /* The Library container */
+        .library-panel { 
             background-color: #f4f4f4; 
             padding: 20px; 
             border-radius: 10px; 
-            width: 200px; 
+            width: 250px; /* Slightly wider for the scrollbar */
             box-shadow: 0 4px 8px rgba(0,0,0,0.2);
+            position: sticky;
+            top: 40px;
         }
 
-        .draggable-item { 
-            padding: 15px; 
+        /* The scrollable box for functions */
+        .library-grid {
+            max-height: 60vh; /* Limits height to 60% of viewport */
+            overflow-y: auto;  /* Adds scrollbar when content exceeds height */
+            padding-right: 10px;
+            display: flex;
+            flex-direction: column;
+        }
+
+        .library-item { 
+            background-color: white; 
+            border: 1px solid #ccc; 
+            padding: 10px; 
             margin-bottom: 10px; 
-            color: white; 
-            font-weight: bold;
+            cursor: grab; 
             text-align: center; 
-            border-radius: 5px; 
-            cursor: grab;
-            border: 1px solid rgba(0,0,0,0.1);
+            border-radius: 5px;
+            transition: opacity 0.2s;
         }
 
-        /* Het Grid gedeelte */
+        /* Grid specific styles */
         main {
             flex-grow: 1;
             display: flex;
             flex-direction: column;
             align-items: center;
-            width: 100%; /* Zorgt dat de grid ruimte krijgt */
+            width: 100%; 
         }
 
         h1 { color: black; margin-bottom: 20px; }
 
-        /* Het flexibele grid */
         .grid { 
             display: grid; 
             width: 100%; 
             max-width: 75vh; 
-            aspect-ratio: 1 / 1; /* Houdt het complete grid altijd in de vorm van een perfect vierkant */
+            aspect-ratio: 1 / 1; 
             background-color: #eeeeee; 
             border: 2px solid black;
-            margin: 0 auto; /* Zet het grid netjes in het midden */
+            margin: 0 auto; 
         }
         
         .grid-item { 
@@ -75,46 +85,41 @@
             width: 100%;
             height: 100%; 
             cursor: pointer;
+            overflow: hidden;
         }
 
-        .grid-item.selected {
-            border: 2px solid #000;      
-            background-color: #f0f8ff;    
+        .grid-item img {
+            width: 100%;
+            height: 100%;
+            object-fit: cover;
+            display: block;
         }
-
-        .grid-item:focus {
-            outline: 3px solid #000;
-        }
-
     </style>
 </head>
 <body>
     <div class="page-layout">
-        
-<aside class="library-panel">
-    <h2 style="color: #333; margin-top: 0;">Functies</h2>
-    
-    <div class="library-grid">
-        @foreach($functions as $function)
-            <div class="library-item" 
-                 draggable="true" 
-                 data-id="{{ $function->id }}" 
-                 data-name="{{ $function->name }}" 
-                 data-image="{{ asset($function->image) }}"
-                 style="background-color: white; border: 1px solid #ccc; padding: 10px; margin-bottom: 10px; cursor: grab; text-align: center; border-radius: 5px;">
-                
-                <img src="{{ asset($function->image) }}" alt="{{ $function->name }}" style="width: 50px; height: 50px; object-fit: contain; pointer-events: none;">
-                
-                <p style="margin: 5px 0 0 0; font-weight: bold; color: #333;">{{ $function->name }}</p>
+        <aside class="library-panel">
+            <h2 style="color: #333; margin-top: 0;">Functies</h2>
+            <div class="library-grid">
+                @foreach($functions as $function)
+                    <div class="library-item" 
+                         draggable="true" 
+                         data-id="{{ $function->id }}" 
+                         data-name="{{ $function->name }}" 
+                         data-image="{{ asset($function->image) }}">
+                        
+                        <img src="{{ asset($function->image) }}" alt="{{ $function->name }}" style="width: 50px; height: 50px; object-fit: contain; pointer-events: none;">
+                        <p style="margin: 5px 0 0 0; font-weight: bold; color: #333;">{{ $function->name }}</p>
+                    </div>
+                @endforeach
             </div>
-        @endforeach
-    </div>
-</aside>
+        </aside>
+
         <main>
             <h1>City Planner Grid</h1>
             <div id="grid-container" style="width: 100%; max-width: 800px;">
                 <?php
-                    // Hier roepen we de controller aan die het grid tekent
+                    // Calling the controller that paints the grid
                     $grid = new \App\Http\Controllers\Grid(12);
                     $grid->paintGrid();
                 ?>
@@ -123,9 +128,7 @@
     </div>
 
 <script>
-    const draggables = document.querySelectorAll('.library-item');
-    const cells = document.querySelectorAll('.grid-item, .grid-cell');
-
+    // Global state for the dragged element
     let draggedData = { 
         id: null, 
         image: null,
@@ -133,7 +136,10 @@
         sourceY: null 
     };
 
-    // 1. Slepen vanuit de Library (Nieuwe items)
+    const draggables = document.querySelectorAll('.library-item');
+    const cells = document.querySelectorAll('.grid-item, .grid-cell');
+
+    // 1. Logic for dragging from the Library
     draggables.forEach(item => {
         item.addEventListener('dragstart', () => {
             draggedData.id = item.getAttribute('data-id');
@@ -145,7 +151,7 @@
         item.addEventListener('dragend', () => item.style.opacity = '1');
     });
 
-    // 2. Functie om een grid-vakje sleepbaar te maken
+    // 2. Logic to make grid cells draggable (for moving items)
     function enableGridDrag(cell) {
         cell.setAttribute('draggable', 'true');
         cell.addEventListener('dragstart', (e) => {
@@ -159,10 +165,12 @@
             
             cell.style.opacity = '0.5';
         });
-        cell.addEventListener('dragend', () => cell.style.opacity = '1');
+        cell.addEventListener('dragend', () => {
+            cell.style.opacity = '1';
+        });
     }
 
-    // 3. Drop logica (Verplaatsen of Plakken)
+    // 3. Drop logic (Moving or Placing)
     cells.forEach(cell => {
         cell.addEventListener('dragover', e => e.preventDefault()); 
 
@@ -172,12 +180,9 @@
             const targetX = cell.getAttribute('data-col') || cell.getAttribute('data-x');
             const targetY = cell.getAttribute('data-row') || cell.getAttribute('data-y');
 
-            if (!targetX || !targetY || !draggedData.id) {
-                console.warn("Drop mislukt: missende data", {targetX, targetY, id: draggedData.id});
-                return;
-            }
+            if (!targetX || !targetY || !draggedData.id) return;
 
-            // STAP A: Als we verplaatsen (sourceX is gevuld), maak de oude cel leeg
+            // Remove item from old location if moving within grid
             if (draggedData.sourceX !== null && draggedData.sourceY !== null) {
                 const sourceCell = document.querySelector(
                     `.grid-item[data-col="${draggedData.sourceX}"][data-row="${draggedData.sourceY}"], 
@@ -189,18 +194,20 @@
                     sourceCell.innerHTML = '';
                     sourceCell.removeAttribute('draggable');
                     sourceCell.removeAttribute('data-function-id');
+                    sourceCell.style.backgroundColor = "#eeeeee"; // Reset to grid grey
                 }
             }
 
-            // STAP B: Vul de nieuwe cel
-            cell.innerHTML = `<img src="${draggedData.image}" style="width: 100%; height: 100%; object-fit: cover;">`;
-            cell.style.backgroundColor = "transparent";
+            // Place item in new cell
+            cell.innerHTML = `<img src="${draggedData.image}" style="opacity: 1;">`;
+            cell.style.backgroundColor = "#eeeeee"; // Ensure background stays grey
+            cell.style.opacity = '1';
             cell.setAttribute('data-function-id', draggedData.id);
-            enableGridDrag(cell); // Maak deze cel nu ook sleepbaar
+            enableGridDrag(cell); 
 
-            // STAP C: Database Update (Autosave)
+            // Trigger Autosave
             try {
-                const response = await fetch('/save-cell', {
+                await fetch('/save-cell', {
                     method: 'POST',
                     headers: {
                         'Content-Type': 'application/json',
@@ -214,16 +221,13 @@
                         oldY: draggedData.sourceY
                     })
                 });
-                
-                const result = await response.json();
-                console.log("Server response:", result);
             } catch (error) {
-                console.error("Autosave error:", error);
+                console.error("Autosave failed:", error);
             }
         });
     });
 
-    // 4. Inladen bij start
+    // 4. Load saved cells on page refresh
     const savedCells = @json($savedCells);
     savedCells.forEach(cell => {
         const gridItem = document.querySelector(
@@ -234,32 +238,11 @@
         );
         
         if (gridItem && cell.city_function) {
-            gridItem.innerHTML = `<img src="/${cell.city_function.image}" style="width: 100%; height: 100%; object-fit: cover;">`;
-            gridItem.style.backgroundColor = "transparent";
+            gridItem.innerHTML = `<img src="/${cell.city_function.image}" style="opacity: 1;">`;
             gridItem.setAttribute('data-function-id', cell.city_function_id);
-            enableGridDrag(gridItem); // Zorg dat opgeslagen items ook gesleept kunnen worden
+            enableGridDrag(gridItem); 
         }
     });
-
-    document.addEventListener('DOMContentLoaded', () => {
-        const cells = document.querySelectorAll('.grid-item');
-
-        cells.forEach(cell => {
-            cell.setAttribute('tabindex', '0'); 
-
-            cell.addEventListener('click', () => {
-                cells.forEach(c => c.classList.remove('selected'));
-                cell.classList.add('selected');
-            });
-
-            cell.addEventListener('keydown', (e) => {
-                if (e.key === 'Enter' || e.key === ' ') {
-                    cells.forEach(c => c.classList.remove('selected'));
-                    cell.classList.add('selected');
-                }
-            });
-        });
-    });    
 </script>
 
 </body>
