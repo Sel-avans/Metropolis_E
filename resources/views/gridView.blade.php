@@ -10,12 +10,18 @@
             <h2>{{ ucfirst($category) }}</h2>
             <ul>
                 @foreach($items as $function)
-                    <li class="library-item">
-                        <img src="{{ asset('icons/' . $function['image']) }}" 
-                             alt="{{ $function['name'] }}" 
-                             class="library-icon">
+                    <li class="library-item"
+                        draggable="true"
+                        data-function="{{ $function['name'] }}"
+                        data-image="/icons/{{ $function['image'] }}">
+                        
+                        <img src="/icons/{{ $function['image'] }}" 
+                            alt="{{ $function['name'] }}" 
+                            class="library-icon">
+
                         <span class="library-name">{{ $function['name'] }}</span>
-                    </li>
+                </li>
+
                 @endforeach
             </ul>
         @empty
@@ -35,32 +41,11 @@
                             data-row="{{ $row }}" 
                             data-col="{{ $col }}">
                         </div>
+
                     @endfor
                 </div>
             @endfor
         </div>
     </div>
 </div>
-<script>
-document.addEventListener('DOMContentLoaded', () => {
-    const cells = document.querySelectorAll('.grid-cell');
-
-    cells.forEach(cell => {
-        cell.setAttribute('tabindex', '0'); 
-
-        cell.addEventListener('click', () => {
-            cells.forEach(c => c.classList.remove('selected'));
-            cell.classList.add('selected');
-        });
-
-        cell.addEventListener('keydown', (e) => {
-            if (e.key === 'Enter' || e.key === ' ') {
-                cells.forEach(c => c.classList.remove('selected'));
-                cell.classList.add('selected');
-            }
-        });
-    });
-});
-
-</script>
 @endsection

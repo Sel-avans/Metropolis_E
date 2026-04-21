@@ -11,28 +11,24 @@ a:hover, button:hover {
     color: #003d80;
 }
 
-.library-icon {
-    width: 48px;  
-    height: 48px;
-}
-.page-wrapper {
-    display: flex;
-    gap: 40px;       
-    align-items: flex-start;
-}
-
 .library-section {
-    flex: 1;         
+    flex: 1;  
+    overflow-y: auto;
+    padding-right: 10px;       
 }
 
 .grid-section {
-    flex: 1;         
+    flex: 1;  
+    position: sticky;
+    top: 0;
+    align-self: flex-start;       
 }
 
 .grid-wrapper {
     display: flex;
     flex-direction: column;
-    gap: 10px;
+    gap: 20px;
+    align-items: flex-start;
     margin-top: 20px;
 }
 
@@ -41,12 +37,44 @@ a:hover, button:hover {
     gap: 10px;
 }
 
+
+.page-wrapper {
+    display: flex;
+    gap: 40px;
+    align-items: flex-start;
+}
+
+.grid-cell.selected {
+    outline: 3px solid #000;
+    outline-offset: -3px;
+    background-color: #f0f8ff;
+}
+
+.grid-cell:focus {
+    outline: 3px solid #000;
+    outline-offset: -3px;
+}
 .grid-cell {
     width: 80px;
     height: 80px;
-    border: 1px solid #333;
-    background-color: #f0f0f0;
+    border: 1px solid #ccc;
+    cursor: pointer;
+    position: relative;
+    outline: none;
+    display: flex;
+    align-items: center;  
+    justify-content: center; 
 }
+.grid-function-icon {
+    width: 64px;
+    height: 64px;
+    object-fit: contain;
+    pointer-events: none;
+    display: block;
+    margin: 0 auto;
+}
+
+
 .library-item {
     display: flex;
     align-items: center;
@@ -58,29 +86,3 @@ a:hover, button:hover {
     width: 32px;
     height: 32px;
 }
-.page-wrapper {
-    display: flex;
-    gap: 40px;
-    align-items: flex-start;
-}
-
-/* Grid cell basis */
-.grid-cell {
-    width: 80px;
-    height: 80px;
-    border: 1px solid #ccc;
-    cursor: pointer;
-    font-size: 16px; 
-}
-
-.grid-cell.selected {
-    border: 2px solid #000;      
-    background-color: #f0f8ff;    
-}
-
-.grid-cell:focus {
-    outline: 3px solid #000;
-}
-
-
-
