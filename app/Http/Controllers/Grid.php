@@ -43,9 +43,8 @@ class Grid{
         return $this->height;
     }
 
-    public function paintGrid($name = "Default grid"){
+    public function paintGrid(){
         echo "<div class='container'>";
-        echo "<h3 class='grid-header'>$name</h3>";
         echo "<div class='grid' style='grid-template-columns: repeat({$this->width}, minmax(60px, 1fr)); grid-template-rows: repeat({$this->height}, minmax(60px, 1fr));'>";
 
         for($x = 0; $x < $this->width; $x++){

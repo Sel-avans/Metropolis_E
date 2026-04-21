@@ -85,14 +85,15 @@
             width: 100%;
             height: 100%; 
             cursor: pointer;
-            overflow: hidden;
         }
 
-        .grid-item img {
-            width: 100%;
-            height: 100%;
-            object-fit: cover;
-            display: block;
+        .grid-item.selected {
+            border: 2px solid #000;      
+            background-color: #f0f8ff;    
+        }
+
+        .grid-item:focus {
+            outline: 3px solid #000;
         }
     </style>
 </head>
@@ -242,6 +243,26 @@
             gridItem.setAttribute('data-function-id', cell.city_function_id);
             enableGridDrag(gridItem); 
         }
+    });
+
+    document.addEventListener('DOMContentLoaded', () => {
+        const cells = document.querySelectorAll('.grid-item');
+
+        cells.forEach(cell => {
+            cell.setAttribute('tabindex', '0'); 
+
+            cell.addEventListener('click', () => {
+                cells.forEach(c => c.classList.remove('selected'));
+                cell.classList.add('selected');
+            });
+
+            cell.addEventListener('keydown', (e) => {
+                if (e.key === 'Enter' || e.key === ' ') {
+                    cells.forEach(c => c.classList.remove('selected'));
+                    cell.classList.add('selected');
+                }
+            });
+        });
     });
 </script>
 
