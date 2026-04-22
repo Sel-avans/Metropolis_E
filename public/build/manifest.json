@@ -8,10 +8,25 @@
     "src": "resources/css/app.css",
     "isEntry": true
   },
+  "resources/css/grid.css": {
+    "file": "assets/grid-D0V0td1a.css",
+    "name": "grid",
+    "names": [
+      "grid.css"
+    ],
+    "src": "resources/css/grid.css",
+    "isEntry": true
+  },
   "resources/js/app.js": {
-    "file": "assets/app-Clp7t88n.js",
+    "file": "assets/app-BLa98ks6.js",
     "name": "app",
     "src": "resources/js/app.js",
+    "isEntry": true
+  },
+  "resources/js/grid.js": {
+    "file": "assets/grid-CX6fWpO9.js",
+    "name": "grid",
+    "src": "resources/js/grid.js",
     "isEntry": true
   }
 }
