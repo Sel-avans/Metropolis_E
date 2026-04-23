@@ -1,10 +1,10 @@
 @extends('layouts.app')
 
 @section('content')
-<div class="flex min-h-screen">
+<div class="flex gap-4 min-h-screen">
 
     {{-- Linkerzijde: Function Library --}}
-    <div class="w-1/3 p-6 bg-gray-100">
+    <div class="w-1/3 p-6 bg-gray-100 max-h-800  overflow-scroll">
         <h1 class="text-2xl font-bold mb-4">Function Library</h1>
 
         @forelse($functions as $category => $items)
@@ -41,9 +41,9 @@
     <div class="w-2/3 p-6">
         <h1 class="text-2xl font-bold mb-4">City Grid (3x4)</h1>
 
-        <div class="grid grid-rows-3 gap-4">
+        <div class="gap-1">
             @for($row = 1; $row <= 3; $row++)
-                <div class="grid grid-cols-4 gap-4">
+                <div class="gap-1 flex">
                     @for($col = 1; $col <= 4; $col++)
                         <div 
                             class="grid-cell border-2 border-dashed border-gray-300 h-24 flex items-center justify-center hover:bg-gray-100 transition"
