@@ -1,51 +1,61 @@
 @extends('layouts.app')
 
 @section('content')
-<div class="page-wrapper">
+<div class="flex gap-4 min-h-screen">
+
     {{-- Linkerzijde: Function Library --}}
-    <div class="library-section">
-        <h1>Function Library</h1>
+    <div class="w-1/3 p-6 bg-gray-100 max-h-800  overflow-scroll">
+        <h1 class="text-2xl font-bold mb-4">Function Library</h1>
 
         @forelse($functions as $category => $items)
-            <h2>{{ ucfirst($category) }}</h2>
-            <ul>
+            <h2 class="text-xl font-semibold mt-4 mb-2">
+                {{ ucfirst($category) }}
+            </h2>
+
+            <ul class="space-y-2">
                 @foreach($items as $function)
-                    <li class="library-item"
+                    <li 
+                        class="library-item flex items-center gap-3 p-2 bg-white rounded shadow cursor-grab"
                         draggable="true"
                         data-function="{{ $function['name'] }}"
-                        data-image="/icons/{{ $function['image'] }}">
-                        
-                        <img src="/icons/{{ $function['image'] }}" 
+                        data-image="/icons/{{ $function['image'] }}"
+                    >
+                        <img 
+                            src="/icons/{{ $function['image'] }}" 
                             alt="{{ $function['name'] }}" 
-                            class="library-icon">
+                            class="w-8 h-8"
+                        >
 
-                        <span class="library-name">{{ $function['name'] }}</span>
-                </li>
-
+                        <span class="font-medium">
+                            {{ $function['name'] }}
+                        </span>
+                    </li>
                 @endforeach
             </ul>
         @empty
-            <p>No functions available.</p>
+            <p class="text-gray-500">No functions available.</p>
         @endforelse
     </div>
 
     {{-- Rechterzijde: City Grid --}}
-    <div class="grid-section">
-        <h1>City Grid (3x4)</h1>
+    <div class="w-2/3 p-6">
+        <h1 class="text-2xl font-bold mb-4">City Grid (3x4)</h1>
 
-        <div class="grid-wrapper">
+        <div class="gap-1">
             @for($row = 1; $row <= 3; $row++)
-                <div class="grid-row">
+                <div class="gap-1 flex">
                     @for($col = 1; $col <= 4; $col++)
-                        <div class="grid-cell" 
+                        <div 
+                            class="grid-cell border-2 border-dashed border-gray-300 h-24 flex items-center justify-center hover:bg-gray-100 transition"
                             data-row="{{ $row }}" 
-                            data-col="{{ $col }}">
+                            data-col="{{ $col }}"
+                        >
                         </div>
-
                     @endfor
                 </div>
             @endfor
         </div>
     </div>
+
 </div>
 @endsection
