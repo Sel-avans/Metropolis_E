@@ -7,7 +7,6 @@
     <aside class="w-1/3 bg-gray-100 p-6 overflow-y-auto">
         <h1 class="text-2xl font-bold mb-4">Function Library</h1>
 
-        {{-- Zoekveld (als je die gebruikt) --}}
         <input 
             id="searchInput"
             type="text"
@@ -27,7 +26,6 @@
                             class="library-item p-3 bg-white rounded shadow cursor-pointer flex flex-col items-center text-center hover:bg-gray-100 transition"
                             tabindex="0"
                             role="button"
-                            aria-label="{{ $function->name }}"
                         >
                             <img 
                                 src="{{ asset($function->image) }}" 
@@ -59,7 +57,6 @@
                             class="grid-cell border-2 border-dashed border-gray-300 h-24 flex items-center justify-center hover:bg-gray-100 transition"
                             data-row="{{ $row }}" 
                             data-col="{{ $col }}"
-                            tabindex="0"
                         ></div>
                     @endfor
                 </div>

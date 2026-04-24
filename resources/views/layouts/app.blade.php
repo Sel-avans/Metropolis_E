@@ -5,6 +5,9 @@
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>Metropolis</title>
     @vite(['resources/css/grid.css', 'resources/css/app.css', 'resources/js/app.js', 'resources/js/grid.js'])
+    <meta name="csrf-token" content="{{ csrf_token() }}">
+    @vite(['resources/js/grid.js'])
+
 </head>
 <body>
     <div class="container">

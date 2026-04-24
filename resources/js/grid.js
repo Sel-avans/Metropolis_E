@@ -1,81 +1,84 @@
 document.addEventListener("DOMContentLoaded", () => {
+
     const cells = document.querySelectorAll(".grid-cell");
     const items = document.querySelectorAll(".library-item");
 
     let draggedItem = null;
     let isDragging = false;
+    let sourceCell = null;
 
-    function createDragImage(src) {
-        const canvas = document.createElement("canvas");
-        canvas.width = 64;
-        canvas.height = 64;
+    async function saveCell(row, col, functionName) {
+        try {
+            await fetch('/grid/update', {
+                method: 'POST',
+                headers: {
+                    'Content-Type': 'application/json',
+                    'X-CSRF-TOKEN': document.querySelector('meta[name="csrf-token"]').content
+                },
+                body: JSON.stringify({
+                    row: row,
+                    col: col,
+                    function: functionName
+                })
+            });
 
-        const ctx = canvas.getContext("2d");
-        const img = new Image();
-        img.src = src;
-
-        return new Promise(resolve => {
-            img.onload = () => {
-                ctx.drawImage(img, 0, 0, 64, 64);
-                resolve(canvas);
-            };
-        });
+            updateQoL();
+        } catch (err) {
+            console.error("Fout bij opslaan gridcel:", err);
+        }
     }
 
-    items.forEach(item => {
-        item.addEventListener("dragstart", async e => {
-            isDragging = true;
 
-            if (document.activeElement && document.activeElement.classList.contains('grid-cell')) {
-                document.activeElement.blur();
-            }
+    async function updateQoL() {
+        try {
+            const response = await fetch('/qol/details');
+            const data = await response.json();
+
+            document.getElementById('qol-score-value').textContent = data.total_score;
+        } catch (err) {
+            console.error("Fout bij ophalen QoL:", err);
+        }
+    }
+
+
+    items.forEach(item => {
+        item.addEventListener("dragstart", e => {
+            isDragging = true;
 
             draggedItem = {
                 name: item.dataset.function,
                 image: item.dataset.image
             };
 
-            cells.forEach(c => c.classList.remove("selected"));
-
-            const dragImg = await createDragImage(draggedItem.image);
-            e.dataTransfer.setDragImage(dragImg, 32, 32);
-
-            e.dataTransfer.effectAllowed = "copy";
+            e.dataTransfer.setDragImage(item.querySelector("img"), 16, 16);
         });
     });
 
+
+
     cells.forEach(cell => {
-        cell.addEventListener("dragstart", async e => {
+        cell.addEventListener("dragstart", e => {
             const img = cell.querySelector(".grid-function-icon");
             if (!img) return;
 
             isDragging = true;
-
-            cell.blur();
 
             draggedItem = {
                 name: img.alt,
                 image: img.src
             };
 
-            cells.forEach(c => c.classList.remove("selected"));
+            e.dataTransfer.setDragImage(img, 16, 16);
 
-            const dragImg = await createDragImage(draggedItem.image);
-            e.dataTransfer.setDragImage(dragImg, 32, 32);
-
-            cell.innerHTML = "";
-            cell.removeAttribute("draggable");
+            sourceCell = cell;
+            cell.classList.add("drag-source");
         });
     });
+
 
     cells.forEach(cell => {
         cell.addEventListener("dragover", e => {
             e.preventDefault();
-
-            if (isDragging) {
-                cells.forEach(c => c.classList.remove("selected"));
-            }
-
             cell.classList.add("drag-over");
         });
 
@@ -83,22 +86,35 @@ document.addEventListener("DOMContentLoaded", () => {
             cell.classList.remove("drag-over");
         });
 
-        cell.addEventListener("drop", e => {
+        cell.addEventListener("drop", async e => {
             e.preventDefault();
             isDragging = false;
 
             cell.classList.remove("drag-over");
 
-            cell.innerHTML = "";
+            if (sourceCell) {
+                const oldRow = sourceCell.dataset.row;
+                const oldCol = sourceCell.dataset.col;
 
+                await saveCell(oldRow, oldCol, null);
+
+                sourceCell.innerHTML = "";
+                sourceCell.removeAttribute("draggable");
+                sourceCell.classList.remove("drag-source");
+
+                sourceCell = null;
+            }
+
+
+            cell.innerHTML = "";
             const img = document.createElement("img");
             img.src = draggedItem.image;
             img.alt = draggedItem.name;
-            img.classList.add("grid-function-icon");
-
+            img.classList.add("w-12", "h-12", "object-contain");
             cell.appendChild(img);
-
             cell.setAttribute("draggable", "true");
+
+            await saveCell(cell.dataset.row, cell.dataset.col, draggedItem.name);
         });
     });
 
@@ -108,18 +124,71 @@ document.addEventListener("DOMContentLoaded", () => {
 
         cell.addEventListener("click", () => {
             if (isDragging) return;
-
             cells.forEach(c => c.classList.remove("selected"));
             cell.classList.add("selected");
         });
 
         cell.addEventListener("keydown", e => {
             if (isDragging) return;
-
             if (e.key === "Enter" || e.key === " ") {
                 cells.forEach(c => c.classList.remove("selected"));
                 cell.classList.add("selected");
             }
         });
     });
+
+    updateQoL();
+
+});
+
+window.openQolModal = function() {
+    fetch('/qol/details')
+        .then(res => res.json())
+        .then(data => {
+
+            let html = '';
+
+            for (const [category, info] of Object.entries(data.categories)) {
+                html += `
+                    <h3 class="font-semibold mt-3">
+                        ${category} (totaal: ${info.total})
+                    </h3>
+                `;
+
+                info.items.forEach(item => {
+                    html += `
+                        <div class="flex justify-between">
+                            <span>${item.function}</span>
+                            <span class="${item.value < 0 ? 'text-red-600' : 'text-green-600'}">
+                                ${item.value}
+                            </span>
+                        </div>
+                    `;
+                });
+            }
+
+            html += `
+                <h3 class="font-bold mt-4">
+                    Totale QoL: ${data.total_score}
+                </h3>
+            `;
+
+            document.getElementById('qol-details-content').innerHTML = html;
+
+            document.getElementById('qol-details-modal').classList.remove('hidden');
+        })
+        .catch(err => console.error("Fout bij QoL details:", err));
+}
+
+window.closeQolModal = function() {
+    document.getElementById('qol-details-modal').classList.add('hidden');
+}
+
+document.addEventListener("DOMContentLoaded", () => {
+    const closeBtn = document.getElementById('qol-close');
+    if (closeBtn) {
+        closeBtn.addEventListener('click', () => {
+            closeQolModal();
+        });
+    }
 });
