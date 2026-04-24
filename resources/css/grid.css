@@ -1,6 +1,6 @@
 /* geselecteerde cell */
 .grid-cell.selected {
-    outline: 3px solid #000;
+    outline: 3px solid #b34848;
     outline-offset: -3px;
     background-color: #f0f8ff;
 }
@@ -12,8 +12,9 @@
 
 /* icon in grid */
 .grid-function-icon {
-    width: 64px;
-    height: 64px;
     object-fit: contain;
     pointer-events: none;
+    display: flex;
+    align-items: center;
+    justify-content: center;
 }
