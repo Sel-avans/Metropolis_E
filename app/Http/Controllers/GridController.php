@@ -8,49 +8,60 @@ use App\Models\GridCell;
 
 class GridController extends Controller
 {
-public function index()
-{
-    $items = CityFunction::all();
-    $functions = $items->groupBy('category');
+    public function index()
+    {
+        $grid = GridCell::with('function')->get();
+        $items = CityFunction::all();
+        $functions = $items->groupBy('category');
 
-    $grid = GridCell::with('function')->get();
-
-    return view('gridView', [
-        'functions' => $functions,
-        'grid' => $grid
-    ]);
-}
-
-
-public function update(Request $request)
-{
-    $row = $request->input('row');
-    $col = $request->input('col');
-    $name = $request->input('function');
-
-    if (!$row || !$col) {
-        return response()->json(['error' => 'Missing row/col'], 400);
+        return response()
+            ->view('gridView', [
+                'functions' => $functions,
+                'grid' => $grid
+            ])
+            ->header('Cache-Control', 'no-cache, no-store, must-revalidate')
+            ->header('Pragma', 'no-cache')
+            ->header('Expires', '0');
     }
 
-    if (!$name) {
-        GridCell::where('row', $row)->where('col', $col)->delete();
+    public function update(Request $request)
+    {
+        $oldRow = $request->input('old_row');
+        $oldCol = $request->input('old_col');
+        $newRow = $request->input('new_row');
+        $newCol = $request->input('new_col');
+        $functionName = $request->input('function');
+
+        if ($oldRow !== null && $oldCol !== null) {
+            GridCell::where('row', $oldRow)
+                    ->where('col', $oldCol)
+                    ->delete();
+        }
+
+        if ($functionName === null) {
+            GridCell::where('row', $newRow)
+                    ->where('col', $newCol)
+                    ->delete();
+
+            return response()->json(['success' => true]);
+        }
+
+        $function = CityFunction::where('name', $functionName)->first();
+
+        if (!$function) {
+            return response()->json(['error' => 'Function not found'], 404);
+        }
+
+        GridCell::updateOrCreate(
+            [
+                'row' => $newRow,
+                'col' => $newCol
+            ],
+            [
+                'city_function_id' => $function->id
+            ]
+        );
+
         return response()->json(['success' => true]);
     }
-
-    $function = CityFunction::where('name', $name)->first();
-
-    if (!$function) {
-        return response()->json(['error' => 'Function not found'], 404);
-    }
-
-    GridCell::where('row', $row)->where('col', $col)->delete();
-
-    GridCell::create([
-        'row' => $row,
-        'col' => $col,
-        'city_function_id' => $function->id
-    ]);
-
-    return response()->json(['success' => true]);
-}
 }

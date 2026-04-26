@@ -56,13 +56,26 @@
                 <h1 class="text-2xl font-bold mb-4 text-teal-500">City Grid (3x4)</h1>
 
                 <div class="grid grid-flow-col grid-rows-4 gap-3 w-min">
-                    @for($id = 1; $id <= 3; $id++)
+                    @for($col = 1; $col <= 3; $col++)
                         @for($row = 1; $row <= 4; $row++)
+
+                            @php
+                                $cell = $grid->first(function($c) use ($row, $col) {
+                                    return $c->row == $row && $c->col == $col;
+                                });
+                            @endphp
                             <div 
                             class="grid-cell border-2 bg-blue-950 border-gray-300 w-24 h-24 items-center justify-center hover:bg-gray-100 cursor-pointer transition"
                             data-row="{{$row}}"
-                            data-col="{{$id}}"
-                            >
+                            data-col="{{$col}}"
+                            draggable="{{ $cell ? 'true' : 'false' }}">
+
+                            @if($cell && $cell->function)
+                                <img src="{{ asset($cell->function->image) }}"
+                                    alt="{{ $cell->function->name }}"
+                                    class="grid-function-icon w-12 h-12 object-contain">
+                            @endif
+
                             </div>
                         @endfor
                     @endfor
