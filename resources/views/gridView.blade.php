@@ -73,7 +73,7 @@
                             @if($cell && $cell->function)
                                 <img src="{{ asset($cell->function->image) }}"
                                     alt="{{ $cell->function->name }}"
-                                    class="grid-function-icon w-12 h-12 object-contain">
+                                    class="grid-function-icon">
                             @endif
 
                             </div>

@@ -109,7 +109,7 @@ document.addEventListener("DOMContentLoaded", () => {
             const img = document.createElement("img");
             img.src = draggedItem.image;
             img.alt = draggedItem.name;
-            img.classList.add("grid-function-icon", "w-12", "h-12", "object-contain");
+            img.classList.add("grid-function-icon", "object-contain");
             cell.appendChild(img);
             cell.setAttribute("draggable", "true");
 
