@@ -1,13 +1,13 @@
 <x-app-layout>
     <div class="flex gap-4 max-h-screen overflow-y-auto">
 
-        {{-- QoL Detailed screen --}}
+        {{-- QoL Breakdown Screen --}}
         <div id="qol-details-modal" class="fixed inset-0 bg-black/40 flex items-center justify-center z-50 hidden">
             <div class="bg-white p-6 max-w-xl w-full max-h-[80vh] overflow-y-auto rounded-lg relative">
 
-                <button id="qol-close" class="absolute top-3 right-3 text-lg cursor-pointer">✕</button>
+                <button id="qol-close" class="text-black absolute top-3 right-3 text-lg cursor-pointer">✕</button>
 
-                <h2 class="text-xl font-bold mb-4">Quality of Life details</h2>
+                <h2 class="text-black text-xl font-bold mb-4">Quality of Life details</h2>
 
                 <div id="qol-details-content"></div>
             </div>
@@ -56,16 +56,15 @@
                 <h1 class="text-2xl font-bold mb-4 text-teal-500">City Grid (3x4)</h1>
 
                 <div class="grid grid-flow-col grid-rows-4 gap-3 w-min">
-                    @for($id = 1; $id <= 12; $id++)
-
-                                <div 
-                                    class="grid-cell border-2 bg-blue-950 border-gray-300 w-24 h-24 items-center justify-center hover:bg-gray-100 cursor-pointer transition"
-                                    data-id="{{$id}}"
-                                    data-row="{{$id}}"
-                                    data-col="{{$id}}"
-                                >
-                                </div>
-
+                    @for($id = 1; $id <= 3; $id++)
+                        @for($row = 1; $row <= 4; $row++)
+                            <div 
+                            class="grid-cell border-2 bg-blue-950 border-gray-300 w-24 h-24 items-center justify-center hover:bg-gray-100 cursor-pointer transition"
+                            data-row="{{$row}}"
+                            data-col="{{$id}}"
+                            >
+                            </div>
+                        @endfor
                     @endfor
                 </div>
             </div>

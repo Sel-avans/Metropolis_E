@@ -1,0 +1,16 @@
+document.addEventListener(`DOMContentLoaded`,()=>{let e=document.querySelectorAll(`.grid-cell`),t=document.querySelectorAll(`.library-item`),n=null,r=!1,i=null;async function a(e,t,n){try{await fetch(`/grid/update`,{method:`POST`,headers:{"Content-Type":`application/json`,"X-CSRF-TOKEN":document.querySelector(`meta[name="csrf-token"]`).content},body:JSON.stringify({row:e,col:t,function:n})}),o()}catch(e){console.error(`Fout bij opslaan gridcel:`,e)}}async function o(){try{let e=await(await fetch(`/qol/details`)).json();document.getElementById(`qol-score-value`).textContent=e.total_score}catch(e){console.error(`Fout bij ophalen QoL:`,e)}}t.forEach(e=>{e.addEventListener(`dragstart`,t=>{r=!0,n={name:e.dataset.function,image:e.dataset.image},t.dataTransfer.setDragImage(e.querySelector(`img`),16,16)})}),e.forEach(e=>{e.addEventListener(`dragstart`,t=>{let a=e.querySelector(`.grid-function-icon`);a&&(r=!0,n={name:a.alt,image:a.src},t.dataTransfer.setDragImage(a,16,16),i=e,e.classList.add(`drag-source`))})}),e.forEach(e=>{e.addEventListener(`dragover`,t=>{t.preventDefault(),e.classList.add(`drag-over`)}),e.addEventListener(`dragleave`,()=>{e.classList.remove(`drag-over`)}),e.addEventListener(`drop`,async t=>{if(t.preventDefault(),r=!1,e.classList.remove(`drag-over`),i){let e=i.dataset.row,t=i.dataset.col;await a(e,t,null),i.innerHTML=``,i.removeAttribute(`draggable`),i.classList.remove(`drag-source`),i=null}e.innerHTML=``;let o=document.createElement(`img`);o.src=n.image,o.alt=n.name,o.classList.add(`w-12`,`h-12`,`object-contain`),e.appendChild(o),e.setAttribute(`draggable`,`true`),await a(e.dataset.row,e.dataset.col,n.name)})}),e.forEach(t=>{t.setAttribute(`tabindex`,`0`),t.addEventListener(`click`,()=>{r||(e.forEach(e=>e.classList.remove(`selected`)),t.classList.add(`selected`))}),t.addEventListener(`keydown`,n=>{r||(n.key===`Enter`||n.key===` `)&&(e.forEach(e=>e.classList.remove(`selected`)),t.classList.add(`selected`))})}),o()}),window.openQolModal=function(){fetch(`/qol/details`).then(e=>e.json()).then(e=>{let t=``;for(let[n,r]of Object.entries(e.categories))t+=`
+                    <h3 class="font-semibold mt-3">
+                        ${n} (totaal: ${r.total})
+                    </h3>
+                `,r.items.forEach(e=>{t+=`
+                        <div class="flex justify-between">
+                            <span class="text-slate-950">${e.function}</span>
+                            <span class="${e.value<0?`text-red-600`:`text-green-600`}">
+                                ${e.value}
+                            </span>
+                        </div>
+                    `});t+=`
+                <h3 class="font-bold mt-4">
+                    Totale QoL: ${e.total_score}
+                </h3>
+            `,document.getElementById(`qol-details-content`).innerHTML=t,document.getElementById(`qol-details-modal`).classList.remove(`hidden`)}).catch(e=>console.error(`Fout bij QoL details:`,e))},window.closeQolModal=function(){document.getElementById(`qol-details-modal`).classList.add(`hidden`)},document.addEventListener(`DOMContentLoaded`,()=>{let e=document.getElementById(`qol-close`);e&&e.addEventListener(`click`,()=>{closeQolModal()})});

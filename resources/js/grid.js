@@ -140,7 +140,7 @@ document.addEventListener("DOMContentLoaded", () => {
     updateQoL();
 
 });
-
+// QoL breakdown modal
 window.openQolModal = function() {
     fetch('/qol/details')
         .then(res => res.json())
@@ -150,7 +150,7 @@ window.openQolModal = function() {
 
             for (const [category, info] of Object.entries(data.categories)) {
                 html += `
-                    <h3 class="font-semibold mt-3">
+                    <h3 class="text-black font-semibold mt-3">
                         ${category} (totaal: ${info.total})
                     </h3>
                 `;
@@ -158,7 +158,7 @@ window.openQolModal = function() {
                 info.items.forEach(item => {
                     html += `
                         <div class="flex justify-between">
-                            <span>${item.function}</span>
+                            <span class="text-black">${item.function}</span>
                             <span class="${item.value < 0 ? 'text-red-600' : 'text-green-600'}">
                                 ${item.value}
                             </span>
@@ -168,7 +168,7 @@ window.openQolModal = function() {
             }
 
             html += `
-                <h3 class="font-bold mt-4">
+                <h3 class="text-black font-bold mt-4">
                     Totale QoL: ${data.total_score}
                 </h3>
             `;
