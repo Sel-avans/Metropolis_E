@@ -13,7 +13,6 @@ public function run()
 {
     $data = [
 
-        // VEILIGHEID
         'Politiebureau' => [
             'veiligheid' => 5,
             'recreatie' => 1,
@@ -29,7 +28,6 @@ public function run()
             'mobiliteit' => 2
         ],
 
-        // RECREATIE
         'Park' => [
             'veiligheid' => -2,
             'recreatie' => 5,
