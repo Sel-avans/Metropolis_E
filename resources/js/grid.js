@@ -34,10 +34,48 @@ document.addEventListener("DOMContentLoaded", () => {
         try {
             const response = await fetch('/qol/details');
             const data = await response.json();
+
             document.getElementById('qol-score-value').textContent = data.total_score;
+
+            const breakdown = document.getElementById('breakdown-qol-score');
+            if (breakdown) {
+                breakdown.innerHTML = renderQoLBreakdown(data);
+            }
         } catch (err) {
             console.error("Fout bij ophalen QoL:", err);
         }
+    }
+
+    function renderQoLBreakdown(data) {
+        let html = '';
+
+        html += '<h1 class="text-teal-500">Breakdown QoL Score</h1>';
+        for (const [category, info] of Object.entries(data.categories)) {
+            html += `
+                <h3 class="font-semibold mt-3 text-teal-600">
+                    ${category} (totaal: ${info.total})
+                </h3>
+            `;
+
+            info.items.forEach(item => {
+                html += `
+                    <div class="flex justify-between text-white">
+                        <span>${item.function}</span>
+                        <span class="${item.value <= 0 ? 'text-red-600' : 'text-green-600'}">
+                            ${item.value}
+                        </span>
+                    </div>
+                `;
+            });
+        }
+
+        html += `
+            <h3 class="font-bold mt-4 text-teal-600">
+                Totale QoL: ${data.total_score}
+            </h3>
+        `;
+
+        return html;
     }
 
     items.forEach(item => {
@@ -134,56 +172,6 @@ document.addEventListener("DOMContentLoaded", () => {
             }
         });
     });
-
-    window.openQolModal = function() {
-        fetch('/qol/details')
-            .then(res => res.json())
-            .then(data => {
-
-                let html = '';
-
-                for (const [category, info] of Object.entries(data.categories)) {
-                    html += `
-                        <h3 class="font-semibold mt-3">
-                            ${category} (totaal: ${info.total})
-                        </h3>
-                    `;
-
-                    info.items.forEach(item => {
-                        html += `
-                            <div class="flex justify-between">
-                                <span>${item.function}</span>
-                                <span class="${item.value < 0 ? 'text-red-600' : 'text-green-600'}">
-                                    ${item.value}
-                                </span>
-                            </div>
-                        `;
-                    });
-                }
-
-                html += `
-                    <h3 class="font-bold mt-4">
-                        Totale QoL: ${data.total_score}
-                    </h3>
-                `;
-
-                document.getElementById('qol-details-content').innerHTML = html;
-
-                document.getElementById('qol-details-modal').classList.remove('hidden');
-            })
-            .catch(err => console.error("Fout bij QoL details:", err));
-    }
-
-    window.closeQolModal = function() {
-        document.getElementById('qol-details-modal').classList.add('hidden');
-    }
-
-    const closeBtn = document.getElementById('qol-close');
-    if (closeBtn) {
-        closeBtn.addEventListener('click', () => {
-            closeQolModal();
-        });
-    }
 
     updateQoL();
 });

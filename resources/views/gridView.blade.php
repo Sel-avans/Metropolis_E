@@ -1,20 +1,8 @@
 <x-app-layout>
-    <div class="flex gap-4 max-h-screen overflow-y-auto">
-
-        {{-- QoL Breakdown Screen --}}
-        <div id="qol-details-modal" class="fixed inset-0 bg-black/40 flex items-center justify-center z-50 hidden">
-            <div class="bg-white p-6 max-w-xl w-full max-h-[80vh] overflow-y-auto rounded-lg relative">
-
-                <button id="qol-close" class="text-black absolute top-3 right-3 text-lg cursor-pointer">✕</button>
-
-                <h2 class="text-black text-xl font-bold mb-4">Quality of Life details</h2>
-
-                <div id="qol-details-content"></div>
-            </div>
-        </div>
-
+    <div class="flex gap-4">
+        
         {{-- Linkerzijde: Function Library --}}
-        <div class="w-1/3 p-6 border-t-indigo-900 max-h-400 overflow-y-auto">
+        <div class="w-auto p-6 border-t-indigo-900 h-screen overflow-y-auto">
           
             <div>    
                 <h1 class="text-2xl text-teal-500 font-bold mb-4">Function Library</h1>
@@ -29,9 +17,9 @@
                     {{ ucfirst($category) }}
                 </h2>
 
-                <ul class="mt-2 space-y-2">
+                <ul class="mt-2 space-y-2 text-white">
                     @foreach($items as $function)
-                        <li class="library-item flex items-center gap-2 p-2 border rounded cursor-pointer"
+                        <li class="library-item flex items-center gap-2 px-4 py-2 border rounded cursor-pointer"
                             draggable="true"
                             data-function="{{ $function->name }}"
                             data-image="{{ asset($function->image) }}">
@@ -49,10 +37,10 @@
             @endforelse
         </div>
 
-        <div class="flex flex-col">
+        <div class="flex flex-col mx-auto">
 
-            {{-- Rechterzijde: City Grid --}}
-            <div class="w-2/3 p-6">
+            {{-- Midden: City Grid --}}
+            <div class="w-auto p-6">
                 <h1 class="text-2xl font-bold mb-4 text-teal-500">City Grid (3x4)</h1>
 
                 <div class="grid grid-flow-col grid-rows-4 gap-3 w-min">
@@ -65,7 +53,7 @@
                                 });
                             @endphp
                             <div 
-                            class="grid-cell border-2 bg-blue-950 border-gray-300 w-24 h-24 items-center justify-center hover:bg-gray-100 cursor-pointer transition"
+                            class="grid-cell border-2 bg-blue-950 border-gray-300 w-32 h-32 items-center justify-center hover:bg-gray-100 cursor-pointer transition"
                             data-row="{{$row}}"
                             data-col="{{$col}}"
                             draggable="{{ $cell ? 'true' : 'false' }}">
@@ -82,19 +70,19 @@
                 </div>
             </div>
 
-                                {{-- Qol Score --}}
+            {{-- QoL Score --}}
             <div class="w-auto h-min border-4 bg-indigo-800 border-teal-600 rounded-md p-6">
 
-                <span id="qol-score" onclick="openQolModal()" class="cursor-pointer text-xl font-semibold mb-2 text-teal-500">
+                <span id="qol-score" class="text-xl font-semibold mb-2 text-teal-500">
                     QoL score: <span id="qol-score-value"></span>
                 </span>
                 
-            </div>
+            </div><S></S>
 
         </div>
 
-        <div class="bg-green-950 w-2/5">
-
+        {{-- BreakDown QoL Score --}}
+        <div id="breakdown-qol-score" class="border-solid border border-white w-2/12 p-3 ml-auto">
         </div>
 
     </div>
