@@ -175,3 +175,134 @@ document.addEventListener("DOMContentLoaded", () => {
 
     updateQoL();
 });
+
+
+import { directions } from './neighbours.js';
+
+
+const HOVER_DELAY_MS = 300; 
+let hoverTimer = null;
+
+
+const popup = document.getElementById('qol-popup');
+const neighborsList = document.getElementById('popup-neighbors-list');
+const gridCells = document.querySelectorAll('.grid-cell');
+
+
+gridCells.forEach(cell => {
+    cell.addEventListener('mouseenter', (event) => {
+        const row = parseInt(cell.dataset.row);
+        const col = parseInt(cell.dataset.col);
+
+        
+        hoverTimer = setTimeout(() => {
+            handleTileHover(row, col, event);
+        }, HOVER_DELAY_MS);
+    });
+
+    cell.addEventListener('mouseleave', () => {
+        
+        clearTimeout(hoverTimer);
+        hidePopup();
+    });
+});
+
+
+function handleTileHover(row, col, event) {
+    
+    positionPopup(event.pageX, event.pageY);
+
+    
+    fetchQolData(row, col);
+}
+
+
+function positionPopup(x, y) {
+    const offset = 15; 
+    popup.style.left = `${x + offset}px`;
+    popup.style.top = `${y + offset}px`;
+}
+
+
+function fetchQolData(row, col) {
+    
+    const url = `/api/neighbors?row=${row}&col=${col}`;
+
+    fetch(url)
+        .then(response => {
+            if (!response.ok) {
+                throw new Error('Network response was not ok');
+            }
+            return response.json();
+        })
+        .then(data => {
+            
+            renderNeighborsList(data.neighbors);
+            showPopup();
+        })
+        .catch(error => {
+            console.error('Error fetching QoL data:', error);
+        });
+}
+
+
+function renderNeighborsList(neighbors) {
+    // Clear any previous list items
+    neighborsList.innerHTML = '';
+
+    
+    if (!neighbors || neighbors.length === 0) {
+        neighborsList.innerHTML = '<li class="text-slate-400">No neighbors found</li>';
+        return;
+    }
+
+    
+    neighbors.forEach(neighbor => {
+        const li = document.createElement('li');
+        li.className = 'flex justify-between items-center gap-4 py-0.5';
+
+        
+        const directionName = neighbor.direction.charAt(0).toUpperCase() + neighbor.direction.slice(1);
+        
+        // Determine the text color and sign (+/-) based on the QoL score
+        let scoreClass = 'text-slate-400'; // Neutral
+        let scoreText = `${neighbor.qol_effect}`;
+
+        if (neighbor.qol_effect > 0) {
+            scoreClass = 'text-green-400 font-semibold';
+            scoreText = `+${neighbor.qol_effect}`;
+        } else if (neighbor.qol_effect < 0) {
+            scoreClass = 'text-red-400 font-semibold';
+        }
+
+        // Fill the list item HTML
+        li.innerHTML = `
+            <span class="text-slate-300 font-medium">${directionName}: ${neighbor.function}</span>
+            <span class="${scoreClass}">${scoreText}</span>
+        `;
+
+        neighborsList.appendChild(li);
+    });
+}
+
+
+function showPopup() {
+    popup.classList.remove('hidden');
+    
+    
+    void popup.offsetWidth; 
+    
+    popup.classList.remove('opacity-0', 'scale-95');
+    popup.classList.add('opacity-100', 'scale-100');
+}
+
+
+function hidePopup() {
+    popup.classList.add('opacity-0', 'scale-95');
+    popup.classList.remove('opacity-100', 'scale-100');
+    
+    
+    setTimeout(() => {
+        popup.classList.add('hidden');
+    }, 150);
+}
