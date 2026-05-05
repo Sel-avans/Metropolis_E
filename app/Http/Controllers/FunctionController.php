@@ -2,16 +2,13 @@
 
 namespace App\Http\Controllers;
 
-use App\Models\FunctionItem;
+use App\Models\CityFunction;
 
 class FunctionController extends Controller
 {
     public function index()
     {
-        
-        $items = FunctionItem::all();
-
-      
+        $items = CityFunction::all();
         $functions = $items->groupBy('category');
 
         return view('library', [

@@ -12,9 +12,8 @@
 
 /* icon in grid */
 .grid-function-icon {
+    width: 100%;
+    height: 100%;
     object-fit: contain;
-    pointer-events: none;
-    display: flex;
-    align-items: center;
-    justify-content: center;
+    object-position: center;
 }
