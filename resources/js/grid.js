@@ -49,17 +49,17 @@ document.addEventListener("DOMContentLoaded", () => {
     function renderQoLBreakdown(data) {
         let html = '';
 
-        html += '<h1 class="text-teal-500">Breakdown QoL Score</h1>';
+        html += '<h1 class="dark:text-teal-500">Breakdown QoL Score</h1>';
         for (const [category, info] of Object.entries(data.categories)) {
             html += `
-                <h3 class="font-semibold mt-3 text-teal-600">
+                <h3 class="font-semibold mt-3 dark:text-teal-600">
                     ${category} (totaal: ${info.total})
                 </h3>
             `;
 
             info.items.forEach(item => {
                 html += `
-                    <div class="flex justify-between text-white">
+                    <div class="flex justify-between text-gray-700 dark:text-white">
                         <span>${item.function}</span>
                         <span class="${item.value <= 0 ? 'text-red-600' : 'text-green-600'}">
                             ${item.value}
@@ -70,7 +70,7 @@ document.addEventListener("DOMContentLoaded", () => {
         }
 
         html += `
-            <h3 class="font-bold mt-4 text-teal-600">
+            <h3 class="font-bold mt-4 dark:text-teal-600">
                 Totale QoL: ${data.total_score}
             </h3>
         `;

@@ -1,6 +1,6 @@
 {
   "resources/css/app.css": {
-    "file": "assets/app-Cfs4KQf6.css",
+    "file": "assets/app-DvtdG9JO.css",
     "src": "resources/css/app.css"
   },
   "resources/css/grid.css": {
@@ -20,7 +20,7 @@
     "isEntry": true
   },
   "resources/js/grid.js": {
-    "file": "assets/grid-DJHnEeh5.js",
+    "file": "assets/grid-xLmjFGs_.js",
     "name": "grid",
     "src": "resources/js/grid.js",
     "isEntry": true

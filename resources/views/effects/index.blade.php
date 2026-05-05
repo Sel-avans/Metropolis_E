@@ -1,7 +1,7 @@
 <x-app-layout>
 
 
-    <h1 class="text-2xl font-bold mb-2 text-teal-500">Effects Management</h1>
+    <h1 class="text-2xl font-bold mb-2 dark:text-teal-500">Effects Management</h1>
 
     <a href="{{ url('/grid') }}"
     class="inline-flex items-center gap-1 mb-4 px-3 py-1.5 bg-blue-600 hover:bg-blue-700 text-white text-sm rounded-md shadow transition">
@@ -9,11 +9,11 @@
         <span>Terug</span>
     </a>
     
-    <p class="mb-4 text-white">Beheer hier hoe elke functie invloed heeft op de QoL‑categorieën.</p>
+    <p class="mb-4 dark:text-white">Beheer hier hoe elke functie invloed heeft op de QoL‑categorieën.</p>
 
     {{-- Effects Table --}}
     <table class="w-full border border-gray-200 rounded-lg overflow-hidden shadow-sm">
-        <thead class="dark:bg-gray-800 text-white">
+        <thead class="bg-gray-400 dark:bg-gray-800 dark:text-white">
             <tr>
                 <th class="border-b p-3 text-left font-semibold">Functie</th>
 
@@ -27,8 +27,8 @@
 
         <tbody class="divide-y divide-gray-200">
             @foreach($functions as $function)
-                <tr data-row="{{ $function->id }}" data-image="{{ asset($function->image) }}" class="hover:bg-indigo-950 transition">
-                    <td class="p-3 font-medium flex gap-3 text-white">
+                <tr data-row="{{ $function->id }}" data-image="{{ asset($function->image) }}" class="hover:bg-gray-300 hover:dark:bg-indigo-950 transition">
+                    <td class="p-3 font-medium flex gap-3 dark:text-white">
                         <img src="{{ asset($function->image) }}" 
                             alt="{{ $function->name }}" 
                             class="w-8 h-8 object-contain pointer-events-none">
@@ -48,7 +48,7 @@
                                     bg-red-500 hover:bg-red-600 text-white rounded-md transition shadow-sm"
                                     data-category="{{ $cat }}">–</button>
 
-                                <span class="effect-value w-8 inline-block text-center font-semibold text-white"
+                                <span class="effect-value w-8 inline-block text-center font-semibold dark:text-white"
                                     data-category="{{ $cat }}"
                                     data-original="{{ $value }}">
                                     {{ $value }}
