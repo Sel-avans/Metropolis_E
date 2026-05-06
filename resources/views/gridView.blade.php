@@ -7,8 +7,13 @@
             <div>    
                 <h1 class="text-2xl dark:text-teal-500 font-bold mb-4">Function Library</h1>
                 <a href="{{ route('effects.index') }}" 
-                    class="px-3 py-1.5 bg-blue-600 text-white rounded  hover:bg-blue-700 text-xs">
-                    Manage Functions
+                    class="px-3 py-1.5 bg-teal-600 text-white rounded hover:bg-teal-700 text-xs shadow">
+                    Effect Functions
+                </a>
+
+                <a href="{{ route('functions.index') }}" 
+                   class="px-3 py-1.5 bg-blue-600 text-white rounded hover:bg-blue-700 text-xs shadow">
+                    Function Management
                 </a>
             </div>
 

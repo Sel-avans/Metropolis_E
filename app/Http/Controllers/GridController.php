@@ -10,7 +10,7 @@ class GridController extends Controller
 {
     public function index()
     {
-        $grid = GridCell::with('function')->get();
+        $grid = GridCell::with('function.effects')->get();
         $items = CityFunction::all();
         $functions = $items->groupBy('category');
 
@@ -58,7 +58,7 @@ class GridController extends Controller
                 'col' => $newCol
             ],
             [
-                'city_function_id' => $function->id
+                'function_id' => $function->id
             ]
         );
 

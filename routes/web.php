@@ -6,6 +6,14 @@ use Illuminate\Support\Facades\Route;
 use App\Http\Controllers\QoLController;
 use App\Http\Controllers\FunctionController;
 use App\Http\Controllers\EffectsController;
+use App\Http\Controllers\FunctionManagementController;
+
+Route::get('/functions', [FunctionManagementController::class, 'index'])->name('functions.index');
+Route::get('/functions/create', [FunctionManagementController::class, 'create'])->name('functions.create');
+Route::post('/functions', [FunctionManagementController::class, 'store'])->name('functions.store');
+Route::get('/functions/{function}/edit', [FunctionManagementController::class, 'edit'])->name('functions.edit');
+Route::put('/functions/{function}', [FunctionManagementController::class, 'update'])->name('functions.update');
+Route::delete('/functions/{function}', [FunctionManagementController::class, 'destroy'])->name('functions.destroy');
 
 Route::get('/', function () {
     return view('welcome');
@@ -16,6 +24,8 @@ Route::get('/library', [FunctionController::class, 'index'])->name('library');
 
 Route::get('/effects', [EffectsController::class, 'index'])->name('effects.index');
 Route::post('/effects/update', [EffectsController::class, 'update'])->name('effects.update');
+
+Route::get('/functions/manage', function () { return view('functions.manage'); })->name('functions.manage');
 
 Route::post('/grid/update', [GridController::class, 'update']);
 Route::get('/qol/details', [QoLController::class, 'details'])->name('qol.details');
