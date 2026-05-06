@@ -1,11 +1,21 @@
 {
   "resources/css/app.css": {
-    "file": "assets/app-DStnWzS5.css",
-    "src": "resources/css/app.css"
+    "file": "assets/app-CDXm2SzG.css",
+    "name": "app",
+    "names": [
+      "app.css"
+    ],
+    "src": "resources/css/app.css",
+    "isEntry": true
   },
   "resources/css/grid.css": {
     "file": "assets/grid-wtHOj6k2.css",
-    "src": "resources/css/grid.css"
+    "name": "grid",
+    "names": [
+      "grid.css"
+    ],
+    "src": "resources/css/grid.css",
+    "isEntry": true
   },
   "resources/js/app.js": {
     "file": "assets/app-BQMLaWsp.js",
