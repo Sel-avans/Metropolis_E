@@ -9,13 +9,13 @@ use App\Models\Effect;
 class EffectsController extends Controller
 {
     public function index()
-    {
-        $functions = CityFunction::with('effects')->get();
+{
+    $functions = CityFunction::with('effects')->get();
 
-        $categories = ['veiligheid', 'recreatie', 'milieukwaliteit', 'voorzieningen', 'mobiliteit'];
+    $categories = ['veiligheid', 'recreatie', 'voorzieningen', 'mobiliteit', 'milieu'];
 
-        return view('effects.index', compact('functions', 'categories'));
-    }
+    return view('effects.index', compact('functions', 'categories'));
+}
 
 public function update(Request $request)
 {
@@ -27,7 +27,7 @@ public function update(Request $request)
     $functionId = $request->function_id;
     $newEffects = $request->effects;
 
-    $currentEffects = Effect::where('city_function_id', $functionId)
+    $currentEffects = Effect::where('function_id', $functionId)
         ->pluck('value', 'category')
         ->toArray();
 
@@ -37,7 +37,7 @@ public function update(Request $request)
         $oldValue = $currentEffects[$category] ?? null;
 
         if ($oldValue !== $newValue) {
-            Effect::where('city_function_id', $functionId)
+            Effect::where('function_id', $functionId)
                 ->where('category', $category)
                 ->update(['value' => $newValue]);
 

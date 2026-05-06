@@ -11,21 +11,21 @@ public function details()
 {
     $cells = GridCell::with('function.effects')->get();
 
-    $categories = [
-        'veiligheid' => [],
-        'recreatie' => [],
-        'milieukwaliteit' => [],
-        'voorzieningen' => [],
-        'mobiliteit' => []
+        $categoryList = [
+        'veiligheid',
+        'recreatie',
+        'voorzieningen',
+        'mobiliteit',
+        'milieu'
     ];
 
-    $totals = [
-        'veiligheid' => 0,
-        'recreatie' => 0,
-        'milieukwaliteit' => 0,
-        'voorzieningen' => 0,
-        'mobiliteit' => 0
-    ];
+    $categories = [];
+    $totals = [];
+
+    foreach ($categoryList as $cat) {
+        $categories[$cat] = [];
+        $totals[$cat] = 0;
+    }
 
     foreach ($cells as $cell) {
         if (!$cell->function) continue;
@@ -33,6 +33,8 @@ public function details()
         foreach ($cell->function->effects as $effect) {
             $cat = $effect->category;
             $val = $effect->value;
+
+            if (!array_key_exists($cat, $categories)) continue;
 
             $categories[$cat][] = [
                 'function' => $cell->function->name,
