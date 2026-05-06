@@ -1,3 +1,5 @@
+import { getNeighborsWithQoL } from './neighbours.js';
+
 document.addEventListener("DOMContentLoaded", () => {
 
     const cells = document.querySelectorAll(".grid-cell");
@@ -6,6 +8,28 @@ document.addEventListener("DOMContentLoaded", () => {
     let draggedItem = null;
     let isDragging = false;
     let sourceCell = null;
+
+    const HOVER_DELAY_MS = 300;
+    let hoverTimer = null;
+
+    const popup = document.getElementById('qol-popup');
+    const neighborsList = document.getElementById('popup-neighbors-list');
+
+    const effectsTable = {
+        'Politiebureau': 3,
+        'Brandweerkazerne': 2,
+        'Park': 4,
+        'Bioscoop': 2,
+        'Sportpark': 3,
+        'Waterzuivering': 1,
+        'School': 2,
+        'Winkel': 1,
+        'Ziekenhuis': 3,
+        'Station': 2,
+        'Weg': -1,
+        'Fietspad': 2,
+        'Tankstation': -2
+    };
 
     async function saveMove(oldRow, oldCol, newRow, newCol, functionName) {
         try {
@@ -78,6 +102,75 @@ document.addEventListener("DOMContentLoaded", () => {
         return html;
     }
 
+    function handleTileHover(row, col, event) {
+        positionPopup(event.pageX, event.pageY);
+        const neighbors = getNeighborsWithQoL(row, col, effectsTable);
+        renderNeighborsList(neighbors);
+        showPopup();
+    }
+
+    function positionPopup(x, y) {
+        const offset = 15;
+        popup.style.left = `${x + offset}px`;
+        popup.style.top = `${y + offset}px`;
+    }
+
+    function renderNeighborsList(neighbors) {
+        // Clear any previous list items
+        neighborsList.innerHTML = '';
+
+        if (!neighbors || neighbors.length === 0) {
+            neighborsList.innerHTML = '<li class="text-slate-400">No neighbors with buildings</li>';
+            return;
+        }
+
+        neighbors.forEach(neighbor => {
+            const li = document.createElement('li');
+            li.className = 'flex justify-between items-center gap-4 py-0.5';
+
+            const directionName = neighbor.direction.charAt(0).toUpperCase() + neighbor.direction.slice(1);
+
+            // Determine the text color and sign (+/-) based on the QoL score
+            let scoreClass = 'text-slate-400'; // Neutral
+            let scoreText = `${neighbor.qol_effect}`;
+
+            if (neighbor.qol_effect > 0) {
+                scoreClass = 'text-green-400 font-semibold';
+                scoreText = `+${neighbor.qol_effect}`;
+            } else if (neighbor.qol_effect < 0) {
+                scoreClass = 'text-red-400 font-semibold';
+            }
+
+            // Fill the list item HTML
+            li.innerHTML = `
+                <span class="text-slate-300 font-medium">${directionName}: ${neighbor.function}</span>
+                <span class="${scoreClass}">${scoreText}</span>
+            `;
+
+            neighborsList.appendChild(li);
+        });
+    }
+
+    function showPopup() {
+        popup.classList.remove('hidden');
+        
+        // Force browser reflow to ensure the transition plays smoothly
+        void popup.offsetWidth;
+        
+        popup.classList.remove('opacity-0', 'scale-95');
+        popup.classList.add('opacity-100', 'scale-100');
+    }
+
+    function hidePopup() {
+        popup.classList.add('opacity-0', 'scale-95');
+        popup.classList.remove('opacity-100', 'scale-100');
+
+        // Hide display after the fade-out transition complete (150ms)
+        setTimeout(() => {
+            popup.classList.add('hidden');
+        }, 150);
+    }
+
     items.forEach(item => {
         item.addEventListener("dragstart", e => {
             isDragging = true;
@@ -108,9 +201,7 @@ document.addEventListener("DOMContentLoaded", () => {
             sourceCell = cell;
             cell.classList.add("drag-source");
         });
-    });
 
-    cells.forEach(cell => {
         cell.addEventListener("dragover", e => {
             e.preventDefault();
             cell.classList.add("drag-over");
@@ -153,9 +244,7 @@ document.addEventListener("DOMContentLoaded", () => {
 
             await saveMove(oldRow, oldCol, newRow, newCol, draggedItem.name);
         });
-    });
 
-    cells.forEach(cell => {
         cell.setAttribute("tabindex", "0");
 
         cell.addEventListener("click", () => {
@@ -171,138 +260,23 @@ document.addEventListener("DOMContentLoaded", () => {
                 cell.classList.add("selected");
             }
         });
+
+        cell.addEventListener('mouseenter', (event) => {
+            const row = parseInt(cell.dataset.row);
+            const col = parseInt(cell.dataset.col);
+
+            // Start the 300ms delay timer
+            hoverTimer = setTimeout(() => {
+                handleTileHover(row, col, event);
+            }, HOVER_DELAY_MS);
+        });
+
+        cell.addEventListener('mouseleave', () => {
+            // Cancel the timer immediately if the mouse leaves before 300ms
+            clearTimeout(hoverTimer);
+            hidePopup();
+        });
     });
 
     updateQoL();
 });
-
-
-import { directions } from './neighbours.js';
-
-
-const HOVER_DELAY_MS = 300; 
-let hoverTimer = null;
-
-
-const popup = document.getElementById('qol-popup');
-const neighborsList = document.getElementById('popup-neighbors-list');
-const gridCells = document.querySelectorAll('.grid-cell');
-
-
-gridCells.forEach(cell => {
-    cell.addEventListener('mouseenter', (event) => {
-        const row = parseInt(cell.dataset.row);
-        const col = parseInt(cell.dataset.col);
-
-        
-        hoverTimer = setTimeout(() => {
-            handleTileHover(row, col, event);
-        }, HOVER_DELAY_MS);
-    });
-
-    cell.addEventListener('mouseleave', () => {
-        
-        clearTimeout(hoverTimer);
-        hidePopup();
-    });
-});
-
-
-function handleTileHover(row, col, event) {
-    
-    positionPopup(event.pageX, event.pageY);
-
-    
-    fetchQolData(row, col);
-}
-
-
-function positionPopup(x, y) {
-    const offset = 15; 
-    popup.style.left = `${x + offset}px`;
-    popup.style.top = `${y + offset}px`;
-}
-
-
-function fetchQolData(row, col) {
-    
-    const url = `/api/neighbors?row=${row}&col=${col}`;
-
-    fetch(url)
-        .then(response => {
-            if (!response.ok) {
-                throw new Error('Network response was not ok');
-            }
-            return response.json();
-        })
-        .then(data => {
-            
-            renderNeighborsList(data.neighbors);
-            showPopup();
-        })
-        .catch(error => {
-            console.error('Error fetching QoL data:', error);
-        });
-}
-
-
-function renderNeighborsList(neighbors) {
-    // Clear any previous list items
-    neighborsList.innerHTML = '';
-
-    
-    if (!neighbors || neighbors.length === 0) {
-        neighborsList.innerHTML = '<li class="text-slate-400">No neighbors found</li>';
-        return;
-    }
-
-    
-    neighbors.forEach(neighbor => {
-        const li = document.createElement('li');
-        li.className = 'flex justify-between items-center gap-4 py-0.5';
-
-        
-        const directionName = neighbor.direction.charAt(0).toUpperCase() + neighbor.direction.slice(1);
-        
-        // Determine the text color and sign (+/-) based on the QoL score
-        let scoreClass = 'text-slate-400'; // Neutral
-        let scoreText = `${neighbor.qol_effect}`;
-
-        if (neighbor.qol_effect > 0) {
-            scoreClass = 'text-green-400 font-semibold';
-            scoreText = `+${neighbor.qol_effect}`;
-        } else if (neighbor.qol_effect < 0) {
-            scoreClass = 'text-red-400 font-semibold';
-        }
-
-        // Fill the list item HTML
-        li.innerHTML = `
-            <span class="text-slate-300 font-medium">${directionName}: ${neighbor.function}</span>
-            <span class="${scoreClass}">${scoreText}</span>
-        `;
-
-        neighborsList.appendChild(li);
-    });
-}
-
-
-function showPopup() {
-    popup.classList.remove('hidden');
-    
-    
-    void popup.offsetWidth; 
-    
-    popup.classList.remove('opacity-0', 'scale-95');
-    popup.classList.add('opacity-100', 'scale-100');
-}
-
-
-function hidePopup() {
-    popup.classList.add('opacity-0', 'scale-95');
-    popup.classList.remove('opacity-100', 'scale-100');
-    
-    
-    setTimeout(() => {
-        popup.classList.add('hidden');
-    }, 150);
-}
