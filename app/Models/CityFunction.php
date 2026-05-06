@@ -19,6 +19,6 @@ class CityFunction extends Model
 
     public function effects()
     {
-        return $this->hasMany(Effect::class, 'city_function_id');
+        return $this->hasMany(Effect::class, 'function_id');
     }
 }
