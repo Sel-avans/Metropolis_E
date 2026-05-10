@@ -9,21 +9,22 @@ return new class extends Migration
     /**
      * Run the migrations.
      */
-   public function up()
+    public function up()
 {
     Schema::create('effects', function (Blueprint $table) {
         $table->id();
-        $table->unsignedBigInteger('city_function_id');
+        $table->unsignedBigInteger('function_id');
         $table->string('category');
         $table->integer('value');
         $table->timestamps();
 
-        $table->foreign('city_function_id')
+        $table->foreign('function_id')
               ->references('id')
               ->on('city_functions')
               ->onDelete('cascade');
     });
 }
+
     /**
      * Reverse the migrations.
      */

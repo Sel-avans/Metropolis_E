@@ -1,5 +1,4 @@
 document.addEventListener("DOMContentLoaded", () => {
-
     const cells = document.querySelectorAll(".grid-cell");
     const items = document.querySelectorAll(".library-item");
 
@@ -7,7 +6,7 @@ document.addEventListener("DOMContentLoaded", () => {
     let isDragging = false;
     let sourceCell = null;
 
-    async function saveMove(oldRow, oldCol, newRow, newCol, functionName) {
+    async function saveMove(oldRow, oldCol, newRow, newCol) {
         try {
             await fetch('/grid/update', {
                 method: 'POST',
@@ -20,7 +19,7 @@ document.addEventListener("DOMContentLoaded", () => {
                     old_col: oldCol,
                     new_row: newRow,
                     new_col: newCol,
-                    function: functionName
+                    function_id: draggedItem.id
                 })
             });
 
@@ -31,21 +30,27 @@ document.addEventListener("DOMContentLoaded", () => {
     }
 
     async function updateQoL() {
-        try {
-            const response = await fetch('/qol/details');
-            const data = await response.json();
+    try {
+        const scoreEl = document.getElementById('qol-score-value');
+        const breakdownEl = document.getElementById('breakdown-qol-score');
 
-            document.getElementById('qol-score-value').textContent = data.total_score;
+        if (!scoreEl && !breakdownEl) return;
 
-            const breakdown = document.getElementById('breakdown-qol-score');
-            if (breakdown) {
-                breakdown.innerHTML = renderQoLBreakdown(data);
-            }
-        } catch (err) {
-            console.error("Fout bij ophalen QoL:", err);
+        const response = await fetch('/qol/details');
+        const data = await response.json();
+
+        if (scoreEl) {
+            scoreEl.textContent = data.total_score;
         }
-    }
 
+        if (breakdownEl) {
+            breakdownEl.innerHTML = renderQoLBreakdown(data);
+        }
+
+    } catch (err) {
+        console.error("Fout bij ophalen QoL:", err);
+    }
+}
     function renderQoLBreakdown(data) {
         let html = '';
 
@@ -83,7 +88,8 @@ document.addEventListener("DOMContentLoaded", () => {
             isDragging = true;
 
             draggedItem = {
-                name: item.dataset.function,
+                id: item.dataset.functionId,
+                name: item.dataset.functionName,
                 image: item.dataset.image
             };
 
@@ -99,6 +105,7 @@ document.addEventListener("DOMContentLoaded", () => {
             isDragging = true;
 
             draggedItem = {
+                id: img.dataset.functionId,
                 name: img.alt,
                 image: img.src
             };
@@ -147,11 +154,12 @@ document.addEventListener("DOMContentLoaded", () => {
             const img = document.createElement("img");
             img.src = draggedItem.image;
             img.alt = draggedItem.name;
+            img.dataset.functionId = draggedItem.id;
             img.classList.add("grid-function-icon", "object-contain");
             cell.appendChild(img);
             cell.setAttribute("draggable", "true");
 
-            await saveMove(oldRow, oldCol, newRow, newCol, draggedItem.name);
+            await saveMove(oldRow, oldCol, newRow, newCol);
         });
     });
 
