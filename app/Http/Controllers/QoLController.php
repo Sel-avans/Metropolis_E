@@ -3,15 +3,16 @@
 namespace App\Http\Controllers;
 
 use App\Models\GridCell;
-use App\Models\Condition;
+use App\Models\AdjacencyRule;
 
 class QoLController extends Controller
 {
     public function details()
     {
         $cells = GridCell::with('function.effects')->get();
-
-        $conditions = Condition::with(['functionA', 'functionB'])->get();
+        
+        // Fetch rules from the correct AdjacencyRule table
+        $adjacencyRules = AdjacencyRule::all();
 
         $categories = [
             'veiligheid' => [],
@@ -29,6 +30,7 @@ class QoLController extends Controller
             'mobiliteit' => 0
         ];
 
+        // 1. Calculate base values from the buildings themselves
         foreach ($cells as $cell) {
             if (!$cell->function) continue;
 
@@ -44,6 +46,7 @@ class QoLController extends Controller
 
         $processedPairs = [];
 
+        // 2. Calculate neighbor bonuses and penalties
         foreach ($cells as $cell) {
             if (!$cell->function) continue;
 
@@ -55,34 +58,38 @@ class QoLController extends Controller
 
                 $funcB = $neighbor->function;
 
+                // Create a unique key so we don't count A->B and B->A twice
                 $pairKey = min($funcA->id, $funcB->id) . '-' . max($funcA->id, $funcB->id);
 
                 if (isset($processedPairs[$pairKey])) {
                     continue;
                 }
 
-        $condition = $conditions
-            ->filter(fn($c) =>
-                ($c->function_a == $funcA->id && $c->function_b == $funcB->id) ||
-                ($c->function_a == $funcB->id && $c->function_b == $funcA->id)
-            )
-            ->sortByDesc('value')
-            ->first();
+                // Check if a bonus or penalty rule exists in AdjacencyRules
+                $rule = $adjacencyRules
+                    ->filter(fn($r) =>
+                        ($r->function_a == $funcA->id && $r->function_b == $funcB->id) ||
+                        ($r->function_a == $funcB->id && $r->function_b == $funcA->id)
+                    )
+                    ->whereIn('type', ['bonus', 'penalty'])
+                    ->sortByDesc('value')
+                    ->first();
 
-            $category = $funcA->id < $funcB->id ? $funcA->category : $funcB->category;
+                $category = $funcA->id < $funcB->id ? $funcA->category : $funcB->category;
 
-            if ($condition) {
-                $value = $condition->value ?? 0;
+                // Apply the rule value if it exists
+                if ($rule) {
+                    $value = $rule->value ?? 0;
 
-                $categories[$category][] = [
-                    'function' => "{$funcA->name} naast {$funcB->name} ({$condition->type})",
-                    'value'    => $value
-                ];
+                    $categories[$category][] = [
+                        'function' => "{$funcA->name} + {$funcB->name} ({$rule->type})",
+                        'value'    => $value
+                    ];
 
-                $totals[$category] += $value;
-            }
+                    $totals[$category] += $value;
+                }
 
-
+                // Custom logic for sensitive/polluting buildings
                 $isSensitiveA = $funcA->sensitivity === 'sensitive';
                 $isSensitiveB = $funcB->sensitivity === 'sensitive';
 
@@ -93,7 +100,7 @@ class QoLController extends Controller
                     $totals[$funcA->category] -= 2;
 
                     $categories[$funcA->category][] = [
-                        'function' => "{$funcA->name} naast {$funcB->name} (penalty)",
+                        'function' => "{$funcA->name} + {$funcB->name} (penalty)",
                         'value'    => -2
                     ];
                 }
@@ -102,7 +109,7 @@ class QoLController extends Controller
                     $totals[$funcB->category] -= 2;
 
                     $categories[$funcB->category][] = [
-                        'function' => "{$funcB->name} naast {$funcA->name} (penalty)",
+                        'function' => "{$funcB->name} + {$funcA->name} (penalty)",
                         'value'    => -2
                     ];
                 }
