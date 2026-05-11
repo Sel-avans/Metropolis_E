@@ -8,14 +8,17 @@ use Illuminate\Database\Eloquent\Factories\HasFactory;
 class Effect extends Model
 {
     use HasFactory;
+
+    protected $table = 'effects';
+
     protected $fillable = [
-        'city_function_id',
+        'function_id',
         'category',
         'value',
     ];
 
     public function function()
     {
-        return $this->belongsTo(CityFunction::class, 'city_function_id');
+        return $this->belongsTo(CityFunction::class, 'function_id');
     }
 }

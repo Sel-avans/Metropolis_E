@@ -8,14 +8,26 @@ use App\Models\Effect;
 
 class EffectsController extends Controller
 {
+
+    private $allowedCategories = [
+        'veiligheid',
+        'recreatie',
+        'milieukwaliteit',
+        'voorzieningen',
+        'mobiliteit'
+    ];
+
     public function index()
-    {
-        $functions = CityFunction::with('effects')->get();
+{
+    $functions = CityFunction::with('effects')
+        ->orderBy('category')
+        ->orderBy('name')
+        ->get();
 
-        $categories = ['veiligheid', 'recreatie', 'milieukwaliteit', 'voorzieningen', 'mobiliteit'];
+    $categories = $this->allowedCategories;
 
-        return view('effects.index', compact('functions', 'categories'));
-    }
+    return view('effects.index', compact('functions', 'categories'));
+}
 
 public function update(Request $request)
 {
@@ -27,7 +39,22 @@ public function update(Request $request)
     $functionId = $request->function_id;
     $newEffects = $request->effects;
 
-    $currentEffects = Effect::where('city_function_id', $functionId)
+        $normalizedEffects = [];
+
+        foreach ($newEffects as $category => $value) {
+            $normalized = strtolower(trim($category));
+
+            if (!in_array($normalized, $this->allowedCategories)) {
+                return response()->json([
+                    'success' => false,
+                    'message' => "Ongeldige categorie: $category"
+                ]);
+            }
+
+            $normalizedEffects[$normalized] = $value;
+        }
+
+    $currentEffects = Effect::where('function_id', $functionId)
         ->pluck('value', 'category')
         ->toArray();
 
@@ -37,7 +64,7 @@ public function update(Request $request)
         $oldValue = $currentEffects[$category] ?? null;
 
         if ($oldValue !== $newValue) {
-            Effect::where('city_function_id', $functionId)
+            Effect::where('function_id', $functionId)
                 ->where('category', $category)
                 ->update(['value' => $newValue]);
 

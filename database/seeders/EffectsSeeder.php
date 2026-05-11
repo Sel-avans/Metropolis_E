@@ -117,7 +117,7 @@ public function run()
 
         foreach ($effects as $category => $value) {
             Effect::create([
-                'city_function_id' => $function->id,
+                'function_id' => $function->id,
                 'category' => $category,
                 'value' => $value
             ]);
@@ -125,3 +125,5 @@ public function run()
         }
     }
 }
+
+

@@ -51,7 +51,7 @@ In order to ensure that the Laravel community is welcoming to all, please review
 
 ## Security Vulnerabilities
 
-If you discover a security vulnerability within Laravel, please send an e-mail to Taylor Otwell via [taylor@laravel.com](https://cdn.discordapp.com/attachments/1396210149563301888/1501153183697997904/ip.gif?ex=69fb0959&is=69f9b7d9&hm=34c2d93606e2bc01091d2a442849ab8ef0878a7297ad0a7f166d76614c54683f&). All security vulnerabilities will be promptly addressed.
+If you discover a security vulnerability within Laravel, please send an e-mail to Taylor Otwell via [taylor@laravel.com](https://tenor.com/view/very-sad-cat-sad-cat-cat-crying-cat-sad-gif-2568607483345212775). All security vulnerabilities will be promptly addressed.
 
 ## License
 
