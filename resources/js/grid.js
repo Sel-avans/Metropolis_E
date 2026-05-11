@@ -8,7 +8,7 @@ document.addEventListener("DOMContentLoaded", () => {
 
     async function saveMove(oldRow, oldCol, newRow, newCol) {
         try {
-            await fetch('/grid/update', {
+            const response = await fetch('/grid/update', {
                 method: 'POST',
                 headers: {
                     'Content-Type': 'application/json',
@@ -22,13 +22,21 @@ document.addEventListener("DOMContentLoaded", () => {
                     function_id: draggedItem.id
                 })
             });
-
+    
+            const data = await response.json();
+    
+            if (!response.ok) {
+                // Als de server een 403 geeft, komt hij hier:
+                alert(data.message || "Dit mag niet!"); 
+                location.reload(); // Belangrijk om het grid te herstellen!
+                return;
+            }
+    
             updateQoL();
         } catch (err) {
-            console.error("Fout bij opslaan gridcel:", err);
+            console.error("Fout:", err);
         }
     }
-
     async function updateQoL() {
     try {
         const scoreEl = document.getElementById('qol-score-value');
