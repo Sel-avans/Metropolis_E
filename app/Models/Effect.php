@@ -8,6 +8,9 @@ use Illuminate\Database\Eloquent\Factories\HasFactory;
 class Effect extends Model
 {
     use HasFactory;
+
+    protected $table = 'effects';
+
     protected $fillable = [
         'function_id',
         'category',

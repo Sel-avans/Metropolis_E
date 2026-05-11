@@ -25,43 +25,44 @@ class GridController extends Controller
     }
 
     public function update(Request $request)
-    {
-        $oldRow = $request->input('old_row');
-        $oldCol = $request->input('old_col');
-        $newRow = $request->input('new_row');
-        $newCol = $request->input('new_col');
-        $functionName = $request->input('function');
+{
+    $oldRow = $request->has('old_row') ? intval($request->input('old_row')) : null;
+    $oldCol = $request->has('old_col') ? intval($request->input('old_col')) : null;
+    $newRow = intval($request->input('new_row'));
+    $newCol = intval($request->input('new_col'));
+    $functionId = $request->input('function_id');
+    
+    if ($oldRow !== null && $oldCol !== null) {
+        GridCell::where('row', $oldRow)
+                ->where('col', $oldCol)
+                ->delete();
+    }
 
-        if ($oldRow !== null && $oldCol !== null) {
-            GridCell::where('row', $oldRow)
-                    ->where('col', $oldCol)
-                    ->delete();
-        }
-
-        if ($functionName === null) {
-            GridCell::where('row', $newRow)
-                    ->where('col', $newCol)
-                    ->delete();
-
-            return response()->json(['success' => true]);
-        }
-
-        $function = CityFunction::where('name', $functionName)->first();
-
-        if (!$function) {
-            return response()->json(['error' => 'Function not found'], 404);
-        }
-
-        GridCell::updateOrCreate(
-            [
-                'row' => $newRow,
-                'col' => $newCol
-            ],
-            [
-                'function_id' => $function->id
-            ]
-        );
+    if ($functionId === null) {
+    GridCell::where('row', $newRow)
+            ->where('col', $newCol)
+            ->delete();
 
         return response()->json(['success' => true]);
     }
+
+    $function = CityFunction::find($functionId);
+
+    if (!$function) {
+        return response()->json(['error' => 'Function not found'], 404);
+    }
+
+    GridCell::updateOrCreate(
+        [
+            'row' => $newRow,
+            'col' => $newCol
+        ],
+        [
+            'function_id' => $function->id
+        ]
+    );
+
+    return response()->json(['success' => true]);
+}
+
 }

@@ -8,11 +8,23 @@ use App\Models\Effect;
 
 class EffectsController extends Controller
 {
+
+    private $allowedCategories = [
+        'veiligheid',
+        'recreatie',
+        'milieukwaliteit',
+        'voorzieningen',
+        'mobiliteit'
+    ];
+
     public function index()
 {
-    $functions = CityFunction::with('effects')->get();
+    $functions = CityFunction::with('effects')
+        ->orderBy('category')
+        ->orderBy('name')
+        ->get();
 
-    $categories = ['veiligheid', 'recreatie', 'voorzieningen', 'mobiliteit', 'milieu'];
+    $categories = $this->allowedCategories;
 
     return view('effects.index', compact('functions', 'categories'));
 }
@@ -26,6 +38,21 @@ public function update(Request $request)
 
     $functionId = $request->function_id;
     $newEffects = $request->effects;
+
+        $normalizedEffects = [];
+
+        foreach ($newEffects as $category => $value) {
+            $normalized = strtolower(trim($category));
+
+            if (!in_array($normalized, $this->allowedCategories)) {
+                return response()->json([
+                    'success' => false,
+                    'message' => "Ongeldige categorie: $category"
+                ]);
+            }
+
+            $normalizedEffects[$normalized] = $value;
+        }
 
     $currentEffects = Effect::where('function_id', $functionId)
         ->pluck('value', 'category')

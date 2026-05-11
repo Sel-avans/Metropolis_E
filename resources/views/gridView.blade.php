@@ -1,7 +1,6 @@
 <x-app-layout>
     <div class="flex gap-4">
         
-        {{-- Linkerzijde: Function Library --}}
         <div class="w-auto p-6 h-screen overflow-y-auto">
           
             <div>    
@@ -15,6 +14,11 @@
                    class="px-3 py-1.5 bg-blue-600 text-white rounded hover:bg-blue-700 text-xs shadow">
                     Function Management
                 </a>
+
+                <a href="{{ route('conditions.index') }}" 
+                   class="px-3 py-1.5 bg-blue-600 text-white rounded hover:bg-blue-700 text-xs shadow">
+                    Conditions
+                </a>
             </div>
 
             @forelse($functions as $category => $items)
@@ -26,7 +30,8 @@
                     @foreach($items as $function)
                         <li class="library-item flex items-center gap-2 px-4 py-2 border border-gray-400 dark:border-white rounded cursor-pointer"
                             draggable="true"
-                            data-function="{{ $function->name }}"
+                            data-function-id="{{ $function->id }}"
+                            data-function-name="{{ $function->name }}"
                             data-image="{{ asset($function->image) }}">
 
                             <img src="{{ asset($function->image) }}" 
@@ -44,14 +49,12 @@
 
         <div class="flex flex-col mx-auto">
 
-                {{-- QoL Score --}}
             <div class="w-auto h-min mt-4 border-4 border-gray-400 dark:bg-indigo-800 dark:border-teal-600 rounded-md p-6">
                 <span id="qol-score" class="text-xl font-semibold mb-2 dark:text-teal-500">
                     QoL score: <span id="qol-score-value"></span>
                 </span>
             </div>
 
-            {{-- Midden: City Grid --}}
             <div class="w-auto p-6">
                 <h1 class="text-2xl text-center font-bold mb-4 dark:text-teal-500">City Grid (3x4)</h1>
 

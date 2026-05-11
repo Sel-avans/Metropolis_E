@@ -7,6 +7,7 @@ use App\Http\Controllers\QoLController;
 use App\Http\Controllers\FunctionController;
 use App\Http\Controllers\EffectsController;
 use App\Http\Controllers\FunctionManagementController;
+use App\Http\Controllers\ConditionsController;
 
 Route::get('/functions', [FunctionManagementController::class, 'index'])->name('functions.index');
 Route::get('/functions/create', [FunctionManagementController::class, 'create'])->name('functions.create');
@@ -40,5 +41,7 @@ Route::middleware('auth')->group(function () {
     Route::patch('/profile', [ProfileController::class, 'update'])->name('profile.update');
     Route::delete('/profile', [ProfileController::class, 'destroy'])->name('profile.destroy');
 });
+
+Route::resource('conditions', ConditionsController::class)->except(['show']);
 
 require __DIR__.'/auth.php';
