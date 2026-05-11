@@ -10,38 +10,43 @@ class QoLController extends Controller
     public function details()
     {
         $cells = GridCell::with('function.effects')->get();
-
         $conditions = Condition::with(['functionA', 'functionB'])->get();
 
         $categories = [
-            'veiligheid' => [],
-            'recreatie' => [],
-            'milieukwaliteit' => [],
-            'voorzieningen' => [],
-            'mobiliteit' => []
+            'safety'      => [],
+            'recreation'  => [],
+            'environment' => [],
+            'amenities'   => [],
+            'mobility'    => []
         ];
 
         $totals = [
-            'veiligheid' => 0,
-            'recreatie' => 0,
-            'milieukwaliteit' => 0,
-            'voorzieningen' => 0,
-            'mobiliteit' => 0
+            'safety'      => 0,
+            'recreation'  => 0,
+            'environment' => 0,
+            'amenities'   => 0,
+            'mobility'    => 0
         ];
 
+        // ---------------------------------------------------------
+        // 1. BASE EFFECTS
+        // ---------------------------------------------------------
         foreach ($cells as $cell) {
             if (!$cell->function) continue;
 
             foreach ($cell->function->effects as $effect) {
                 $categories[$effect->category][] = [
                     'function' => $cell->function->name,
-                    'value' => $effect->value
+                    'value'    => $effect->value
                 ];
 
                 $totals[$effect->category] += $effect->value;
             }
         }
 
+        // ---------------------------------------------------------
+        // 2. ADJACENCY EFFECTS
+        // ---------------------------------------------------------
         $processedPairs = [];
 
         foreach ($cells as $cell) {
@@ -55,34 +60,54 @@ class QoLController extends Controller
 
                 $funcB = $neighbor->function;
 
+                // Avoid double counting
                 $pairKey = min($funcA->id, $funcB->id) . '-' . max($funcA->id, $funcB->id);
+                if (isset($processedPairs[$pairKey])) continue;
 
-                if (isset($processedPairs[$pairKey])) {
-                    continue;
+                $category = $funcA->category;
+
+                // ---------------------------------------------------------
+                // 2A. SAME CATEGORY BONUS (+2)
+                // ---------------------------------------------------------
+                if ($funcA->category === $funcB->category) {
+                    $categories[$category][] = [
+                        'function' => "{$funcA->name} next to {$funcB->name} (same category)",
+                        'value'    => 2
+                    ];
+
+                    $totals[$category] += 2;
                 }
 
-        $condition = $conditions
-            ->filter(fn($c) =>
-                ($c->function_a == $funcA->id && $c->function_b == $funcB->id) ||
-                ($c->function_a == $funcB->id && $c->function_b == $funcA->id)
-            )
-            ->sortByDesc('value')
-            ->first();
+                // ---------------------------------------------------------
+                // 2B. CONDITION BONUS (only if not duplicate of same-category)
+                // ---------------------------------------------------------
+                $condition = $conditions
+                    ->filter(fn($c) =>
+                        ($c->function_a == $funcA->id && $c->function_b == $funcB->id) ||
+                        ($c->function_a == $funcB->id && $c->function_b == $funcA->id)
+                    )
+                    ->sortByDesc('value')
+                    ->first();
 
-            $category = $funcA->id < $funcB->id ? $funcA->category : $funcB->category;
+                if ($condition) {
 
-            if ($condition) {
-                $value = $condition->value ?? 0;
+                    // Skip duplicate +2 if it's same category
+                    if (!($condition->value == 2 && $funcA->category === $funcB->category)) {
 
-                $categories[$category][] = [
-                    'function' => "{$funcA->name} naast {$funcB->name} ({$condition->type})",
-                    'value'    => $value
-                ];
+                        $value = $condition->value ?? 0;
 
-                $totals[$category] += $value;
-            }
+                        $categories[$category][] = [
+                            'function' => "{$funcA->name} next to {$funcB->name} ({$condition->type})",
+                            'value'    => $value
+                        ];
 
+                        $totals[$category] += $value;
+                    }
+                }
 
+                // ---------------------------------------------------------
+                // 2C. SENSITIVE / POLLUTING PENALTIES
+                // ---------------------------------------------------------
                 $isSensitiveA = $funcA->sensitivity === 'sensitive';
                 $isSensitiveB = $funcB->sensitivity === 'sensitive';
 
@@ -90,49 +115,35 @@ class QoLController extends Controller
                 $isPollutingB = $funcB->pollution === 'polluting';
 
                 if ($isSensitiveA && $isPollutingB) {
-                    $totals[$funcA->category] -= 2;
-
                     $categories[$funcA->category][] = [
-                        'function' => "{$funcA->name} naast {$funcB->name} (penalty)",
+                        'function' => "{$funcA->name} next to {$funcB->name} (penalty)",
                         'value'    => -2
                     ];
+                    $totals[$funcA->category] -= 2;
                 }
 
                 if ($isSensitiveB && $isPollutingA) {
-                    $totals[$funcB->category] -= 2;
-
                     $categories[$funcB->category][] = [
-                        'function' => "{$funcB->name} naast {$funcA->name} (penalty)",
+                        'function' => "{$funcB->name} next to {$funcA->name} (penalty)",
                         'value'    => -2
                     ];
+                    $totals[$funcB->category] -= 2;
                 }
 
                 $processedPairs[$pairKey] = true;
             }
         }
 
+        // ---------------------------------------------------------
+        // 3. RETURN RESULT
+        // ---------------------------------------------------------
         return response()->json([
             'categories' => [
-                'veiligheid' => [
-                    'total' => $totals['veiligheid'],
-                    'items' => $categories['veiligheid']
-                ],
-                'recreatie' => [
-                    'total' => $totals['recreatie'],
-                    'items' => $categories['recreatie']
-                ],
-                'milieukwaliteit' => [
-                    'total' => $totals['milieukwaliteit'],
-                    'items' => $categories['milieukwaliteit']
-                ],
-                'voorzieningen' => [
-                    'total' => $totals['voorzieningen'],
-                    'items' => $categories['voorzieningen']
-                ],
-                'mobiliteit' => [
-                    'total' => $totals['mobiliteit'],
-                    'items' => $categories['mobiliteit']
-                ],
+                'safety'      => ['total' => $totals['safety'],      'items' => $categories['safety']],
+                'recreation'  => ['total' => $totals['recreation'],  'items' => $categories['recreation']],
+                'environment' => ['total' => $totals['environment'], 'items' => $categories['environment']],
+                'amenities'   => ['total' => $totals['amenities'],   'items' => $categories['amenities']],
+                'mobility'    => ['total' => $totals['mobility'],    'items' => $categories['mobility']],
             ],
             'total_score' => array_sum($totals)
         ]);
@@ -165,4 +176,15 @@ class QoLController extends Controller
 
         return $neighbors;
     }
+
+    public static function recalculateQoL()
+{
+    $controller = new self();
+    $response = $controller->details()->getData(true);
+
+    cache()->put('qol_data', $response, 60);
+
+    return $response;
+}
+
 }

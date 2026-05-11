@@ -1,16 +1,13 @@
-/* geselecteerde cell */
 .grid-cell.selected {
     outline: 3px solid #b34848;
     outline-offset: -3px;
     background-color: #f0f8ff;
 }
 
-/* tijdens drag hover */
 .grid-cell.drag-over {
     background-color: #e6f0ff;
 }
 
-/* icon in grid */
 .grid-function-icon {
     width: 100%;
     height: 100%;

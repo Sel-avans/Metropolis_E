@@ -73,11 +73,15 @@
                             data-col="{{$col}}"
                             draggable="{{ $cell ? 'true' : 'false' }}">
 
-                            @if($cell && $cell->function)
-                                <img src="{{ asset($cell->function->image) }}"
+                            @if(!empty($cell) && !empty($cell->function))
+                                <img 
+                                    src="{{ asset($cell->function->image) }}"
                                     alt="{{ $cell->function->name }}"
-                                    class="grid-function-icon">
+                                    class="grid-function-icon object-contain"
+                                    data-function-id="{{ $cell->function->id }}"
+                                >
                             @endif
+
 
                             </div>
                         @endfor
@@ -87,7 +91,6 @@
 
         </div>
 
-        {{-- BreakDown QoL Score --}}
         <div id="breakdown-qol-score" class="border-solid border-l border-gray-400 dark:border-white w-2/12 p-3 ml-auto">
         </div>
 

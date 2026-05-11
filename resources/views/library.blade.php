@@ -7,7 +7,6 @@
     <aside class="w-1/3 bg-gray-100 p-6 overflow-y-auto">
         <h1 class="text-2xl font-bold mb-4">Function Library</h1>
 
-        {{-- Zoekveld (als je die gebruikt) --}}
         <input 
             id="searchInput"
             type="text"

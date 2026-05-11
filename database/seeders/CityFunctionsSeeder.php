@@ -10,23 +10,23 @@ class CityFunctionsSeeder extends Seeder
     public function run()
     {
         $functions = [
-            ['name' => 'Politiebureau', 'category' => 'veiligheid', 'image' => 'icons/police.png'],
-            ['name' => 'Brandweerkazerne', 'category' => 'veiligheid', 'image' => 'icons/firestation.png'],
+            ['name' => 'Police Station',     'category' => 'safety',        'image' => 'icons/police.png'],
+            ['name' => 'Fire Station',       'category' => 'safety',        'image' => 'icons/firestation.png'],
 
-            ['name' => 'Park', 'category' => 'recreatie', 'image' => 'icons/park.png', 'sensitivity' => 'sensitive'],
-            ['name' => 'Bioscoop', 'category' => 'recreatie', 'image' => 'icons/bioscoop.png'],
-            ['name' => 'Sportpark', 'category' => 'recreatie', 'image' => 'icons/sportpark.png'],
+            ['name' => 'Park',               'category' => 'recreation',    'image' => 'icons/park.png',        'sensitivity' => 'sensitive'],
+            ['name' => 'Cinema',             'category' => 'recreation',    'image' => 'icons/bioscoop.png'],
+            ['name' => 'Sports Park',        'category' => 'recreation',    'image' => 'icons/sportpark.png'],
 
-            ['name' => 'Waterzuivering', 'category' => 'milieukwaliteit', 'image' => 'icons/waterzuivering.png'],
+            ['name' => 'Water Treatment',    'category' => 'environment',   'image' => 'icons/waterzuivering.png'],
 
-            ['name' => 'School', 'category' => 'voorzieningen', 'image' => 'icons/school.png', 'sensitivity' => 'sensitive'],
-            ['name' => 'Winkel', 'category' => 'voorzieningen', 'image' => 'icons/mall.png', 'pollution' => 'polluting'],
-            ['name' => 'Ziekenhuis', 'category' => 'voorzieningen', 'image' => 'icons/hospital.png', 'sensitivity' => 'sensitive'],
+            ['name' => 'School',             'category' => 'amenities',     'image' => 'icons/school.png',      'sensitivity' => 'sensitive'],
+            ['name' => 'Store',              'category' => 'amenities',     'image' => 'icons/mall.png',        'pollution' => 'polluting'],
+            ['name' => 'Hospital',           'category' => 'amenities',     'image' => 'icons/hospital.png',    'sensitivity' => 'sensitive'],
 
-            ['name' => 'Station', 'category' => 'mobiliteit', 'image' => 'icons/station.png'],
-            ['name' => 'Weg', 'category' => 'mobiliteit', 'image' => 'icons/road.png', 'pollution' => 'polluting'],
-            ['name' => 'Fietspad', 'category' => 'mobiliteit', 'image' => 'icons/fietspad.png'],
-            ['name' => 'Tankstation', 'category' => 'mobiliteit', 'image' => 'icons/tankstation.png', 'pollution' => 'polluting'],
+            ['name' => 'Train Station',      'category' => 'mobility',      'image' => 'icons/station.png'],
+            ['name' => 'Road',               'category' => 'mobility',      'image' => 'icons/road.png',        'pollution' => 'polluting'],
+            ['name' => 'Bicycle Path',       'category' => 'mobility',      'image' => 'icons/fietspad.png'],
+            ['name' => 'Gas Station',        'category' => 'mobility',      'image' => 'icons/tankstation.png', 'pollution' => 'polluting'],
         ];
 
         foreach ($functions as $f) {

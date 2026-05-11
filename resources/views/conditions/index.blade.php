@@ -8,13 +8,13 @@
         <h1 class="fw-bold" style="color:#2563eb;">Conditions Management</h1>
 
         <button class="btn btn-primary btn-lg shadow-sm" data-bs-toggle="modal" data-bs-target="#createModal">
-            + Nieuwe regel
+            + New rule
         </button>
     </div>
 
     <div class="card shadow-lg border-0" style="border-radius: 14px;">
         <div class="card-header py-3" style="background: linear-gradient(90deg, #2563eb, #3b82f6); border-radius: 14px 14px 0 0;">
-            <h5 class="mb-0 fw-semibold text-white">Alle adjacency regels</h5>
+            <h5 class="mb-0 fw-semibold text-white">All adjacency rules</h5>
         </div>
 
         <div class="card-body p-0">
@@ -24,11 +24,11 @@
                 <table class="table table-hover align-middle mb-0" style="font-size: 1.1rem;">
                     <thead class="sticky-top" style="background:#f1f5f9;">
                         <tr style="height: 45px;">
-                            <th class="ps-4">Functie A</th>
-                            <th>Functie B</th>
+                            <th class="ps-4">Function A</th>
+                            <th>Function B</th>
                             <th>Type</th>
-                            <th>Waarde</th>
-                            <th class="pe-4">Acties</th>
+                            <th>Value</th>
+                            <th class="pe-4">Actions</th>
                         </tr>
                     </thead>
 
@@ -55,12 +55,12 @@
                                     <button class="btn btn-sm btn-outline-warning me-1"
                                             data-bs-toggle="modal"
                                             data-bs-target="#editModal{{ $condition->id }}">
-                                        Bewerken
+                                        Modify
                                     </button>
 
                                     <button class="btn btn-sm btn-outline-danger"
                                             onclick="confirmDelete('{{ route('conditions.destroy', $condition) }}')">
-                                        Verwijderen
+                                        Delete
                                     </button>
                                 </td>
                             </tr>
@@ -82,13 +82,18 @@
 
                 <div class="modal-content shadow-lg" style="border-radius: 14px;">
                     <div class="modal-header" style="background:#2563eb; color:white;">
-                        <h5 class="modal-title fw-bold">Regel bewerken</h5>
+                        <h5 class="modal-title fw-bold">Modify Rule</h5>
                     </div>
 
+                    @if(session('_last_action') === 'error')
+                        <div class="alert alert-danger m-3">
+                            {{ session('error') }}
+                        </div>
+                    @endif
                     <div class="modal-body">
 
                         <div class="mb-3">
-                            <label class="form-label fw-semibold">Functie A</label>
+                            <label class="form-label fw-semibold">Function A</label>
                             <select name="function_a" class="form-select">
                                 @foreach($functions as $f)
                                     <option value="{{ $f->id }}" @selected($f->id == $condition->function_a)>
@@ -99,7 +104,7 @@
                         </div>
 
                         <div class="mb-3">
-                            <label class="form-label fw-semibold">Functie B</label>
+                            <label class="form-label fw-semibold">Function B</label>
                             <select name="function_b" class="form-select">
                                 @foreach($functions as $f)
                                     <option value="{{ $f->id }}" @selected($f->id == $condition->function_b)>
@@ -119,15 +124,15 @@
                         </div>
 
                         <div class="mb-3">
-                            <label class="form-label fw-semibold">Waarde</label>
+                            <label class="form-label fw-semibold">Value</label>
                             <input type="number" name="value" class="form-control" value="{{ $condition->value }}">
                         </div>
 
                     </div>
 
                     <div class="modal-footer">
-                        <button class="btn btn-light" data-bs-dismiss="modal">Annuleren</button>
-                        <button type="submit" class="btn btn-primary">Opslaan</button>
+                        <button class="btn btn-light" data-bs-dismiss="modal">Cancel</button>
+                        <button type="submit" class="btn btn-primary">Save</button>
                     </div>
                 </div>
 
@@ -144,13 +149,13 @@
 
                 <div class="modal-content shadow-lg" style="border-radius: 14px;">
                     <div class="modal-header" style="background:#2563eb; color:white;">
-                        <h5 class="modal-title fw-bold">Nieuwe regel toevoegen</h5>
+                        <h5 class="modal-title fw-bold">Add New Rule</h5>
                     </div>
 
                     <div class="modal-body">
 
                         <div class="mb-3">
-                            <label class="form-label fw-semibold">Functie A</label>
+                            <label class="form-label fw-semibold">Function A</label>
                             <select name="function_a" class="form-select">
                                 @foreach($functions as $f)
                                     <option value="{{ $f->id }}">{{ $f->name }}</option>
@@ -159,7 +164,7 @@
                         </div>
 
                         <div class="mb-3">
-                            <label class="form-label fw-semibold">Functie B</label>
+                            <label class="form-label fw-semibold">Function B</label>
                             <select name="function_b" class="form-select">
                                 @foreach($functions as $f)
                                     <option value="{{ $f->id }}">{{ $f->name }}</option>
@@ -177,15 +182,15 @@
                         </div>
 
                         <div class="mb-3">
-                            <label class="form-label fw-semibold">Waarde</label>
+                            <label class="form-label fw-semibold">Value</label>
                             <input type="number" name="value" class="form-control">
                         </div>
 
                     </div>
 
                     <div class="modal-footer">
-                        <button class="btn btn-light" data-bs-dismiss="modal">Annuleren</button>
-                        <button class="btn btn-primary">Toevoegen</button>
+                        <button class="btn btn-light" data-bs-dismiss="modal">Cancel</button>
+                        <button class="btn btn-primary">Save</button>
                     </div>
                 </div>
 
@@ -198,20 +203,20 @@
         <div class="modal-dialog modal-dialog-centered">
             <div class="modal-content shadow-lg" style="border-radius: 14px;">
                 <div class="modal-header bg-danger text-white">
-                    <h5 class="modal-title fw-bold">Regel verwijderen</h5>
+                    <h5 class="modal-title fw-bold">Delete Rule</h5>
                 </div>
 
                 <div class="modal-body">
-                    <p class="fw-semibold mb-0">Weet je zeker dat je deze regel wilt verwijderen?</p>
+                    <p class="fw-semibold mb-0">Are you sure you want to delete this rule?</p>
                 </div>
 
                 <div class="modal-footer">
-                    <button class="btn btn-light" data-bs-dismiss="modal">Annuleren</button>
+                    <button class="btn btn-light" data-bs-dismiss="modal">Cancel</button>
 
                     <form id="deleteConfirmForm" method="POST">
                         @csrf
                         @method('DELETE')
-                        <button class="btn btn-danger">Verwijderen</button>
+                        <button class="btn btn-danger">Delete</button>
                     </form>
                 </div>
             </div>
@@ -225,6 +230,22 @@ function confirmDelete(url) {
     document.getElementById('deleteConfirmForm').action = url;
     new bootstrap.Modal(document.getElementById('deleteConfirmModal')).show();
 }
+
+document.addEventListener('DOMContentLoaded', function () {
+
+    @if(session('_last_action') === 'error')
+
+        @if(!session('edit_id'))
+            new bootstrap.Modal(document.getElementById('createModal')).show();
+        @endif
+
+        @if(session('edit_id'))
+            new bootstrap.Modal(document.getElementById('editModal{{ session('edit_id') }}')).show();
+        @endif
+
+    @endif
+
+});
 </script>
 
 <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.2/dist/js/bootstrap.bundle.min.js"></script>

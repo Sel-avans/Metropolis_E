@@ -6,14 +6,14 @@
 
         <a href="/grid"           
             class="px-4 py-2 bg-gray-200 hover:bg-gray-300 text-gray-800 font-medium rounded-md shadow">
-                ← Terug naar grid
+                ← Back to grid
             </a>
         </div>
 
         <div class="mb-4">
             <a href="{{ route('functions.create') }}"
             class="px-4 py-2 bg-blue-600 hover:bg-blue-700 text-white font-medium text-sm rounded-md shadow">
-                + Nieuwe functie
+                + New function
             </a>
         </div>
 
@@ -22,9 +22,9 @@
                 <thead class="bg-gray-100 border-b">
                     <tr class="h-16">
                         <th class="p-3 text-center font-semibold">Icon</th>
-                        <th class="p-3 text-left font-semibold">Naam</th>
+                        <th class="p-3 text-left font-semibold">Name</th>
                         <th class="p-3 text-left font-semibold">Categorie</th>
-                        <th class="p-3 text-center font-semibold">Acties</th>
+                        <th class="p-3 text-center font-semibold">Actions</th>
                     </tr>
                 </thead>
 
@@ -49,16 +49,16 @@
 
                                 <a href="{{ route('functions.edit', $function) }}"
                                 class="px-3 py-1 bg-yellow-500 hover:bg-yellow-600 text-white text-xs font-semibold rounded-md shadow">
-                                    Bewerken
+                                    Modify
                                 </a>
 
                                 <form action="{{ route('functions.destroy', $function) }}" method="POST"
-                                    onsubmit="return confirm('Weet je zeker dat je deze functie wilt verwijderen?');">
+                                    onsubmit="return confirm('Are you sure you want to delete this function?');">
                                     @csrf
                                     @method('DELETE')
                                     <button
                                         class="px-3 py-1 bg-red-600 hover:bg-red-700 text-white text-xs font-semibold rounded-md shadow">
-                                        Verwijderen
+                                        Delete
                                     </button>
                                 </form>
 

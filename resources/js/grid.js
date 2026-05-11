@@ -88,7 +88,7 @@ document.addEventListener("DOMContentLoaded", () => {
             isDragging = true;
 
             draggedItem = {
-                id: item.dataset.functionId,
+                id: Number(item.dataset.functionId),
                 name: item.dataset.functionName,
                 image: item.dataset.image
             };
@@ -105,7 +105,7 @@ document.addEventListener("DOMContentLoaded", () => {
             isDragging = true;
 
             draggedItem = {
-                id: img.dataset.functionId,
+                id: Number(img.dataset.functionId),
                 name: img.alt,
                 image: img.src
             };
