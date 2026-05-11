@@ -2,7 +2,7 @@
     <div class="max-w-5xl mx-auto mt-10">
 
         <div class="flex items-center justify-between mb-6">
-            <h1 class="text-2xl font-bold">Function Management</h1>
+            <h1 class="text-2xl font-bold dark:text-teal-500">Function Management</h1>
 
         <a href="/grid"           
             class="px-4 py-2 bg-gray-200 hover:bg-gray-300 text-gray-800 font-medium rounded-md shadow">
@@ -17,9 +17,9 @@
             </a>
         </div>
 
-        <div class="bg-white shadow rounded-lg overflow-hidden">
+        <div class="shadow rounded-lg overflow-hidden">
             <table class="w-full border-collapse">
-                <thead class="bg-gray-100 border-b">
+                <thead class="bg-gray-400 dark:bg-gray-800 dark:text-white border-b">
                     <tr class="h-16">
                         <th class="p-3 text-center font-semibold">Icon</th>
                         <th class="p-3 text-left font-semibold">Naam</th>
@@ -30,17 +30,17 @@
 
                 <tbody>
                     @foreach($functions as $function)
-                    <tr class="h-20 border-b hover:bg-gray-50 transition">
+                    <tr class="h-20 border-b hover:bg-gray-300 hover:dark:bg-indigo-950 transition">
                         <td class="p-3 text-center align-middle">
                             <img src="{{ asset($function->image) }}"
                                 class="w-16 h-16 object-contain mx-auto">
                         </td>
 
-                        <td class="p-3 text-left align-middle font-medium">
+                        <td class="p-3 text-left align-middle font-medium dark:text-white">
                             {{ $function->name }}
                         </td>
 
-                        <td class="p-3 text-left align-middle text-gray-700">
+                        <td class="p-3 text-left align-middle text-gray-700 dark:text-white">
                             {{ $function->category }}
                         </td>
 

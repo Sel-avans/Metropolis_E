@@ -1,21 +1,11 @@
 {
   "resources/css/app.css": {
-    "file": "assets/app-D_2qmzjT.css",
-    "name": "app",
-    "names": [
-      "app.css"
-    ],
-    "src": "resources/css/app.css",
-    "isEntry": true
+    "file": "assets/app-DD048Nox.css",
+    "src": "resources/css/app.css"
   },
   "resources/css/grid.css": {
     "file": "assets/grid-wtHOj6k2.css",
-    "name": "grid",
-    "names": [
-      "grid.css"
-    ],
-    "src": "resources/css/grid.css",
-    "isEntry": true
+    "src": "resources/css/grid.css"
   },
   "resources/js/app.js": {
     "file": "assets/app-BQMLaWsp.js",
@@ -30,7 +20,7 @@
     "isEntry": true
   },
   "resources/js/grid.js": {
-    "file": "assets/grid-xLmjFGs_.js",
+    "file": "assets/grid-C1-uCHKe.js",
     "name": "grid",
     "src": "resources/js/grid.js",
     "isEntry": true

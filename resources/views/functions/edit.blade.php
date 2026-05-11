@@ -1,5 +1,5 @@
 <x-app-layout>
-    <h1 class="text-2xl font-bold mb-6">Functie bewerken</h1>
+    <h1 class="text-2xl font-bold mb-6 text-teal-500">Functie bewerken</h1>
 
     @if($errors->any())
         <div class="mb-4 px-4 py-2 bg-red-100 text-red-800 rounded">
@@ -16,13 +16,13 @@
         @method('PUT')
 
         <div>
-            <label class="block text-sm font-medium mb-1">Naam</label>
+            <label class="block text-sm font-medium mb-1 dark:text-white">Naam</label>
             <input type="text" name="name" value="{{ old('name', $function->name) }}"
                 class="w-full border rounded px-3 py-2 text-sm" required>
         </div>
 
         <div>
-            <label class="block text-sm font-medium mb-1">Categorie</label>
+            <label class="block text-sm font-medium mb-1 dark:text-white">Categorie</label>
             <input list="category-list" name="category" value="{{ old('category', $function->category) }}"
                 class="w-full border rounded px-3 py-2 text-sm" required>
             <datalist id="category-list">
@@ -30,13 +30,13 @@
                     <option value="{{ $cat }}"></option>
                 @endforeach
             </datalist>
-            <p class="text-xs text-gray-500 mt-1">
+            <p class="text-xs text-gray-500 dark:text-gray-300 mt-1">
                 Kies een bestaande categorie of typ een nieuwe om een nieuwe categorie te maken.
             </p>
         </div>
 
         <div>
-            <label class="block text-sm font-medium mb-1">Huidig icon</label>
+            <label class="block text-sm font-medium mb-1 dark:text-white">Huidig icon</label>
             @if($function->image)
                 <img src="{{ asset($function->image) }}" alt="{{ $function->name }}"
                     class="w-16 h-16 object-contain mb-3">
@@ -44,10 +44,10 @@
                 <p class="text-xs text-gray-500 mb-2">Geen icon ingesteld.</p>
             @endif
 
-            <label class="block text-sm font-medium mb-1">Nieuw icon (optioneel)</label>
+            <label class="block text-sm font-medium mb-1 dark:text-white">Nieuw icon (optioneel)</label>
             <input type="file" name="icon" accept="image/*"
-                class="w-full text-sm">
-            <p class="text-xs text-gray-500 mt-1">Laat leeg om het huidige icon te behouden.</p>
+                class="w-full text-sm dark:text-white">
+            <p class="text-xs text-gray-500 dark:text-gray-300 mt-1">Laat leeg om het huidige icon te behouden.</p>
         </div>
 
         <div class="flex items-center gap-2">
