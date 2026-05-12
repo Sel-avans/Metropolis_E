@@ -3,14 +3,15 @@
 namespace App\Http\Controllers;
 
 use App\Models\GridCell;
-use App\Models\Condition;
+use App\Models\AdjacencyRule;
 
 class QoLController extends Controller
 {
     public function details()
     {
         $cells = GridCell::with('function.effects')->get();
-        $conditions = Condition::with(['functionA', 'functionB'])->get();
+                // Fetch rules from the correct AdjacencyRule table
+        $adjacencyRules = AdjacencyRule::all();
 
         $categories = [
             'safety'      => [],
@@ -31,6 +32,7 @@ class QoLController extends Controller
         // ---------------------------------------------------------
         // 1. BASE EFFECTS
         // ---------------------------------------------------------
+        // 1. Calculate base values from the buildings themselves
         foreach ($cells as $cell) {
             if (!$cell->function) continue;
 
@@ -49,6 +51,7 @@ class QoLController extends Controller
         // ---------------------------------------------------------
         $processedPairs = [];
 
+        // 2. Calculate neighbor bonuses and penalties
         foreach ($cells as $cell) {
             if (!$cell->function) continue;
 
@@ -61,6 +64,7 @@ class QoLController extends Controller
                 $funcB = $neighbor->function;
 
                 // Avoid double counting
+                // Create a unique key so we don't count A->B and B->A twice
                 $pairKey = min($funcA->id, $funcB->id) . '-' . max($funcA->id, $funcB->id);
                 if (isset($processedPairs[$pairKey])) continue;
 
@@ -78,23 +82,21 @@ class QoLController extends Controller
                     $totals[$category] += 2;
                 }
 
-                // ---------------------------------------------------------
-                // 2B. CONDITION BONUS (only if not duplicate of same-category)
-                // ---------------------------------------------------------
+                $rule = $adjacencyRules
                 $condition = $conditions
-                    ->filter(fn($c) =>
-                        ($c->function_a == $funcA->id && $c->function_b == $funcB->id) ||
-                        ($c->function_a == $funcB->id && $c->function_b == $funcA->id)
-                    )
-                    ->sortByDesc('value')
-                    ->first();
+            ->filter(fn($c) =>
+                ($c->function_a == $funcA->id && $c->function_b == $funcB->id) ||
+                ($c->function_a == $funcB->id && $c->function_b == $funcA->id)
+            )
+            ->whereIn('type', ['bonus', 'penalty'])
+            ->sortByDesc('value')
+            ->first();
 
-                if ($condition) {
+            $category = $funcA->id < $funcB->id ? $funcA->category : $funcB->category;
 
-                    // Skip duplicate +2 if it's same category
-                    if (!($condition->value == 2 && $funcA->category === $funcB->category)) {
-
-                        $value = $condition->value ?? 0;
+            if ($condition) {
+                $value = $condition->value ?? 0;
+                $value = $rule->value ?? 0;
 
                         $categories[$category][] = [
                             'function' => "{$funcA->name} next to {$funcB->name} ({$condition->type})",
@@ -107,7 +109,7 @@ class QoLController extends Controller
 
                 // ---------------------------------------------------------
                 // 2C. SENSITIVE / POLLUTING PENALTIES
-                // ---------------------------------------------------------
+                // ---------------------------------------------------------                // Custom logic for sensitive/polluting buildings
                 $isSensitiveA = $funcA->sensitivity === 'sensitive';
                 $isSensitiveB = $funcB->sensitivity === 'sensitive';
 
@@ -176,15 +178,3 @@ class QoLController extends Controller
 
         return $neighbors;
     }
-
-    public static function recalculateQoL()
-{
-    $controller = new self();
-    $response = $controller->details()->getData(true);
-
-    cache()->put('qol_data', $response, 60);
-
-    return $response;
-}
-
-}

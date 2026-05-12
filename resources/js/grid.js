@@ -32,7 +32,7 @@ document.addEventListener("DOMContentLoaded", () => {
         'Gas Station': -2
     };
 
-    async function saveMove(oldRow, oldCol, newRow, newCol, functionName) {
+    async function saveMove(oldRow, oldCol, newRow, newCol, functionName, force = false) {
         try {
             await fetch('/grid/update', {
                 method: 'POST',
@@ -45,16 +45,35 @@ document.addEventListener("DOMContentLoaded", () => {
                     old_col: oldCol,
                     new_row: newRow,
                     new_col: newCol,
-                    function_id: draggedItem.id
+                    function_id: draggedItem.id,
+                    force: force
                 })
             });
 
-            updateQoL();
-        } catch (err) {
-            console.error("Fout bij opslaan gridcel:", err);
+        const data = await response.json();
+        
+        if (response.status === 409) {
+            const userWantsToContinue = window.confirm(data.message);
+            
+            if (userWantsToContinue) {
+                return saveMove(oldRow, oldCol, newRow, newCol, true);
+            } else {
+                location.reload(); 
+                return;
+            }
         }
-    }
 
+        if (!response.ok) {
+            alert(data.message || "Er is een fout opgetreden!"); 
+            location.reload(); 
+            return;
+        }
+
+        updateQoL();
+    } catch (err) {
+        console.error("Fout:", err);
+    }
+}
     async function updateQoL() {
         try {
             const scoreEl = document.getElementById('qol-score-value');
