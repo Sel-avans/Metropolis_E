@@ -134,11 +134,11 @@ class QoLController extends Controller
 
         return response()->json([
             'categories' => [
-                'safety'      => ['total' => $totals['safety'],      'items' => $categories['safety']],
-                'recreation'  => ['total' => $totals['recreation'],  'items' => $categories['recreation']],
-                'environment' => ['total' => $totals['environment'], 'items' => $categories['environment']],
-                'amenities'   => ['total' => $totals['amenities'],   'items' => $categories['amenities']],
-                'mobility'    => ['total' => $totals['mobility'],    'items' => $categories['mobility']],
+                'Safety'      => ['total' => $totals['safety'],      'items' => $categories['safety']],
+                'Recreation'  => ['total' => $totals['recreation'],  'items' => $categories['recreation']],
+                'Environment' => ['total' => $totals['environment'], 'items' => $categories['environment']],
+                'Amenities'   => ['total' => $totals['amenities'],   'items' => $categories['amenities']],
+                'Mobility'    => ['total' => $totals['mobility'],    'items' => $categories['mobility']],
             ],
             'total_score' => array_sum($totals)
         ]);

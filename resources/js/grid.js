@@ -134,7 +134,7 @@ document.addEventListener("DOMContentLoaded", () => {
     function renderQoLBreakdown(data) {
         let html = '';
 
-        html += '<h3 class="dark:text-teal-500">Breakdown QoL Score</h3>';
+        html += '<h3 class="text-xl font-semibold dark:text-teal-500">Breakdown QoL Score</h3>';
         for (const [category, info] of Object.entries(data.categories)) {
             html += `
                 <h3 class="font-semibold mt-3 dark:text-teal-600">
