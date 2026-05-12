@@ -100,4 +100,16 @@
         </div>
 
     </div>
+
+    <div id="qol-popup" class="absolute z-50 bg-slate-800/95 text-slate-50 border border-slate-600 rounded-lg p-3 shadow-lg min-w-[200px] pointer-events-none opacity-0 scale-95 transition-all duration-150 hidden">
+        <div class="font-bold border-b border-slate-600 pb-1.5 mb-2 text-[10px] uppercase tracking-wider text-slate-300">
+            Quality of Life Impact
+        </div>
+        <div>
+            <ul id="popup-neighbors-list" class="space-y-1 text-xs">
+            </ul>
+        </div>
+    </div>
+
+    @vite(['resources/js/grid.js'])
 </x-app-layout>
