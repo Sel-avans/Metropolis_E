@@ -32,9 +32,9 @@ document.addEventListener("DOMContentLoaded", () => {
         'Gas Station': -2
     };
 
-    async function saveMove(oldRow, oldCol, newRow, newCol, functionName, force = false) {
+    async function saveMove(oldRow, oldCol, newRow, newCol, force = false) {
         try {
-            await fetch('/grid/update', {
+            const response = await fetch('/grid/update', {
                 method: 'POST',
                 headers: {
                     'Content-Type': 'application/json',
