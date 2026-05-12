@@ -72,8 +72,9 @@ document.addEventListener("DOMContentLoaded", () => {
         updateQoL();
     } catch (err) {
         console.error("Fout:", err);
+        }
     }
-}
+
     async function updateQoL() {
         try {
             const scoreEl = document.getElementById('qol-score-value');

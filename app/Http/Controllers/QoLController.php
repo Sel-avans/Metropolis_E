@@ -3,6 +3,7 @@
 namespace App\Http\Controllers;
 
 use App\Models\GridCell;
+use App\Models\Condition;
 use App\Models\AdjacencyRule;
 
 class QoLController extends Controller
@@ -10,8 +11,9 @@ class QoLController extends Controller
     public function details()
     {
         $cells = GridCell::with('function.effects')->get();
+        $conditions = Condition::with(['functionA', 'functionB'])->get();
                 // Fetch rules from the correct AdjacencyRule table
-        $adjacencyRules = AdjacencyRule::all();
+        // $adjacencyRules = AdjacencyRule::all();
 
         $categories = [
             'safety'      => [],
@@ -82,21 +84,21 @@ class QoLController extends Controller
                     $totals[$category] += 2;
                 }
 
-                $rule = $adjacencyRules
+                // $rule = $adjacencyRules
                 $condition = $conditions
-            ->filter(fn($c) =>
+                ->filter(fn($c) =>
                 ($c->function_a == $funcA->id && $c->function_b == $funcB->id) ||
                 ($c->function_a == $funcB->id && $c->function_b == $funcA->id)
-            )
-            ->whereIn('type', ['bonus', 'penalty'])
-            ->sortByDesc('value')
-            ->first();
+                )
+                // ->whereIn('type', ['bonus', 'penalty'])
+                ->sortByDesc('value')
+                ->first();
 
-            $category = $funcA->id < $funcB->id ? $funcA->category : $funcB->category;
+                $category = $funcA->id < $funcB->id ? $funcA->category : $funcB->category;
 
-            if ($condition) {
+                if ($condition) {
                 $value = $condition->value ?? 0;
-                $value = $rule->value ?? 0;
+                // $value = $rule->value ?? 0;
 
                         $categories[$category][] = [
                             'function' => "{$funcA->name} next to {$funcB->name} ({$condition->type})",
@@ -104,7 +106,7 @@ class QoLController extends Controller
                         ];
 
                         $totals[$category] += $value;
-                    }
+                    
                 }
 
                 // ---------------------------------------------------------
@@ -176,5 +178,15 @@ class QoLController extends Controller
             }
         }
 
-        return $neighbors;
+    return $neighbors;
     }
+    public static function recalculateQoL()
+    {
+        $controller = new self();
+        $response = $controller->details()->getData(true);
+
+        cache()->put('qol_data', $response, 60);
+
+        return $response;
+    }
+}
