@@ -45,9 +45,6 @@ class QoLController extends Controller
             }
         }
 
-        // ---------------------------------------------------------
-        // 2. ADJACENCY EFFECTS
-        // ---------------------------------------------------------
         $processedPairs = [];
 
         // 2. Calculate neighbor bonuses and penalties
@@ -69,10 +66,12 @@ class QoLController extends Controller
 
                 $category = $funcA->category;
 
-                // ---------------------------------------------------------
-                // 2A. SAME CATEGORY BONUS (+2)
-                // ---------------------------------------------------------
-                if ($funcA->category === $funcB->category) {
+                $conditionExists = $conditions->first(function ($c) use ($funcA, $funcB) {
+                    return $c->function_a == min($funcA->id, $funcB->id)
+                        && $c->function_b == max($funcA->id, $funcB->id);
+                });
+
+                if (!$conditionExists && $funcA->category === $funcB->category) {
                     $categories[$category][] = [
                         'function' => "{$funcA->name} next to {$funcB->name} (same category)",
                         'value'    => 2
@@ -133,9 +132,6 @@ class QoLController extends Controller
             }
         }
 
-        // ---------------------------------------------------------
-        // 3. RETURN RESULT
-        // ---------------------------------------------------------
         return response()->json([
             'categories' => [
                 'safety'      => ['total' => $totals['safety'],      'items' => $categories['safety']],

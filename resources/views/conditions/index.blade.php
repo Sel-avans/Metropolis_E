@@ -152,7 +152,12 @@
                         <h5 class="modal-title fw-bold">Add New Rule</h5>
                     </div>
 
-                        <div class="modal-body">
+                    <div class="modal-body">
+                        @if(session('_last_action') === 'error' && !session('edit_id'))
+                            <div class="alert alert-danger">
+                                {{ session('error') }}
+                            </div>
+                        @endif
 
                         <div class="mb-3">
                             <label class="form-label fw-semibold">Function A</label>
@@ -244,6 +249,16 @@ document.addEventListener('DOMContentLoaded', function () {
         @endif
 
     @endif
+    const createModal = document.getElementById('createModal');
+
+    createModal.addEventListener('hidden.bs.modal', function () {
+        createModal.querySelector('form').reset();
+
+        fetch("{{ route('conditions.index') }}", {
+            method: "GET",
+            headers: { "X-Requested-With": "XMLHttpRequest" }
+        });
+    });
 
 });
 </script>
