@@ -15,20 +15,21 @@ document.addEventListener("DOMContentLoaded", () => {
     const popup = document.getElementById('qol-popup');
     const neighborsList = document.getElementById('popup-neighbors-list');
 
+    // This is the QoL effects table. hardcoded for now. Should be changed to follow actual scores.
     const effectsTable = {
-        'Politiebureau': 3,
-        'Brandweerkazerne': 2,
+        'Police Station': 3,
+        'Fire Station': 2,
         'Park': 4,
-        'Bioscoop': 2,
-        'Sportpark': 3,
-        'Waterzuivering': 1,
+        'Cinema': 2,
+        'Sports Park': 3,
+        'Water Treatment': 1,
         'School': 2,
-        'Winkel': 1,
-        'Ziekenhuis': 3,
-        'Station': 2,
-        'Weg': -1,
-        'Fietspad': 2,
-        'Tankstation': -2
+        'Store': 1,
+        'Hospital': 3,
+        'Train Station': 2,
+        'Road': -1,
+        'Bicycle Path': 2,
+        'Gas Station': -2
     };
 
     async function saveMove(oldRow, oldCol, newRow, newCol, functionName) {
