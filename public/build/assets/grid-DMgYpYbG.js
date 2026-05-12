@@ -1,6 +1,10 @@
 document.addEventListener(`DOMContentLoaded`,()=>{let e=document.querySelectorAll(`.grid-cell`),t=document.querySelectorAll(`.library-item`),n=null,r=!1,i=null;async function a(e,t,r,i){try{await fetch(`/grid/update`,{method:`POST`,headers:{"Content-Type":`application/json`,"X-CSRF-TOKEN":document.querySelector(`meta[name="csrf-token"]`).content},body:JSON.stringify({old_row:e,old_col:t,new_row:r,new_col:i,function_id:n.id})}),o()}catch(e){console.error(`Fout bij opslaan gridcel:`,e)}}async function o(){try{let e=document.getElementById(`qol-score-value`),t=document.getElementById(`breakdown-qol-score`);if(!e&&!t)return;let n=await(await fetch(`/qol/details`)).json();e&&(e.textContent=n.total_score),t&&(t.innerHTML=s(n))}catch(e){console.error(`Fout bij ophalen QoL:`,e)}}function s(e){let t=``;t+=`<h1 class="dark:text-teal-500">Breakdown QoL Score</h1>`;for(let[n,r]of Object.entries(e.categories))t+=`
                 <h3 class="font-semibold mt-3 dark:text-teal-600">
-                    ${n} (totaal: ${r.total})
+                    ${n} (total:
+                    <span class="${r.total<=0?`text-red-600`:`text-green-600`}">
+                        ${r.total}
+                    </span>
+                    )
                 </h3>
             `,r.items.forEach(e=>{t+=`
                     <div class="flex justify-between text-gray-700 dark:text-white">

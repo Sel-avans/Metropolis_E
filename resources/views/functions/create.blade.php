@@ -41,7 +41,7 @@
                text-gray-800 text-sm rounded-md cursor-pointer w-fit">
                 Choose file
             <input type="file" name="icon" accept="image/*" class="hidden" id="fileInput">
-            <p class="text-xs text-gray-500 mt-1">Optional. Max 2MB.</p>
+            <p class="text-xs text-gray-500 dark:text-gray-300 mt-1">Optional. Max 2MB.</p>
         </div>
 
         <div class="flex items-center gap-2">

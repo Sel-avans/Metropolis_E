@@ -1,7 +1,7 @@
 <x-app-layout>
     <div class="flex gap-4">
         
-        <div class="w-auto p-6 h-screen overflow-y-auto">
+        <div class="w-auto p-6 max-h-[93vh] overflow-y-auto">
           
             <div>    
                 <h1 class="text-2xl dark:text-teal-500 font-bold mb-4">Function Library</h1>
@@ -49,12 +49,17 @@
 
         <div class="flex flex-col mx-auto">
 
+            {{-- QoL Score Display --}}
             <div class="w-auto h-min mt-4 border-4 border-gray-400 dark:bg-indigo-800 dark:border-teal-600 rounded-md p-6">
                 <span id="qol-score" class="text-xl font-semibold mb-2 dark:text-teal-500">
                     QoL score: <span id="qol-score-value"></span>
                 </span>
+
+                <span id="old-qol-score" class="mt-4 text-sm">
+                </span>
             </div>
 
+            {{-- Grid Display --}}
             <div class="w-auto p-6">
                 <h1 class="text-2xl text-center font-bold mb-4 dark:text-teal-500">City Grid (3x4)</h1>
 
