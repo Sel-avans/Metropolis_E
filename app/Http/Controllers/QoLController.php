@@ -28,9 +28,6 @@ class QoLController extends Controller
             'mobility'    => 0
         ];
 
-        // ---------------------------------------------------------
-        // 1. BASE EFFECTS
-        // ---------------------------------------------------------
         foreach ($cells as $cell) {
             if (!$cell->function) continue;
 
@@ -44,9 +41,6 @@ class QoLController extends Controller
             }
         }
 
-        // ---------------------------------------------------------
-        // 2. ADJACENCY EFFECTS
-        // ---------------------------------------------------------
         $processedPairs = [];
 
         foreach ($cells as $cell) {
@@ -60,16 +54,17 @@ class QoLController extends Controller
 
                 $funcB = $neighbor->function;
 
-                // Avoid double counting
                 $pairKey = min($funcA->id, $funcB->id) . '-' . max($funcA->id, $funcB->id);
                 if (isset($processedPairs[$pairKey])) continue;
 
                 $category = $funcA->category;
 
-                // ---------------------------------------------------------
-                // 2A. SAME CATEGORY BONUS (+2)
-                // ---------------------------------------------------------
-                if ($funcA->category === $funcB->category) {
+                $conditionExists = $conditions->first(function ($c) use ($funcA, $funcB) {
+                    return $c->function_a == min($funcA->id, $funcB->id)
+                        && $c->function_b == max($funcA->id, $funcB->id);
+                });
+
+                if (!$conditionExists && $funcA->category === $funcB->category) {
                     $categories[$category][] = [
                         'function' => "{$funcA->name} next to {$funcB->name} (same category)",
                         'value'    => 2
@@ -78,9 +73,8 @@ class QoLController extends Controller
                     $totals[$category] += 2;
                 }
 
-                // ---------------------------------------------------------
-                // 2B. CONDITION BONUS (only if not duplicate of same-category)
-                // ---------------------------------------------------------
+
+
                 $condition = $conditions
                     ->filter(fn($c) =>
                         ($c->function_a == $funcA->id && $c->function_b == $funcB->id) ||
@@ -91,7 +85,6 @@ class QoLController extends Controller
 
                 if ($condition) {
 
-                    // Skip duplicate +2 if it's same category
                     if (!($condition->value == 2 && $funcA->category === $funcB->category)) {
 
                         $value = $condition->value ?? 0;
@@ -105,9 +98,7 @@ class QoLController extends Controller
                     }
                 }
 
-                // ---------------------------------------------------------
-                // 2C. SENSITIVE / POLLUTING PENALTIES
-                // ---------------------------------------------------------
+
                 $isSensitiveA = $funcA->sensitivity === 'sensitive';
                 $isSensitiveB = $funcB->sensitivity === 'sensitive';
 
@@ -134,9 +125,6 @@ class QoLController extends Controller
             }
         }
 
-        // ---------------------------------------------------------
-        // 3. RETURN RESULT
-        // ---------------------------------------------------------
         return response()->json([
             'categories' => [
                 'safety'      => ['total' => $totals['safety'],      'items' => $categories['safety']],

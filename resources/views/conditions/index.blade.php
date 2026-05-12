@@ -2,6 +2,7 @@
 
 <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.2/dist/css/bootstrap.min.css" rel="stylesheet">
 
+
 <div class="container py-5">
 
     <div class="d-flex justify-content-between align-items-center mb-4">
@@ -153,6 +154,11 @@
                     </div>
 
                     <div class="modal-body">
+                        @if(session('_last_action') === 'error' && !session('edit_id'))
+                            <div class="alert alert-danger">
+                                {{ session('error') }}
+                            </div>
+                        @endif
 
                         <div class="mb-3">
                             <label class="form-label fw-semibold">Function A</label>
@@ -244,9 +250,20 @@ document.addEventListener('DOMContentLoaded', function () {
         @endif
 
     @endif
+    const createModal = document.getElementById('createModal');
+
+    createModal.addEventListener('hidden.bs.modal', function () {
+        createModal.querySelector('form').reset();
+
+        fetch("{{ route('conditions.index') }}", {
+            method: "GET",
+            headers: { "X-Requested-With": "XMLHttpRequest" }
+        });
+    });
 
 });
 </script>
+
 
 <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.2/dist/js/bootstrap.bundle.min.js"></script>
 
