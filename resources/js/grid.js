@@ -88,11 +88,20 @@ document.addEventListener("DOMContentLoaded", () => {
         }
         else {
             const delta_score = data.total_score - old_score;
-            html += `   
-            <span class="${delta_score < 0 ? 'text-red-600' : 'text-green-600'}">
-                ${delta_score}
-            </span>
-            `;
+            if (delta_score >= 0) {
+                html += ` 
+                <span class="text-right text-xl float-right ${delta_score < 0 ? 'text-red-600' : 'text-green-600'}">
+                    +${delta_score}
+                </span>
+                `;
+            }
+            else{
+                html += ` 
+                <span class="text-right text-xl float-right ${delta_score < 0 ? 'text-red-600' : 'text-green-600'}">
+                    ${delta_score}
+                </span>
+                `;
+            }
         }
 
         if (data.total_score !== 0) {

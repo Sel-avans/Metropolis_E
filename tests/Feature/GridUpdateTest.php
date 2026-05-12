@@ -14,21 +14,21 @@ class GridUpdateTest extends TestCase
     public function test_it_saves_a_function_to_a_grid_cell()
     {
         $func = CityFunction::factory()->create([
-            'name' => 'Politiebureau'
+            'name' => 'Politiebureau',
+            'category' => 'Veiligheid',
         ]);
 
         $response = $this->post('/grid/update', [
-            'row' => 1,
-            'col' => 1,
-            'function' => 'Politiebureau'
+            'new_row' => 1,
+            'new_col' => 1,
+            'function_id' => $func->id
         ]);
-
         $response->assertStatus(200);
 
         $this->assertDatabaseHas('grid_cells', [
             'row' => 1,
             'col' => 1,
-            'city_function_id' => $func->id
+            'function_id' => $func->id
         ]);
     }
 }
