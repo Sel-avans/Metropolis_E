@@ -6,37 +6,49 @@ document.addEventListener("DOMContentLoaded", () => {
     let isDragging = false;
     let sourceCell = null;
 
-    async function saveMove(oldRow, oldCol, newRow, newCol) {
-        try {
-            const response = await fetch('/grid/update', {
-                method: 'POST',
-                headers: {
-                    'Content-Type': 'application/json',
-                    'X-CSRF-TOKEN': document.querySelector('meta[name="csrf-token"]').content
-                },
-                body: JSON.stringify({
-                    old_row: oldRow,
-                    old_col: oldCol,
-                    new_row: newRow,
-                    new_col: newCol,
-                    function_id: draggedItem.id
-                })
-            });
-    
-            const data = await response.json();
-    
-            if (!response.ok) {
-                // Als de server een 403 geeft, komt hij hier:
-                alert(data.message || "Dit mag niet!"); 
-                location.reload(); // Belangrijk om het grid te herstellen!
+// Added the force parameter with a default value of false
+async function saveMove(oldRow, oldCol, newRow, newCol, force = false) {
+    try {
+        const response = await fetch('/grid/update', {
+            method: 'POST',
+            headers: {
+                'Content-Type': 'application/json',
+                'X-CSRF-TOKEN': document.querySelector('meta[name="csrf-token"]').content
+            },
+            body: JSON.stringify({
+                old_row: oldRow,
+                old_col: oldCol,
+                new_row: newRow,
+                new_col: newCol,
+                function_id: draggedItem.id,
+                force: force
+            })
+        });
+
+        const data = await response.json();
+        
+        if (response.status === 409) {
+            const userWantsToContinue = window.confirm(data.message);
+            
+            if (userWantsToContinue) {
+                return saveMove(oldRow, oldCol, newRow, newCol, true);
+            } else {
+                location.reload(); 
                 return;
             }
-    
-            updateQoL();
-        } catch (err) {
-            console.error("Fout:", err);
         }
+
+        if (!response.ok) {
+            alert(data.message || "Er is een fout opgetreden!"); 
+            location.reload(); 
+            return;
+        }
+
+        updateQoL();
+    } catch (err) {
+        console.error("Fout:", err);
     }
+}
     async function updateQoL() {
     try {
         const scoreEl = document.getElementById('qol-score-value');

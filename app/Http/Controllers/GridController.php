@@ -33,45 +33,40 @@ class GridController extends Controller
         $newCol = intval($request->input('new_col'));
         $functionId = $request->input('function_id');
         
-        if ($oldRow !== null && $oldCol !== null) {
-            GridCell::where('row', $oldRow)
-                    ->where('col', $oldCol)
-                    ->delete();
-        }
-
+        $force = $request->boolean('force', false); 
+        
         if ($functionId === null) {
-            GridCell::where('row', $newRow)
-                    ->where('col', $newCol)
-                    ->delete();
-
+            if ($oldRow !== null && $oldCol !== null) {
+                GridCell::where('row', $oldRow)->where('col', $oldCol)->delete();
+            }
+            GridCell::where('row', $newRow)->where('col', $newCol)->delete();
             return response()->json(['success' => true]);
         }
-
+    
         $function = CityFunction::find($functionId);
-
+        
         if (!$function) {
             return response()->json(['error' => 'Function not found'], 404);
         }
-
+    
         $adjacencyResult = $this->checkAdjacency($newRow, $newCol, $function->id);
-
-        if (!$adjacencyResult['allowed']) {
+    
+        if (!$adjacencyResult['allowed'] && !$force) {
             return response()->json([
                 'success' => false,
-                'message' => $adjacencyResult['message']
-            ], 403);
+                'message' => $adjacencyResult['message'] . "\n\nAre you sure you want to place this building here?"
+            ], 409); 
         }
-
+    
+        if ($oldRow !== null && $oldCol !== null) {
+            GridCell::where('row', $oldRow)->where('col', $oldCol)->delete();
+        }
+    
         GridCell::updateOrCreate(
-            [
-                'row' => $newRow,
-                'col' => $newCol
-            ],
-            [
-                'function_id' => $function->id
-            ]
+            ['row' => $newRow, 'col' => $newCol],
+            ['function_id' => $function->id]
         );
-
+    
         return response()->json(['success' => true]);
     }
 

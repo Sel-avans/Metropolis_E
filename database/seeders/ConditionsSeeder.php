@@ -46,6 +46,9 @@ class ConditionsSeeder extends Seeder
             [9, 8, 'penalty', -2],
             [9, 11, 'penalty', -2],
             [9, 13, 'penalty', -2],
+            
+            [3, 13, 'forbidden', null], 
+            [13, 3, 'forbidden', null],
         ];
 
         foreach ($rules as $r) {
