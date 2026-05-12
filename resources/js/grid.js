@@ -90,14 +90,14 @@ document.addEventListener("DOMContentLoaded", () => {
             const delta_score = data.total_score - old_score;
             if (delta_score >= 0) {
                 html += ` 
-                <span class="text-right text-xl float-right ${delta_score < 0 ? 'text-red-600' : 'text-green-600'}">
+                <span class="text-xl float-right ${delta_score < 0 ? 'text-red-600' : 'text-green-600'}">
                     +${delta_score}
                 </span>
                 `;
             }
             else{
                 html += ` 
-                <span class="text-right text-xl float-right ${delta_score < 0 ? 'text-red-600' : 'text-green-600'}">
+                <span class="text-xl ${delta_score < 0 ? 'text-red-600' : 'text-green-600'}">
                     ${delta_score}
                 </span>
                 `;

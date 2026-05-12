@@ -55,7 +55,7 @@
                     QoL score: <span id="qol-score-value"></span>
                 </span>
 
-                <span id="old-qol-score">
+                <span id="old-qol-score" class="float-right">
                 </span>
             </div>
 
