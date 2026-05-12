@@ -12,13 +12,12 @@ class DestinationSeeder extends Seeder
      */
     public function run(): void
     {
-        // Define the default destinations for the library
         $destinations = [
-            ['name' => 'Park', 'color' => '#2ecc71'],
-            ['name' => 'Woonwijk', 'color' => '#3498db'],
-            ['name' => 'Centrum', 'color' => '#e74c3c'],
-            ['name' => 'Industrie', 'color' => '#f1c40f'],
-            ['name' => 'Water', 'color' => '#1abc9c'],
+            ['name' => 'Park',        'color' => '#2ecc71'],
+            ['name' => 'Residential', 'color' => '#3498db'],
+            ['name' => 'Downtown',    'color' => '#e74c3c'],
+            ['name' => 'Industrial',  'color' => '#f1c40f'],
+            ['name' => 'Water',       'color' => '#1abc9c'],
         ];
 
         foreach ($destinations as $data) {

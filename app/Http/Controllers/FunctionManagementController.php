@@ -3,31 +3,30 @@
 namespace App\Http\Controllers;
 
 use App\Models\CityFunction;
+use App\Models\Effect;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Storage;
 
 class FunctionManagementController extends Controller
 {
-    private $allowedCategories = [
-        'veiligheid',
-        'recreatie',
-        'milieukwaliteit',
-        'voorzieningen',
-        'mobiliteit'
-    ];
-
     public function index()
     {
         $functions = CityFunction::orderBy('category')->orderBy('name')->get();
 
-        $categories = $this->allowedCategories;
+        $categories = CityFunction::select('category')
+            ->distinct()
+            ->orderBy('category')
+            ->pluck('category');
 
         return view('functions.index', compact('functions', 'categories'));
     }
 
     public function create()
     {
-        $categories = $this->allowedCategories;
+        $categories = CityFunction::select('category')
+            ->distinct()
+            ->orderBy('category')
+            ->pluck('category');
 
         return view('functions.create', compact('categories'));
     }
@@ -42,12 +41,12 @@ class FunctionManagementController extends Controller
 
         $inputCategory = strtolower(trim($request->category));
 
-        $normalizedCategory = collect($this->allowedCategories)
-            ->first(fn($cat) => strtolower($cat) === $inputCategory);
+        $normalizedCategory = CityFunction::select('category')
+            ->whereRaw('LOWER(category) = ?', [$inputCategory])
+            ->value('category');
 
-        if (!$normalizedCategory) {
-            return back()->withErrors(['category' => 'Ongeldige categorie']);
-        }
+        $finalCategory = $normalizedCategory ?? $request->category;
+        $data['category'] = $finalCategory;
 
         if ($request->hasFile('icon')) {
             $filename = time() . '_' . $request->file('icon')->getClientOriginalName();
@@ -57,12 +56,14 @@ class FunctionManagementController extends Controller
 
         $function = CityFunction::create([
             'name'     => $data['name'],
-            'category' => $normalizedCategory,
+            'category' => $data['category'],
             'image'    => $data['image'] ?? null,
         ]);
 
-        foreach ($this->allowedCategories as $cat) {
-            \App\Models\Effect::create([
+        $allCategories = ['safety', 'recreation', 'environment', 'amenities', 'mobility'];
+
+        foreach ($allCategories as $cat) {
+            Effect::create([
                 'function_id' => $function->id,
                 'category'    => $cat,
                 'value'       => 0,
@@ -71,12 +72,15 @@ class FunctionManagementController extends Controller
 
         return redirect()
             ->route('functions.index')
-            ->with('status', 'Functie succesvol aangemaakt.');
+            ->with('status', 'Function successfully created.');
     }
 
     public function edit(CityFunction $function)
     {
-        $categories = $this->allowedCategories;
+        $categories = CityFunction::select('category')
+            ->distinct()
+            ->orderBy('category')
+            ->pluck('category');
 
         return view('functions.edit', compact('function', 'categories'));
     }
@@ -91,17 +95,16 @@ class FunctionManagementController extends Controller
 
         $inputCategory = strtolower(trim($request->category));
 
-        $normalizedCategory = collect($this->allowedCategories)
-            ->first(fn($cat) => strtolower($cat) === $inputCategory);
+        $normalizedCategory = CityFunction::select('category')
+            ->whereRaw('LOWER(category) = ?', [$inputCategory])
+            ->value('category');
 
-        if (!$normalizedCategory) {
-            return back()->withErrors(['category' => 'Ongeldige categorie']);
-        }
+        $finalCategory = $normalizedCategory ?? $request->category;
+        $data['category'] = $finalCategory;
 
         if ($request->hasFile('icon')) {
-            if ($function->image && str_starts_with($function->image, 'storage/')) {
-                $oldPath = str_replace('storage/', '', $function->image);
-                Storage::disk('public')->delete($oldPath);
+            if ($function->image && str_starts_with($function->image, 'icons/')) {
+                @unlink(public_path($function->image));
             }
 
             $filename = time() . '_' . $request->file('icon')->getClientOriginalName();
@@ -111,26 +114,25 @@ class FunctionManagementController extends Controller
 
         $function->update([
             'name'     => $data['name'],
-            'category' => $normalizedCategory,
+            'category' => $data['category'],
             'image'    => $data['image'] ?? $function->image,
         ]);
 
         return redirect()
             ->route('functions.index')
-            ->with('status', 'Functie succesvol bijgewerkt.');
+            ->with('status', 'Function successfully updated.');
     }
 
     public function destroy(CityFunction $function)
     {
-        if ($function->image && str_starts_with($function->image, 'storage/')) {
-            $oldPath = str_replace('storage/', '', $function->image);
-            Storage::disk('public')->delete($oldPath);
+        if ($function->image && str_starts_with($function->image, 'icons/')) {
+            @unlink(public_path($function->image));
         }
 
         $function->delete();
 
         return redirect()
             ->route('functions.index')
-            ->with('status', 'Functie succesvol verwijderd.');
+            ->with('status', 'Function successfully deleted.');
     }
 }

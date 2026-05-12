@@ -1,6 +1,6 @@
 {
   "resources/css/app.css": {
-    "file": "assets/app-DD048Nox.css",
+    "file": "assets/app-B3lTpGUp.css",
     "src": "resources/css/app.css"
   },
   "resources/css/grid.css": {
@@ -14,13 +14,13 @@
     "isEntry": true
   },
   "resources/js/effects.js": {
-    "file": "assets/effects-CQebDMqM.js",
+    "file": "assets/effects-C3yvENlS.js",
     "name": "effects",
     "src": "resources/js/effects.js",
     "isEntry": true
   },
   "resources/js/grid.js": {
-    "file": "assets/grid-C1-uCHKe.js",
+    "file": "assets/grid-C8DgBFE6.js",
     "name": "grid",
     "src": "resources/js/grid.js",
     "isEntry": true

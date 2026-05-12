@@ -5,6 +5,7 @@ document.addEventListener("DOMContentLoaded", () => {
     let draggedItem = null;
     let isDragging = false;
     let sourceCell = null;
+    let old_score;
 
     async function saveMove(oldRow, oldCol, newRow, newCol) {
         try {
@@ -30,53 +31,86 @@ document.addEventListener("DOMContentLoaded", () => {
     }
 
     async function updateQoL() {
-    try {
-        const scoreEl = document.getElementById('qol-score-value');
-        const breakdownEl = document.getElementById('breakdown-qol-score');
+        try {
+            const scoreEl = document.getElementById('qol-score-value');
+            const breakdownEl = document.getElementById('breakdown-qol-score');
+            const oldScoreEl = document.getElementById('old-qol-score');
 
-        if (!scoreEl && !breakdownEl) return;
+            if (!scoreEl && !breakdownEl) return;
 
-        const response = await fetch('/qol/details');
-        const data = await response.json();
+            const response = await fetch('/qol/details');
+            const data = await response.json();
 
-        if (scoreEl) {
-            scoreEl.textContent = data.total_score;
+            if (scoreEl) {
+                scoreEl.textContent = data.total_score;
+                oldScoreEl.innerHTML = compareScores(data);
+            }
+
+            if (breakdownEl) {
+                breakdownEl.innerHTML = renderQoLBreakdown(data);
+            }
+
+        } catch (err) {
+            console.error("Fout bij ophalen QoL:", err);
         }
-
-        if (breakdownEl) {
-            breakdownEl.innerHTML = renderQoLBreakdown(data);
-        }
-
-    } catch (err) {
-        console.error("Fout bij ophalen QoL:", err);
     }
-}
+
+    function compareScores(data) {
+        let html ='';
+
+        if (old_score === undefined) {
+            html+='';
+        }
+        else {
+            const delta_score = data.total_score - old_score;
+            html += `   
+            <span class="${delta_score < 0 ? 'text-red-600' : 'text-green-600'}">
+                ${delta_score}
+            </span>
+            `;
+        }
+
+        if (data.total_score !== 0) {
+            old_score = data.total_score;
+        }
+
+        return html;
+    }
+
     function renderQoLBreakdown(data) {
         let html = '';
 
-        html += '<h1 class="dark:text-teal-500">Breakdown QoL Score</h1>';
+        html += '<h3 class="dark:text-teal-500">Breakdown QoL Score</h3>';
         for (const [category, info] of Object.entries(data.categories)) {
             html += `
                 <h3 class="font-semibold mt-3 dark:text-teal-600">
-                    ${category} (totaal: ${info.total})
+                    ${category} (total:
+                    <span class="${info.total <= 0 ? 'text-red-600' : 'text-green-600'}">
+                        ${info.total}
+                    </span>
+                    )
                 </h3>
             `;
 
-            info.items.forEach(item => {
-                html += `
-                    <div class="flex justify-between text-gray-700 dark:text-white">
-                        <span>${item.function}</span>
-                        <span class="${item.value <= 0 ? 'text-red-600' : 'text-green-600'}">
-                            ${item.value}
-                        </span>
-                    </div>
-                `;
-            });
+            // Shows what item function contributes to the QoL score and by how much.
+            
+            // info.items.forEach(item => {
+            //     html += `
+            //         <div class="flex justify-between text-gray-700 dark:text-white">
+            //             <span>${item.function}</span>
+            //             <span class="${item.value <= 0 ? 'text-red-600' : 'text-green-600'}">
+            //                 ${item.value}
+            //             </span>
+            //         </div>
+            //     `;
+            // });
         }
 
+        // Should we keep this?
         html += `
             <h3 class="font-bold mt-4 dark:text-teal-600">
-                Totale QoL: ${data.total_score}
+                Total QoL: 
+                <span class="${data.total_score <= 0 ? 'text-red-600' : 'text-green-600'}">${data.total_score}</span>
             </h3>
         `;
 
@@ -88,7 +122,7 @@ document.addEventListener("DOMContentLoaded", () => {
             isDragging = true;
 
             draggedItem = {
-                id: item.dataset.functionId,
+                id: Number(item.dataset.functionId),
                 name: item.dataset.functionName,
                 image: item.dataset.image
             };
@@ -105,7 +139,7 @@ document.addEventListener("DOMContentLoaded", () => {
             isDragging = true;
 
             draggedItem = {
-                id: img.dataset.functionId,
+                id: Number(img.dataset.functionId),
                 name: img.alt,
                 image: img.src
             };

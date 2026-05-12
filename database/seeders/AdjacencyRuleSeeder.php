@@ -11,11 +11,9 @@ class AdjacencyRuleSeeder extends Seeder
     public function run(): void
     {
         $rules = [
-            ['a' => 'Park', 'b' => 'Sportpark', 'type' => 'bonus', 'value' => 2],
-
-            ['a' => 'School', 'b' => 'Weg', 'type' => 'penalty', 'value' => -2],
-
-            ['a' => 'Ziekenhuis', 'b' => 'Tankstation', 'type' => 'forbidden', 'value' => 0],
+            ['a' => 'Park',          'b' => 'Sports Park',   'type' => 'bonus',     'value' => 2],
+            ['a' => 'School',        'b' => 'Road',          'type' => 'penalty',   'value' => -2],
+            ['a' => 'Hospital',      'b' => 'Gas Station',   'type' => 'forbidden', 'value' => 0],
         ];
 
         foreach ($rules as $r) {
