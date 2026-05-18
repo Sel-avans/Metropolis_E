@@ -13,7 +13,7 @@
     <table class="w-full border border-gray-200 rounded-lg overflow-hidden shadow-sm">
         <thead class="bg-gray-400 dark:bg-gray-800 dark:text-white">
             <tr>
-                <th class="border-b p-3 text-left font-semibold">Functie</th>
+                <th class="border-b p-3 text-left font-semibold">Functions</th>
 
                 @foreach($categories as $cat)
                     <th class="border-b p-3 text-center font-semibold capitalize">{{ $cat }}</th>
@@ -70,97 +70,104 @@
         </tbody>
     </table>
 
-    {{-- Toasts --}}
     <div id="toast"
          class="fixed top-4 right-4 bg-green-600 text-white px-4 py-2 rounded-lg shadow-lg opacity-0 pointer-events-none transition-opacity duration-300 z-50">
-        ✔ Effecten succesvol opgeslagen!
+        ✔ Effects succesfully saved!
     </div>
 
     <div id="toast-nochange"
          class="fixed top-4 right-4 bg-gray-700 text-white px-4 py-2 rounded-lg shadow-lg opacity-0 pointer-events-none transition-opacity duration-300 z-50">
-        Geen wijzigingen om op te slaan
+        No changes to save
     </div>
 
     <div id="effects-config" data-update-url="{{ route('effects.update') }}" class="hidden"></div>
 
-    {{-- JS --}}
     <script>
-        document.addEventListener('click', async function (e) {
+document.addEventListener('click', async function (e) {
 
-            // PLUS
-            if (e.target.classList.contains('plus-btn')) {
-                const span = e.target.closest('tr')
-                    .querySelector(`.effect-value[data-category="${e.target.dataset.category}"]`);
+    if (e.target.classList.contains('plus-btn')) {
+        const span = e.target.closest('tr')
+            .querySelector(`.effect-value[data-category="${e.target.dataset.category}"]`);
 
-                let value = Number(span.textContent.trim());
-                if (value < 5) value++;
+        let value = Number(span.textContent.trim());
+        if (value < 5) value++;
 
-                span.textContent = value;
-            }
+        span.textContent = value;
+    }
 
-            // MINUS
-            if (e.target.classList.contains('minus-btn')) {
-                const span = e.target.closest('tr')
-                    .querySelector(`.effect-value[data-category="${e.target.dataset.category}"]`);
+    if (e.target.classList.contains('minus-btn')) {
+        const span = e.target.closest('tr')
+            .querySelector(`.effect-value[data-category="${e.target.dataset.category}"]`);
 
-                let value = Number(span.textContent.trim());
-                if (value > -5) value--;
+        let value = Number(span.textContent.trim());
+        if (value > -5) value--;
 
-                span.textContent = value;
-            }
+        span.textContent = value;
+    }
 
-            // SAVE
-            if (e.target.classList.contains('save-row-btn')) {
+    if (e.target.classList.contains('save-row-btn')) {
 
-                const row = e.target.closest('tr');
-                const functionId = e.target.dataset.id;
+        const row = e.target.closest('tr');
+        const functionId = e.target.dataset.id;
 
-                let effects = {};
-                let hasChanges = false;
+        let effects = {};
+        let hasChanges = false;
 
-                row.querySelectorAll('.effect-value').forEach(span => {
-                    const category = span.dataset.category;
-                    const original = Number(span.dataset.original);
-                    const current = Number(span.textContent.trim());
+        row.querySelectorAll('.effect-value').forEach(span => {
+            const category = span.dataset.category;
+            const original = Number(span.dataset.original);
+            const current = Number(span.textContent.trim());
 
-                    effects[category] = current;
+            effects[category] = current;
 
-                    if (current !== original) hasChanges = true;
-                });
-
-                if (!hasChanges) {
-                    const toast = document.getElementById('toast-nochange');
-                    toast.style.opacity = 1;
-                    setTimeout(() => toast.style.opacity = 0, 1500);
-                    return;
-                }
-
-                const response = await fetch(
-                    document.getElementById('effects-config').dataset.updateUrl,
-                    {
-                        method: "POST",
-                        headers: {
-                            "Content-Type": "application/json",
-                            "X-CSRF-TOKEN": document.querySelector('meta[name="csrf-token"]').content
-                        },
-                        body: JSON.stringify({
-                            function_id: functionId,
-                            effects: effects
-                        })
-                    }
-                );
-
-                if (response.ok) {
-                    row.querySelectorAll('.effect-value').forEach(span => {
-                        span.dataset.original = span.textContent.trim();
-                    });
-
-                    const toast = document.getElementById('toast');
-                    toast.style.opacity = 1;
-                    setTimeout(() => toast.style.opacity = 0, 1500);
-                }
-            }
+            if (current !== original) hasChanges = true;
         });
-    </script>
+
+        if (!hasChanges) {
+            const toast = document.getElementById('toast-nochange');
+            toast.style.opacity = 1;
+            setTimeout(() => toast.style.opacity = 0, 1500);
+            return;
+        }
+
+        const confirmed = confirm("Are you sure you want to save this effect(s)?");
+        if (!confirmed) {
+
+            row.querySelectorAll('.effect-value').forEach(span => {
+                span.textContent = span.dataset.original;
+            });
+
+            return;
+        }
+
+        const response = await fetch(
+            document.getElementById('effects-config').dataset.updateUrl,
+            {
+                method: "POST",
+                headers: {
+                    "Content-Type": "application/json",
+                    "X-CSRF-TOKEN": document.querySelector('meta[name="csrf-token"]').content
+                },
+                body: JSON.stringify({
+                    function_id: functionId,
+                    effects: effects
+                })
+            }
+        );
+
+        if (response.ok) {
+            // Update original values
+            row.querySelectorAll('.effect-value').forEach(span => {
+                span.dataset.original = span.textContent.trim();
+            });
+
+            const toast = document.getElementById('toast');
+            toast.style.opacity = 1;
+            setTimeout(() => toast.style.opacity = 0, 1500);
+        }
+    }
+});
+</script>
+
 
 </x-app-layout>

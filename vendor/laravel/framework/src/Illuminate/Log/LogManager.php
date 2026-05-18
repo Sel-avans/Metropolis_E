@@ -5,6 +5,7 @@ namespace Illuminate\Log;
 use Closure;
 use Illuminate\Contracts\Log\ContextLogProcessor;
 use Illuminate\Support\Collection;
+use Illuminate\Support\RebindsCallbacksToSelf;
 use Illuminate\Support\Str;
 use InvalidArgumentException;
 use Monolog\Formatter\LineFormatter;
@@ -21,6 +22,7 @@ use Monolog\Logger as Monolog;
 use Monolog\Processor\ProcessorInterface;
 use Monolog\Processor\PsrLogMessageProcessor;
 use Psr\Log\LoggerInterface;
+use ReflectionException;
 use RuntimeException;
 use Throwable;
 
@@ -31,7 +33,7 @@ use function Illuminate\Support\enum_value;
  */
 class LogManager implements LoggerInterface
 {
-    use ParsesLogConfiguration;
+    use ParsesLogConfiguration, RebindsCallbacksToSelf;
 
     /**
      * The application instance.
@@ -581,12 +583,12 @@ class LogManager implements LoggerInterface
     /**
      * Set the default log driver name.
      *
-     * @param  string  $name
+     * @param  \UnitEnum|string  $name
      * @return void
      */
     public function setDefaultDriver($name)
     {
-        $this->app['config']['logging.default'] = $name;
+        $this->app['config']['logging.default'] = enum_value($name);
     }
 
     /**
@@ -602,9 +604,9 @@ class LogManager implements LoggerInterface
     public function extend($driver, Closure $callback)
     {
         try {
-            $callback = $callback->bindTo($this, static::class) ?? throw new RuntimeException;
-        } catch (Throwable) {
-            $callback = $callback->bindTo(null, static::class);
+            $callback = $this->bindCallbackToSelf($callback) ?? throw new RuntimeException('Unable to bind custom driver callback');
+        } catch (ReflectionException $e) {
+            throw new RuntimeException('Unable to bind custom driver callback', previous: $e);
         }
 
         $this->customCreators[$driver] = $callback;

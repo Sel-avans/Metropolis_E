@@ -21,20 +21,34 @@
                 class="w-full border rounded px-3 py-2 text-sm" required>
         </div>
 
-        <div>
+        <div class="relative">
             <label class="block text-sm text-white font-medium mb-1">Category</label>
-            <input list="category-list" name="category" value="{{ old('category', $function->category) }}"
-                class="w-full border rounded px-3 py-2 text-sm" required>
 
-            <datalist id="category-list">
+            <input
+                type="text"
+                id="category-input"
+                name="category"
+                value="{{ old('category', $function->category) }}"
+                class="w-full border rounded px-3 py-2 text-sm bg-gray-100 cursor-pointer"
+                autocomplete="off"
+                readonly
+                required
+            >
+
+            <div id="category-dropdown"
+                 class="absolute z-20 w-full bg-white border rounded shadow hidden max-h-48 overflow-y-auto">
+
                 @foreach($categories as $cat)
-                    <option value="{{ $cat }}"></option>
+                    <div class="px-3 py-2 text-sm hover:bg-gray-100 cursor-pointer category-option">
+                        {{ $cat }}
+                    </div>
                 @endforeach
-            </datalist>
 
-            <p class="text-xs text-gray-500 dark:text-gray-300 mt-1">
-                Choose an existing category or type a new one to create a new category.
-            </p>
+                <div class="px-3 py-2 text-sm text-blue-600 hover:bg-blue-100 cursor-pointer font-medium"
+                     id="add-new-category">
+                    + Add new category
+                </div>
+            </div>
         </div>
 
         <div>
@@ -73,6 +87,7 @@
             <p class="text-xs text-gray-500 dark:text-gray-300 mt-1">Leave empty to keep the current icon.</p>
         </div>
 
+        {{-- BUTTONS --}}
         <div class="flex items-center gap-2">
             <button type="submit"
                     class="px-4 py-2 bg-blue-600 hover:bg-blue-700 text-white text-sm rounded-md">
@@ -92,6 +107,57 @@
             label.textContent = this.files.length
                 ? this.files[0].name
                 : 'No file chosen';
+        });
+
+        const input = document.getElementById('category-input');
+        const dropdown = document.getElementById('category-dropdown');
+        const addNewBtn = document.getElementById('add-new-category');
+
+        input.addEventListener('click', () => {
+            dropdown.classList.remove('hidden');
+        });
+
+        document.addEventListener('click', (e) => {
+            if (!input.contains(e.target) && !dropdown.contains(e.target)) {
+                dropdown.classList.add('hidden');
+            }
+        });
+
+        document.querySelectorAll('.category-option').forEach(option => {
+            option.addEventListener('click', () => {
+                input.value = option.textContent.trim();
+                dropdown.classList.add('hidden');
+            });
+        });
+
+        addNewBtn.addEventListener('click', () => {
+            const newCat = prompt("Enter a new category name:");
+
+            if (!newCat) return;
+
+            const newOption = document.createElement('div');
+            newOption.className = "px-3 py-2 text-sm hover:bg-gray-100 cursor-pointer category-option";
+            newOption.textContent = newCat;
+
+            dropdown.insertBefore(newOption, addNewBtn);
+
+            newOption.addEventListener('click', () => {
+                input.value = newCat;
+                dropdown.classList.add('hidden');
+            });
+
+            input.value = newCat;
+            dropdown.classList.add('hidden');
+        });
+
+        const form = document.querySelector('form');
+        const saveButton = form.querySelector('button[type="submit"]');
+
+        saveButton.addEventListener('click', function (event) {
+            const confirmed = confirm("Are you sure you want to update this function?");
+            if (!confirmed) {
+                event.preventDefault();
+            }
         });
     </script>
 
