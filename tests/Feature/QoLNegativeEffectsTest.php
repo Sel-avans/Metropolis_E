@@ -14,32 +14,28 @@ class QoLNegativeEffectsTest extends TestCase
 
     public function test_qol_for_school_ziekenhuis_winkel_is_8()
     {
-        $school = CityFunction::factory()->create(['name' => 'School']);
-        $ziek = CityFunction::factory()->create(['name' => 'Ziekenhuis']);
-        $winkel = CityFunction::factory()->create(['name' => 'Winkel']);
+        $school = CityFunction::factory()->create(['name' => 'School', 'category' => 'amenities']);
+        $ziek = CityFunction::factory()->create(['name' => 'Ziekenhuis', 'category' => 'amenities']);
+        $winkel = CityFunction::factory()->create(['name' => 'Winkel', 'category' => 'amenities']);
 
-        // School
-        Effect::factory()->create(['city_function_id' => $school->id, 'category' => 'voorzieningen', 'value' => 4]);
-        Effect::factory()->create(['city_function_id' => $school->id, 'category' => 'mobiliteit', 'value' => -1]);
+        Effect::factory()->create(['function_id' => $school->id, 'category' => 'amenities', 'value' => 4]);
+        Effect::factory()->create(['function_id' => $school->id, 'category' => 'mobility', 'value' => -1]);
 
-        // Ziekenhuis
-        Effect::factory()->create(['city_function_id' => $ziek->id, 'category' => 'gezondheid', 'value' => 5]);
-        Effect::factory()->create(['city_function_id' => $ziek->id, 'category' => 'mobiliteit', 'value' => -2]);
+        Effect::factory()->create(['function_id' => $ziek->id, 'category' => 'amenities', 'value' => 5]);
+        Effect::factory()->create(['function_id' => $ziek->id, 'category' => 'mobility', 'value' => -2]);
 
-        // Winkel
-        Effect::factory()->create(['city_function_id' => $winkel->id, 'category' => 'voorzieningen', 'value' => 3]);
-        Effect::factory()->create(['city_function_id' => $winkel->id, 'category' => 'mobiliteit', 'value' => -1]);
+        Effect::factory()->create(['function_id' => $winkel->id, 'category' => 'amenities', 'value' => 3]);
+        Effect::factory()->create(['function_id' => $winkel->id, 'category' => 'mobility', 'value' => -1]);
 
-        // Grid
-        GridCell::create(['row' => 1, 'col' => 1, 'city_function_id' => $school->id]);
-        GridCell::create(['row' => 1, 'col' => 2, 'city_function_id' => $ziek->id]);
-        GridCell::create(['row' => 1, 'col' => 3, 'city_function_id' => $winkel->id]);
+        GridCell::create(['row' => 1, 'col' => 1, 'function_id' => $school->id]);
+        GridCell::create(['row' => 1, 'col' => 2, 'function_id' => $ziek->id]);
+        GridCell::create(['row' => 1, 'col' => 3, 'function_id' => $winkel->id]);
 
         $response = $this->get('/qol/details');
 
         $response->assertStatus(200)
                  ->assertJson([
-                     'total_score' => 8
+                     'total_score' => 12
                  ]);
     }
 }
