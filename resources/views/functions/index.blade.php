@@ -23,7 +23,7 @@
                     <tr class="h-16">
                         <th class="p-3 text-center font-semibold">Icon</th>
                         <th class="p-3 text-left font-semibold">Name</th>
-                        <th class="p-3 text-left font-semibold">Categorie</th>
+                        <th class="p-3 text-left font-semibold">Category</th>
                         <th class="p-3 text-center font-semibold">Actions</th>
                     </tr>
                 </thead>
@@ -41,7 +41,7 @@
                         </td>
 
                         <td class="p-3 text-left align-middle text-gray-300">
-                            {{ $function->category }}
+                            {{ ucfirst($function->category) }}
                         </td>
 
                         <td class="p-3 text-center align-middle">

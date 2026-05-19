@@ -42,6 +42,8 @@ Route::middleware('auth')->group(function () {
     Route::delete('/profile', [ProfileController::class, 'destroy'])->name('profile.destroy');
 });
 
+Route::delete('/grid/cell/{cell}/function', [GridController::class, 'removeFunction']);
+
 Route::resource('conditions', ConditionsController::class)->except(['show']);
 
 require __DIR__.'/auth.php';

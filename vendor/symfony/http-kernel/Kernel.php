@@ -72,11 +72,11 @@ abstract class Kernel implements KernelInterface, RebootableInterface, Terminabl
      */
     private static array $freshCache = [];
 
-    public const VERSION = '8.0.8';
-    public const VERSION_ID = 80008;
+    public const VERSION = '8.0.11';
+    public const VERSION_ID = 80011;
     public const MAJOR_VERSION = 8;
     public const MINOR_VERSION = 0;
-    public const RELEASE_VERSION = 8;
+    public const RELEASE_VERSION = 11;
     public const EXTRA_VERSION = '';
 
     public const END_OF_MAINTENANCE = '07/2026';
@@ -430,7 +430,7 @@ abstract class Kernel implements KernelInterface, RebootableInterface, Terminabl
 
         if ($collectDeprecations = $this->debug && !\defined('PHPUNIT_COMPOSER_INSTALL')) {
             $collectedLogs = [];
-            $previousHandler = set_error_handler(function ($type, $message, $file, $line) use (&$collectedLogs, &$previousHandler) {
+            $previousHandler = set_error_handler(static function ($type, $message, $file, $line) use (&$collectedLogs, &$previousHandler) {
                 if (\E_USER_DEPRECATED !== $type && \E_DEPRECATED !== $type) {
                     return $previousHandler ? $previousHandler($type, $message, $file, $line) : false;
                 }

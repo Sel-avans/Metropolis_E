@@ -435,7 +435,17 @@ abstract class Model implements Arrayable, ArrayAccess, CanBeEscapedWhenCastToSt
     {
         $table = static::resolveClassAttribute(Table::class);
 
-        $this->table ??= $table->name ?? null;
+        $reflection = new ReflectionClass(static::class);
+
+        $declaresTable = $reflection->hasProperty('table')
+            && $reflection->getProperty('table')->getDeclaringClass()->getName() === static::class;
+
+        if (! $declaresTable && $reflection->getAttributes(Table::class) !== []) {
+            $this->table = $table->name ?? null;
+        } else {
+            $this->table ??= $table->name ?? null;
+        }
+
         $this->connection ??= static::resolveClassAttribute(Connection::class, 'name');
 
         if ($this->primaryKey === 'id' && $table && $table->key !== null) {
@@ -1670,7 +1680,7 @@ abstract class Model implements Arrayable, ArrayAccess, CanBeEscapedWhenCastToSt
 
         $ids = is_array($ids) ? $ids : func_get_args();
 
-        if (count($ids) === 0) {
+        if ($ids === []) {
             return 0;
         }
 
@@ -1979,9 +1989,13 @@ abstract class Model implements Arrayable, ArrayAccess, CanBeEscapedWhenCastToSt
      */
     protected static function isScopeMethodWithAttribute(string $method)
     {
-        return method_exists(static::class, $method) &&
-            (new ReflectionMethod(static::class, $method))
-                ->getAttributes(LocalScope::class) !== [];
+        if (method_exists(static::class, $method)) {
+            $reflectionClass = new ReflectionMethod(static::class, $method);
+
+            return ! $reflectionClass->isPrivate() && $reflectionClass->getAttributes(LocalScope::class) !== [];
+        }
+
+        return false;
     }
 
     /**
@@ -2638,7 +2652,7 @@ abstract class Model implements Arrayable, ArrayAccess, CanBeEscapedWhenCastToSt
      */
     protected static function resolveClassAttribute(string $attributeClass, ?string $property = null, ?string $class = null)
     {
-        $class = $class ?? static::class;
+        $class ??= static::class;
 
         $cacheKey = $class.'@'.$attributeClass;
 

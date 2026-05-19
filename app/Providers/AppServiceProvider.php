@@ -19,8 +19,10 @@ class AppServiceProvider extends ServiceProvider
     /**
      * Bootstrap any application services.
      */
-    public function boot(): void
-    {
-        CityFunction::observe(CityFunctionObserver::class);
+public function boot()
+{
+    if (!app()->runningInConsole()) {
+       // \App\Models\CityFunction::observe(\App\Observers\CityFunctionObserver::class);
     }
+}
 }

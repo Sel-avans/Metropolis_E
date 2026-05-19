@@ -15,7 +15,6 @@ class CityFunction extends Model
         'name',
         'category',
         'image',
-        'notified_at'
     ];
 
     public function effects()
