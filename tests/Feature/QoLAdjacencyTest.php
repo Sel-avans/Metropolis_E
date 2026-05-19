@@ -31,7 +31,7 @@ class QoLAdjacencyTest extends TestCase
         ]);
 
         $weg = CityFunction::factory()->create([
-            'name' => 'Weg',
+            'name' => 'Road',
             'category' => 'mobility',
             'pollution' => 'polluting'
         ]);
@@ -54,7 +54,7 @@ class QoLAdjacencyTest extends TestCase
 
         $this->assertEquals(
             -2,
-            $response->json('categories.amenities.total')
+            $response->json('categories.Amenities.total')
         );
     }
 
@@ -66,7 +66,7 @@ class QoLAdjacencyTest extends TestCase
         ]);
 
         $park2 = CityFunction::factory()->create([
-            'name' => 'Speeltuin',
+            'name' => 'Sports Park',
             'category' => 'recreation'
         ]);
 
@@ -88,7 +88,7 @@ class QoLAdjacencyTest extends TestCase
 
         $this->assertEquals(
             2,
-            $response->json('categories.recreation.total')
+            $response->json('categories.Recreation.total')
         );
     }
 
@@ -100,7 +100,7 @@ class QoLAdjacencyTest extends TestCase
         ]);
 
         $park2 = CityFunction::factory()->create([
-            'name' => 'Speeltuin',
+            'name' => 'Sports Park',
             'category' => 'recreation'
         ]);
 
