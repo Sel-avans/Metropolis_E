@@ -4,13 +4,17 @@
 
 <div class="container py-5">
 
-    <div class="d-flex justify-content-between align-items-center mb-4">
-        <h1 class="fw-bold" style="color:#2563eb;">Conditions Management</h1>
+<div class="d-flex justify-content-between align-items-center mb-4">
+    <h1 class="fw-bold" style="color:#2563eb;">Conditions Management</h1>
 
-        <button class="btn btn-primary btn-lg shadow-sm" data-bs-toggle="modal" data-bs-target="#createModal">
-            + New rule
-        </button>
-    </div>
+    <a href="/grid" class="btn btn-light text-secondary border shadow-sm text-decoration-none">
+        ← Back to grid
+    </a>
+
+    <button class="btn btn-primary btn-lg shadow-sm" data-bs-toggle="modal" data-bs-target="#createModal">
+        + New rule
+    </button>
+</div>
 
     <div class="card shadow-lg border-0" style="border-radius: 14px;">
         <div class="card-header py-3" style="background: linear-gradient(90deg, #2563eb, #3b82f6); border-radius: 14px 14px 0 0;">
@@ -78,8 +82,8 @@
         $isThisModal = session('edit_id') == $condition->id;
     @endphp
 
-    <div class="modal fade" id="editModal{{ $condition->id }}" tabindex="-1">
-        <div class="modal-dialog modal-dialog-centered">
+    <div class="modal fade" id="editModal{{ $condition->id }}" tabindex="-1" aria-hidden="true">
+        <div class="modal-dialog modal-dialog-centered" style="min-height: calc(100% - 3.5rem); display: flex; align-items: center;">
             <form method="POST" action="{{ route('conditions.update', $condition->id) }}" class="edit-form">
                 @csrf
                 @method('PUT')
@@ -161,8 +165,8 @@
         $pending = session('pending_data') ?? [];
     @endphp
 
-    <div class="modal fade" id="createModal" tabindex="-1">
-        <div class="modal-dialog modal-dialog-centered">
+    <div class="modal fade" id="createModal" tabindex="-1" aria-hidden="true">
+        <div class="modal-dialog modal-dialog-centered" style="min-height: calc(100% - 3.5rem); display: flex; align-items: center;">
             <form method="POST" action="{{ route('conditions.store') }}">
                 @csrf
 
@@ -235,8 +239,8 @@
     </div>
 
     {{-- DELETE MODAL --}}
-    <div class="modal fade" id="deleteConfirmModal" tabindex="-1">
-        <div class="modal-dialog modal-dialog-centered">
+    <div class="modal fade" id="deleteConfirmModal" tabindex="-1" aria-hidden="true">
+        <div class="modal-dialog modal-dialog-centered" style="min-height: calc(100% - 3.5rem); display: flex; align-items: center;">
             <div class="modal-content shadow-lg" style="border-radius: 14px;">
                 <div class="modal-header bg-danger text-white">
                     <h5 class="modal-title fw-bold">Delete Rule</h5>
@@ -269,35 +273,47 @@ function confirmDelete(url) {
 }
 
 document.addEventListener('DOMContentLoaded', function () {
-
-    // Foutmelding → open juiste modal
+    // 1. Zorg dat foutmeldingen de JUISTE modal heropenen
     @if(session('_last_action') === 'error')
         @if(session('edit_id'))
-            new bootstrap.Modal(document.getElementById('editModal{{ session('edit_id') }}')).show();
+            // Haal specifiek de modal op die de fout veroorzaakte
+            var errorModalEl = document.getElementById('editModal' + "{{ session('edit_id') }}");
+            if (errorModalEl) {
+                var errorModal = bootstrap.Modal.getOrCreateInstance(errorModalEl);
+                errorModal.show();
+            }
         @else
-            new bootstrap.Modal(document.getElementById('createModal')).show();
+            var createModalEl = document.getElementById('createModal');
+            if (createModalEl) {
+                var createModal = bootstrap.Modal.getOrCreateInstance(createModalEl);
+                createModal.show();
+            }
         @endif
     @endif
 
-    // Confirm update flow (browser popup)
-    @if(session('_confirm_update'))
+    // 2. Behandel de confirm-update logica dynamisch op basis van de sessie-ID
+    @if(session('_confirm_update') && session('edit_id'))
         const editId = "{{ session('edit_id') }}";
-        const modal = new bootstrap.Modal(document.getElementById('editModal' + editId));
-        modal.show();
+        const targetModalEl = document.getElementById('editModal' + editId);
+        
+        if (targetModalEl) {
+            const modal = bootstrap.Modal.getOrCreateInstance(targetModalEl);
+            modal.show();
 
-        setTimeout(() => {
-            if (confirm("Are you sure you want to update this rule?")) {
-                let form = document.querySelector('#editModal' + editId + ' form');
-                let input = document.createElement('input');
-                input.type = 'hidden';
-                input.name = 'confirm';
-                input.value = 'yes';
-                form.appendChild(input);
-                form.submit();
-            }
-        }, 300);
+            // Korte timeout om de animatie van de modal niet te breken
+            setTimeout(() => {
+                if (confirm("Are you sure you want to update this rule?")) {
+                    let form = targetModalEl.querySelector('form');
+                    let input = document.createElement('input');
+                    input.type = 'hidden';
+                    input.name = 'confirm';
+                    input.value = 'yes';
+                    form.appendChild(input);
+                    form.submit();
+                }
+            }, 300);
+        }
     @endif
-
 });
 </script>
 

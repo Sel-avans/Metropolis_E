@@ -143,6 +143,10 @@ class ConditionsController extends Controller
             $request->merge(['value' => abs($request->value)]);
         }
 
+        // Check of de functies daadwerkelijk gewijzigd zijn ten opzichte van de database
+        $functionsChanged = (int)$condition->function_a !== (int)$request->function_a || 
+                            (int)$condition->function_b !== (int)$request->function_b;
+
         // 3. Checks
         if ($request->function_a == $request->function_b) {
             return back()
@@ -152,56 +156,58 @@ class ConditionsController extends Controller
                 ->with('pending_data', $request->all());
         }
 
-        if (
-            (int)$condition->function_a === (int)$request->function_b &&
-            (int)$condition->function_b === (int)$request->function_a
-        ) {
-            return back()
-                ->with('_last_action', 'error')
-                ->with('edit_id', $condition->id)
-                ->with('error', 'You cannot reverse the function order of an existing rule.')
-                ->with('pending_data', $request->all());
-        }
+        if ($functionsChanged) {
+            $existsSame = Condition::where('id', '!=', $condition->id)
+                ->where('function_a', $request->function_a)
+                ->where('function_b', $request->function_b)
+                ->where('type', $request->type)
+                ->exists();
 
-        $existsSame = Condition::where('id', '!=', $condition->id)
-            ->where('function_a', $request->function_a)
-            ->where('function_b', $request->function_b)
-            ->where('type', $request->type)
-            ->exists();
+            if ($existsSame) {
+                return back()
+                    ->with('_last_action', 'error')
+                    ->with('edit_id', $condition->id)
+                    ->with('error', 'This rule already exists.')
+                    ->with('pending_data', $request->all());
+            }
 
-        if ($existsSame) {
-            return back()
-                ->with('_last_action', 'error')
-                ->with('edit_id', $condition->id)
-                ->with('error', 'This rule already exists.')
-                ->with('pending_data', $request->all());
-        }
+            $existsDifferentType = Condition::where('id', '!=', $condition->id)
+                ->where('function_a', $request->function_a)
+                ->where('function_b', $request->function_b)
+                ->where('type', '!=', $request->type)
+                ->exists();
 
-        $existsDifferentType = Condition::where('id', '!=', $condition->id)
-            ->where('function_a', $request->function_a)
-            ->where('function_b', $request->function_b)
-            ->where('type', '!=', $request->type)
-            ->exists();
+            if ($existsDifferentType) {
+                return back()
+                    ->with('_last_action', 'error')
+                    ->with('edit_id', $condition->id)
+                    ->with('error', 'A rule with this function pair already exists with a different type.')
+                    ->with('pending_data', $request->all());
+            }
 
-        if ($existsDifferentType) {
-            return back()
-                ->with('_last_action', 'error')
-                ->with('edit_id', $condition->id)
-                ->with('error', 'A rule with this function pair already exists with a different type.')
-                ->with('pending_data', $request->all());
-        }
+            if (
+                (int)$condition->function_a === (int)$request->function_b &&
+                (int)$condition->function_b === (int)$request->function_a
+            ) {
+                return back()
+                    ->with('_last_action', 'error')
+                    ->with('edit_id', $condition->id)
+                    ->with('error', 'You cannot reverse the function order of an existing rule.')
+                    ->with('pending_data', $request->all());
+            }
 
-        $existsReverse = Condition::where('id', '!=', $condition->id)
-            ->where('function_a', $request->function_b)
-            ->where('function_b', $request->function_a)
-            ->exists();
+            $existsReverse = Condition::where('id', '!=', $condition->id)
+                ->where('function_a', $request->function_b)
+                ->where('function_b', $request->function_a)
+                ->exists();
 
-        if ($existsReverse) {
-            return back()
-                ->with('_last_action', 'error')
-                ->with('edit_id', $condition->id)
-                ->with('error', 'The reversed combination already exists.')
-                ->with('pending_data', $request->all());
+            if ($existsReverse) {
+                return back()
+                    ->with('_last_action', 'error')
+                    ->with('edit_id', $condition->id)
+                    ->with('error', 'The reversed combination already exists.')
+                    ->with('pending_data', $request->all());
+            }
         }
 
         // 4. CONFIRM FLOW

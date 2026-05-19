@@ -28,7 +28,7 @@
                 type="text"
                 id="category-input"
                 name="category"
-                value="{{ old('category', $function->category) }}"
+                value="{{ ucfirst(old('category', $function->category)) }}"
                 class="w-full border rounded px-3 py-2 text-sm bg-gray-100 cursor-pointer"
                 autocomplete="off"
                 readonly
@@ -40,7 +40,7 @@
 
                 @foreach($categories as $cat)
                     <div class="px-3 py-2 text-sm hover:bg-gray-100 cursor-pointer category-option">
-                        {{ $cat }}
+                        {{ ucfirst($cat) }}
                     </div>
                 @endforeach
 
