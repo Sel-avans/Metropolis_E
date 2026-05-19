@@ -9,13 +9,12 @@ class GridCellFactory extends Factory
 {
     protected $model = GridCell::class;
 
-    public function definition()
+    public function definition(): array
     {
         return [
-            'row' => $this->faker->numberBetween(1, 3),
-            'col' => $this->faker->numberBetween(1, 4),
-            'city_function_id' => null,
+            'row' => $this->faker->numberBetween(1, 4),
+            'col' => $this->faker->numberBetween(1, 3),
+            'function_id' => null, //Deze was noodzakelijk voor het slagen van de tests
         ];
     }
 }
-        
