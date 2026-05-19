@@ -66,7 +66,7 @@ document.addEventListener("DOMContentLoaded", () => {
     const items = document.querySelectorAll(".library-item");
 
 
-    async function saveMove(oldRow, oldCol, newRow, newCol) {
+    async function saveMove(oldRow, oldCol, newRow, newCol, force = false) {
         try {
             const response = await fetch('/grid/update', {
                 method: 'POST',
