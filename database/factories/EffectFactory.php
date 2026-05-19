@@ -12,7 +12,7 @@ class EffectFactory extends Factory
     public function definition()
     {
         return [
-            'city_function_id' => null,
+            'function_id' => null, 
             'category' => $this->faker->word(),
             'value' => $this->faker->numberBetween(-3, 5),
         ];

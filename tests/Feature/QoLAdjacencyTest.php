@@ -11,9 +11,6 @@ class QoLAdjacencyTest extends TestCase
 {
     use RefreshDatabase;
 
-    /** -----------------------------------------------------------
-     *  1. Alleen RIGHT en DOWN neighbors worden gedetecteerd
-     * ------------------------------------------------------------*/
     public function test_neighbors_right_and_down_are_detected()
     {
         $center = GridCell::factory()->create(['row' => 5, 'col' => 5]);
@@ -25,31 +22,30 @@ class QoLAdjacencyTest extends TestCase
         $response->assertStatus(200);
     }
 
-    /** -----------------------------------------------------------
-     *  2. Penalty: sensitive naast polluting → -2
-     * ------------------------------------------------------------*/
     public function test_penalty_sensitive_next_to_polluting()
     {
         $school = CityFunction::factory()->create([
             'name' => 'School',
-            'category' => 'voorzieningen'
+            'category' => 'amenities',
+            'sensitivity' => 'sensitive'
         ]);
 
         $weg = CityFunction::factory()->create([
             'name' => 'Weg',
-            'category' => 'mobiliteit'
+            'category' => 'mobility',
+            'pollution' => 'polluting'
         ]);
 
         GridCell::factory()->create([
             'row' => 5,
             'col' => 5,
-            'city_function_id' => $school->id
+            'function_id' => $school->id
         ]);
 
         GridCell::factory()->create([
             'row' => 5,
             'col' => 6,
-            'city_function_id' => $weg->id
+            'function_id' => $weg->id
         ]);
 
         $response = $this->getJson('/qol/details');
@@ -58,35 +54,32 @@ class QoLAdjacencyTest extends TestCase
 
         $this->assertEquals(
             -2,
-            $response->json('categories.voorzieningen.total')
+            $response->json('categories.amenities.total')
         );
     }
 
-    /** -----------------------------------------------------------
-     *  3. Bonus: zelfde category recreatie → +2
-     * ------------------------------------------------------------*/
     public function test_bonus_same_category_recreatie()
     {
         $park1 = CityFunction::factory()->create([
             'name' => 'Park',
-            'category' => 'recreatie'
+            'category' => 'recreation'
         ]);
 
         $park2 = CityFunction::factory()->create([
             'name' => 'Speeltuin',
-            'category' => 'recreatie'
+            'category' => 'recreation'
         ]);
 
         GridCell::factory()->create([
             'row' => 5,
             'col' => 5,
-            'city_function_id' => $park1->id
+            'function_id' => $park1->id
         ]);
 
         GridCell::factory()->create([
             'row' => 5,
             'col' => 6,
-            'city_function_id' => $park2->id
+            'function_id' => $park2->id
         ]);
 
         $response = $this->getJson('/qol/details');
@@ -95,35 +88,32 @@ class QoLAdjacencyTest extends TestCase
 
         $this->assertEquals(
             2,
-            $response->json('categories.recreatie.total')
+            $response->json('categories.recreation.total')
         );
     }
 
-    /** -----------------------------------------------------------
-     *  4. Total_score bevat synergy effecten
-     * ------------------------------------------------------------*/
     public function test_total_score_includes_synergy()
     {
         $park1 = CityFunction::factory()->create([
             'name' => 'Park',
-            'category' => 'recreatie'
+            'category' => 'recreation'
         ]);
 
         $park2 = CityFunction::factory()->create([
             'name' => 'Speeltuin',
-            'category' => 'recreatie'
+            'category' => 'recreation'
         ]);
 
         GridCell::factory()->create([
             'row' => 5,
             'col' => 5,
-            'city_function_id' => $park1->id
+            'function_id' => $park1->id
         ]);
 
         GridCell::factory()->create([
             'row' => 5,
             'col' => 6,
-            'city_function_id' => $park2->id
+            'function_id' => $park2->id
         ]);
 
         $response = $this->getJson('/qol/details');
