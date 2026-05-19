@@ -63,7 +63,7 @@
             <div class="w-auto p-6">
                 <h1 class="text-2xl text-center font-bold mb-4 dark:text-teal-500">City Grid (3x4)</h1>
 
-                <div class="grid grid-flow-col grid-rows-4 gap-3 w-min">
+                <div class="city-grid grid grid-flow-col grid-rows-4 gap-3 w-min">
                     @for($col = 1; $col <= 3; $col++)
                         @for($row = 1; $row <= 4; $row++)
 
@@ -73,22 +73,29 @@
                                 });
                             @endphp
                             <div 
-                            class="grid-cell border-2 bg-gray-300 border-gray-800 dark:bg-blue-950 dark:border-gray-300 w-32 h-32 items-center justify-center hover:bg-gray-400 hover:dark:bg-gray-100 cursor-pointer transition"
-                            data-row="{{$row}}"
-                            data-col="{{$col}}"
-                            draggable="{{ $cell ? 'true' : 'false' }}">
+                                class="grid-cell relative border-2 bg-gray-300 border-gray-800 dark:bg-blue-950 dark:border-gray-300 w-32 h-32 items-center justify-center hover:bg-gray-400 hover:dark:bg-gray-100 cursor-pointer transition"
+                                data-row="{{ $row }}"
+                                data-col="{{ $col }}"
+                                data-id="{{ $cell->id }}"
+                                draggable="{{ $cell ? 'true' : 'false' }}"
+                            >
+                                @if(!empty($cell) && !empty($cell->function))
+                                    <img 
+                                        src="{{ asset($cell->function->image) }}"
+                                        alt="{{ $cell->function->name }}"
+                                        class="grid-function-icon object-contain"
+                                        data-function-id="{{ $cell->function->id }}"
+                                    >
 
-                            @if(!empty($cell) && !empty($cell->function))
-                                <img 
-                                    src="{{ asset($cell->function->image) }}"
-                                    alt="{{ $cell->function->name }}"
-                                    class="grid-function-icon object-contain"
-                                    data-function-id="{{ $cell->function->id }}"
-                                >
-                            @endif
+                                    <button 
+                                            class="delete-btn absolute top-[2px] right-[2px] bg-red-600/80 text-white w-5 h-5 text-[14px] rounded cursor-pointer flex items-center justify-center"
+                                        >
+                                            ✖
+                                    </button>
 
-
+                                @endif
                             </div>
+
                         @endfor
                     @endfor
                 </div>

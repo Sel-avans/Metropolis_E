@@ -1,12 +1,17 @@
 import { getNeighborsWithQoL } from './neighbours.js';
 
 document.addEventListener("DOMContentLoaded", () => {
-    const cells = document.querySelectorAll(".grid-cell");
-    const items = document.querySelectorAll(".library-item");
+
+
+    function activateCell(cell) {
+        document.querySelectorAll(".grid-cell").forEach(c => c.classList.remove("selected"));
+        cell.classList.add("selected");
+    }
 
     let draggedItem = null;
     let isDragging = false;
     let sourceCell = null;
+    let dropOccurred = false;
     let old_score;
 
     const HOVER_DELAY_MS = 300;
@@ -15,7 +20,6 @@ document.addEventListener("DOMContentLoaded", () => {
     const popup = document.getElementById('qol-popup');
     const neighborsList = document.getElementById('popup-neighbors-list');
 
-    // This is the QoL effects table. hardcoded for now. Should be changed to follow actual scores.
     const effectsTable = {
         'Police Station': 3,
         'Fire Station': 2,
@@ -32,7 +36,37 @@ document.addEventListener("DOMContentLoaded", () => {
         'Gas Station': -2
     };
 
-    async function saveMove(oldRow, oldCol, newRow, newCol, functionName) {
+    document.addEventListener("click", async (e) => {
+        if (!e.target.classList.contains("delete-btn")) return;
+
+        const cell = e.target.closest(".grid-cell");
+        if (!cell) return;
+
+        // UI delete
+        cell.innerHTML = "";
+        cell.removeAttribute("draggable");
+
+        activateCell(cell);
+
+        try {
+            await fetch(`/grid/cell/${cell.dataset.id}/function`, {
+                method: "DELETE",
+                headers: {
+                    "X-CSRF-TOKEN": document.querySelector('meta[name="csrf-token"]').content
+                }
+            });
+        } catch (err) {
+            console.error("Fout bij verwijderen functie:", err);
+        }
+
+        setTimeout(() => updateQoL(), 10);
+    });
+
+    const cells = document.querySelectorAll(".grid-cell");
+    const items = document.querySelectorAll(".library-item");
+
+
+    async function saveMove(oldRow, oldCol, newRow, newCol) {
         try {
             await fetch('/grid/update', {
                 method: 'POST',
@@ -48,20 +82,17 @@ document.addEventListener("DOMContentLoaded", () => {
                     function_id: draggedItem.id
                 })
             });
-
-            updateQoL();
         } catch (err) {
             console.error("Fout bij opslaan gridcel:", err);
         }
     }
+
 
     async function updateQoL() {
         try {
             const scoreEl = document.getElementById('qol-score-value');
             const breakdownEl = document.getElementById('breakdown-qol-score');
             const oldScoreEl = document.getElementById('old-qol-score');
-
-            if (!scoreEl && !breakdownEl) return;
 
             const response = await fetch('/qol/details');
             const data = await response.json();
@@ -83,30 +114,16 @@ document.addEventListener("DOMContentLoaded", () => {
     function compareScores(data) {
         let html ='';
 
-        if (old_score === undefined) {
-            html+='';
-        }
-        else {
+        if (old_score !== undefined) {
             const delta_score = data.total_score - old_score;
-            if (delta_score >= 0) {
-                html += ` 
+            html += `
                 <span class="text-xl float-right ${delta_score < 0 ? 'text-red-600' : 'text-green-600'}">
-                    +${delta_score}
+                    ${delta_score >= 0 ? '+' : ''}${delta_score}
                 </span>
-                `;
-            }
-            else{
-                html += ` 
-                <span class="text-xl ${delta_score < 0 ? 'text-red-600' : 'text-green-600'}">
-                    ${delta_score}
-                </span>
-                `;
-            }
+            `;
         }
 
-        if (data.total_score !== 0) {
-            old_score = data.total_score;
-        }
+        if (data.total_score !== 0) old_score = data.total_score;
 
         return html;
     }
@@ -125,22 +142,8 @@ document.addEventListener("DOMContentLoaded", () => {
                     )
                 </h3>
             `;
-
-            // Shows what item function contributes to the QoL score and by how much.
-            
-            // info.items.forEach(item => {
-            //     html += `
-            //         <div class="flex justify-between text-gray-700 dark:text-white">
-            //             <span>${item.function}</span>
-            //             <span class="${item.value <= 0 ? 'text-red-600' : 'text-green-600'}">
-            //                 ${item.value}
-            //             </span>
-            //         </div>
-            //     `;
-            // });
         }
 
-        // Should we keep this?
         html += `
             <h3 class="font-bold mt-4 dark:text-teal-600">
                 Total QoL: 
@@ -150,6 +153,7 @@ document.addEventListener("DOMContentLoaded", () => {
 
         return html;
     }
+
 
     function handleTileHover(row, col, event) {
         positionPopup(event.pageX, event.pageY);
@@ -165,7 +169,6 @@ document.addEventListener("DOMContentLoaded", () => {
     }
 
     function renderNeighborsList(neighbors) {
-        // Clear any previous list items
         neighborsList.innerHTML = '';
 
         if (!neighbors || neighbors.length === 0) {
@@ -179,8 +182,7 @@ document.addEventListener("DOMContentLoaded", () => {
 
             const directionName = neighbor.direction.charAt(0).toUpperCase() + neighbor.direction.slice(1);
 
-            // Determine the text color and sign (+/-) based on the QoL score
-            let scoreClass = 'text-slate-400'; // Neutral
+            let scoreClass = 'text-slate-400';
             let scoreText = `${neighbor.qol_effect}`;
 
             if (neighbor.qol_effect > 0) {
@@ -190,7 +192,6 @@ document.addEventListener("DOMContentLoaded", () => {
                 scoreClass = 'text-red-400 font-semibold';
             }
 
-            // Fill the list item HTML
             li.innerHTML = `
                 <span class="text-slate-300 font-medium">${directionName}: ${neighbor.function}</span>
                 <span class="${scoreClass}">${scoreText}</span>
@@ -202,10 +203,7 @@ document.addEventListener("DOMContentLoaded", () => {
 
     function showPopup() {
         popup.classList.remove('hidden');
-        
-        // Force browser reflow to ensure the transition plays smoothly
         void popup.offsetWidth;
-        
         popup.classList.remove('opacity-0', 'scale-95');
         popup.classList.add('opacity-100', 'scale-100');
     }
@@ -214,15 +212,16 @@ document.addEventListener("DOMContentLoaded", () => {
         popup.classList.add('opacity-0', 'scale-95');
         popup.classList.remove('opacity-100', 'scale-100');
 
-        // Hide display after the fade-out transition complete (150ms)
         setTimeout(() => {
             popup.classList.add('hidden');
         }, 150);
     }
 
+  
     items.forEach(item => {
         item.addEventListener("dragstart", e => {
             isDragging = true;
+            dropOccurred = false;
 
             draggedItem = {
                 id: Number(item.dataset.functionId),
@@ -234,12 +233,15 @@ document.addEventListener("DOMContentLoaded", () => {
         });
     });
 
+
     cells.forEach(cell => {
+
         cell.addEventListener("dragstart", e => {
             const img = cell.querySelector(".grid-function-icon");
             if (!img) return;
 
             isDragging = true;
+            dropOccurred = false;
 
             draggedItem = {
                 id: Number(img.dataset.functionId),
@@ -262,9 +264,11 @@ document.addEventListener("DOMContentLoaded", () => {
             cell.classList.remove("drag-over");
         });
 
+
         cell.addEventListener("drop", async e => {
             e.preventDefault();
             isDragging = false;
+            dropOccurred = true;
 
             cell.classList.remove("drag-over");
 
@@ -286,48 +290,102 @@ document.addEventListener("DOMContentLoaded", () => {
             }
 
             cell.innerHTML = "";
+
             const img = document.createElement("img");
             img.src = draggedItem.image;
             img.alt = draggedItem.name;
             img.dataset.functionId = draggedItem.id;
             img.classList.add("grid-function-icon", "object-contain");
             cell.appendChild(img);
+
+            const deleteBtn = document.createElement("button");
+            deleteBtn.className =
+                "delete-btn absolute top-[2px] right-[2px] bg-red-600/80 text-white w-5 h-5 text-[14px] rounded cursor-pointer flex items-center justify-center";
+            deleteBtn.innerHTML = "✖";
+            cell.appendChild(deleteBtn);
+
             cell.setAttribute("draggable", "true");
 
-            await saveMove(oldRow, oldCol, newRow, newCol);
-        });
+            activateCell(cell);
 
-        cell.setAttribute("tabindex", "0");
+            await saveMove(oldRow, oldCol, newRow, newCol);
+
+            setTimeout(() => updateQoL(), 10);
+        });
 
         cell.addEventListener("click", () => {
             if (isDragging) return;
-            cells.forEach(c => c.classList.remove("selected"));
-            cell.classList.add("selected");
+            activateCell(cell);
         });
 
         cell.addEventListener("keydown", e => {
             if (isDragging) return;
             if (e.key === "Enter" || e.key === " ") {
-                cells.forEach(c => c.classList.remove("selected"));
-                cell.classList.add("selected");
+                activateCell(cell);
             }
         });
+
 
         cell.addEventListener('mouseenter', (event) => {
             const row = parseInt(cell.dataset.row);
             const col = parseInt(cell.dataset.col);
 
-            // Start the 300ms delay timer
             hoverTimer = setTimeout(() => {
                 handleTileHover(row, col, event);
             }, HOVER_DELAY_MS);
         });
 
         cell.addEventListener('mouseleave', () => {
-            // Cancel the timer immediately if the mouse leaves before 300ms
             clearTimeout(hoverTimer);
             hidePopup();
         });
+    });
+
+
+    document.addEventListener("dragend", async (e) => {
+        if (!draggedItem || !sourceCell) return;
+
+        if (dropOccurred) {
+            dropOccurred = false;
+            return;
+        }
+
+        const grid = document.querySelector(".city-grid");
+        const rect = grid.getBoundingClientRect();
+
+        const x = e.pageX;
+        const y = e.pageY;
+
+        const outside =
+            x < rect.left ||
+            x > rect.right ||
+            y < rect.top ||
+            y > rect.bottom;
+
+        if (!outside) return;
+
+        console.log("dragged off grid → delete");
+
+        sourceCell.innerHTML = "";
+        sourceCell.removeAttribute("draggable");
+
+        activateCell(sourceCell);
+
+        try {
+            await fetch(`/grid/cell/${sourceCell.dataset.id}/function`, {
+                method: "DELETE",
+                headers: {
+                    "X-CSRF-TOKEN": document.querySelector('meta[name="csrf-token"]').content
+                }
+            });
+        } catch (err) {
+            console.error("Fout bij drag-off delete:", err);
+        }
+
+        draggedItem = null;
+        sourceCell = null;
+
+        setTimeout(() => updateQoL(), 10);
     });
 
     updateQoL();
