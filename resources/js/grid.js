@@ -176,7 +176,7 @@ document.addEventListener("DOMContentLoaded", () => {
         neighborsList.innerHTML = '';
 
         if (!data.categories || Object.keys(data.categories).length === 0) {
-            neighborsList.innerHTML = '<li class="text-slate-400 text-sm">Geen actieve QoL invloeden op deze cel</li>';
+            neighborsList.innerHTML = '<li class="text-slate-400 text-sm">No active QoL influences on this cell</li>';
             return;
         }
 
@@ -218,7 +218,7 @@ document.addEventListener("DOMContentLoaded", () => {
 
         html += `
             <div class="flex justify-between items-center mt-3 pt-2 border-t border-slate-600/50 w-full">
-                <span class="text-slate-300 font-bold text-xs uppercase tracking-wider">Totale QoL:</span>
+                <span class="text-slate-300 font-bold text-xs uppercase tracking-wider">Total QoL:</span>
                 <span class="${totalClass} font-extrabold text-base">${totalSign}${finalTotal}</span>
             </div>
         `;
