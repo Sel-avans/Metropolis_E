@@ -17,3 +17,28 @@
     object-fit: contain;
     object-position: center;
 }
+
+/* --- AANPASSINGEN VOOR ACCESSIBILITY --- */
+/* iets donkerdere kleur voor betere zichtbaarheid */
+.grid-cell.selected {
+    outline-color: #b91c1c; /* iets donkerder rood */
+    background-color: #fef2f2; /* iets duidelijker */
+}
+
+/* hover kleur iets donkerder gemaakt */
+.grid-cell.drag-over {
+    background-color: #dbeafe;
+}
+
+/* focus ring toegevoegd voor keyboard gebruikers */
+.grid-cell:focus {
+    outline: 3px solid #2563eb;
+    outline-offset: 2px;
+}
+
+/* library items ook focusbaar gemaakt */
+.library-item:focus {
+    outline: 3px solid #2563eb;
+    outline-offset: 2px;
+}
+/* --- EINDE AANPASSINGEN --- */
