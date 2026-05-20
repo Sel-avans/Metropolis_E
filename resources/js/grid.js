@@ -300,10 +300,17 @@ document.addEventListener("DOMContentLoaded", () => {
             cell.appendChild(img);
 
             const deleteBtn = document.createElement("button");
+            deleteBtn.type = "button";
             deleteBtn.className =
                 "delete-btn absolute top-[2px] right-[2px] bg-red-600/80 text-white w-5 h-5 text-[14px] rounded cursor-pointer flex items-center justify-center";
-            deleteBtn.ariaLabel = "Remove function from grid";
-            deleteBtn.innerHTML = "✖";
+            const deleteText = `Remove ${draggedItem.name} from grid cell`;
+            deleteBtn.setAttribute("aria-label", deleteText);
+            deleteBtn.setAttribute("title", deleteText);
+            const srText = document.createElement("span");
+            srText.className = "sr-only";
+            srText.textContent = deleteText;
+            deleteBtn.appendChild(srText);
+            deleteBtn.append("✖");
             cell.appendChild(deleteBtn);
 
             cell.setAttribute("draggable", "true");

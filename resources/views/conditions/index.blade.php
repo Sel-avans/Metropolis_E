@@ -57,12 +57,14 @@
                                 <td class="pe-4">
                                     <button class="btn btn-sm btn-outline-warning me-1"
                                             data-bs-toggle="modal"
-                                            data-bs-target="#editModal{{ $condition->id }}">
+                                            data-bs-target="#editModal{{ $condition->id }}"
+                                            aria-label="Modify {{ $condition->functionA->name }} and {{ $condition->functionB->name }} rule">
                                         Modify
                                     </button>
 
                                     <button class="btn btn-sm btn-outline-danger"
-                                            onclick="confirmDelete('{{ route('conditions.destroy', $condition) }}')">
+                                            onclick="confirmDelete('{{ route('conditions.destroy', $condition) }}')"
+                                            aria-label="Delete {{ $condition->functionA->name }} and {{ $condition->functionB->name }} rule">
                                         Delete
                                     </button>
                                 </td>
@@ -82,7 +84,7 @@
         $isThisModal = session('edit_id') == $condition->id;
     @endphp
 
-    <div class="modal fade" id="editModal{{ $condition->id }}" tabindex="-1" aria-hidden="true">
+    <div class="modal fade" id="editModal{{ $condition->id }}" tabindex="-1" aria-hidden="true" aria-labelledby="editModal{{ $condition->id }}Label">
         <div class="modal-dialog modal-dialog-centered" style="min-height: calc(100% - 3.5rem); display: flex; align-items: center;">
             <form method="POST" action="{{ route('conditions.update', $condition->id) }}" class="edit-form">
                 @csrf
@@ -90,7 +92,7 @@
 
                 <div class="modal-content shadow-lg" style="border-radius: 14px;">
                     <div class="modal-header" style="background:#2563eb; color:white;">
-                        <h5 class="modal-title fw-bold">Modify Rule</h5>
+                        <h5 class="modal-title fw-bold" id="editModal{{ $condition->id }}Label">Modify Rule</h5>
                     </div>
 
                     @if(session('_last_action') === 'error' && $isThisModal)
@@ -165,14 +167,14 @@
         $pending = session('pending_data') ?? [];
     @endphp
 
-    <div class="modal fade" id="createModal" tabindex="-1" aria-hidden="true">
+    <div class="modal fade" id="createModal" tabindex="-1" aria-hidden="true" aria-labelledby="createModalLabel">
         <div class="modal-dialog modal-dialog-centered" style="min-height: calc(100% - 3.5rem); display: flex; align-items: center;">
             <form method="POST" action="{{ route('conditions.store') }}">
                 @csrf
 
                 <div class="modal-content shadow-lg" style="border-radius: 14px;">
                     <div class="modal-header" style="background:#2563eb; color:white;">
-                        <h5 class="modal-title fw-bold">Add New Rule</h5>
+                        <h5 class="modal-title fw-bold" id="createModalLabel">Add New Rule</h5>
                     </div>
 
                     @if(session('_last_action') === 'error' && session('edit_id') === null)
@@ -239,11 +241,11 @@
     </div>
 
     {{-- DELETE MODAL --}}
-    <div class="modal fade" id="deleteConfirmModal" tabindex="-1" aria-hidden="true">
+    <div class="modal fade" id="deleteConfirmModal" tabindex="-1" aria-hidden="true" aria-labelledby="deleteConfirmModalLabel">
         <div class="modal-dialog modal-dialog-centered" style="min-height: calc(100% - 3.5rem); display: flex; align-items: center;">
             <div class="modal-content shadow-lg" style="border-radius: 14px;">
                 <div class="modal-header bg-danger text-white">
-                    <h5 class="modal-title fw-bold">Delete Rule</h5>
+                    <h5 class="modal-title fw-bold" id="deleteConfirmModalLabel">Delete Rule</h5>
                 </div>
 
                 <div class="modal-body">
