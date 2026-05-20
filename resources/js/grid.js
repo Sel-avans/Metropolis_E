@@ -2,7 +2,6 @@ import { getNeighborsWithQoL } from './neighbours.js';
 
 document.addEventListener("DOMContentLoaded", () => {
 
-
     function activateCell(cell) {
         document.querySelectorAll(".grid-cell").forEach(c => c.classList.remove("selected"));
         cell.classList.add("selected");
@@ -19,22 +18,6 @@ document.addEventListener("DOMContentLoaded", () => {
 
     const popup = document.getElementById('qol-popup');
     const neighborsList = document.getElementById('popup-neighbors-list');
-
-    const effectsTable = {
-        'Police Station': 3,
-        'Fire Station': 2,
-        'Park': 4,
-        'Cinema': 2,
-        'Sports Park': 3,
-        'Water Treatment': 1,
-        'School': 2,
-        'Store': 1,
-        'Hospital': 3,
-        'Train Station': 2,
-        'Road': -1,
-        'Bicycle Path': 2,
-        'Gas Station': -2
-    };
 
     document.addEventListener("click", async (e) => {
         if (!e.target.classList.contains("delete-btn")) return;
@@ -65,10 +48,9 @@ document.addEventListener("DOMContentLoaded", () => {
     const cells = document.querySelectorAll(".grid-cell");
     const items = document.querySelectorAll(".library-item");
 
-
     async function saveMove(oldRow, oldCol, newRow, newCol, force = false) {
         try {
-            const response = await fetch('/grid/update', {
+            await fetch('/grid/update', {
                 method: 'POST',
                 headers: {
                     'Content-Type': 'application/json',
@@ -87,7 +69,6 @@ document.addEventListener("DOMContentLoaded", () => {
             console.error("Fout bij opslaan gridcel:", err);
         }
     }
-
 
     async function updateQoL() {
         try {
@@ -113,7 +94,7 @@ document.addEventListener("DOMContentLoaded", () => {
     }
 
     function compareScores(data) {
-        let html ='';
+        let html = '';
 
         if (old_score !== undefined) {
             const delta_score = data.total_score - old_score;
@@ -133,33 +114,55 @@ document.addEventListener("DOMContentLoaded", () => {
         let html = '';
 
         html += '<h3 class="text-xl font-semibold dark:text-teal-500">Breakdown QoL Score</h3>';
-        for (const [category, info] of Object.entries(data.categories)) {
-            html += `
-                <h3 class="font-semibold mt-3 dark:text-teal-600">
-                    ${category} (total:
-                    <span class="${info.total <= 0 ? 'text-red-600' : 'text-green-600'}">
-                        ${info.total}
-                    </span>
-                    )
-                </h3>
-            `;
-        }
 
-        html += `
-            <h3 class="font-bold mt-4 dark:text-teal-600">
-                Total QoL: 
-                <span class="${data.total_score <= 0 ? 'text-red-600' : 'text-green-600'}">${data.total_score}</span>
+        for (const [category, info] of Object.entries(data.categories)) {
+            const score = Number(info.total);
+
+            // Bepaal de kleur: groen bij positief, rood bij negatief, grijs bij 0
+            let scoreClass = 'text-slate-400';
+            if (score > 0) {
+                scoreClass = 'text-green-600';
+            } else if (score < 0) {
+                scoreClass = 'text-red-600';
+            }
+
+            // Voeg een + toe als de score positief is
+            let scoreSign = score > 0 ? '+' : '';
+
+            html += `
+            <h3 class="font-semibold mt-3 dark:text-teal-600">
+                ${category}: 
+                <span class="${scoreClass}">
+                    ${scoreSign}${score}
+                </span>
             </h3>
         `;
+        }
+
+        const totalScore = Number(data.total_score);
+        let totalClass = 'text-slate-400';
+        if (totalScore > 0) {
+            totalClass = 'text-green-600';
+        } else if (totalScore < 0) {
+            totalClass = 'text-red-600';
+        }
+
+        let totalSign = totalScore > 0 ? '+' : '';
+
+        html += `
+        <h3 class="font-bold mt-4 dark:text-teal-600">
+            Total QoL: 
+            <span class="${totalClass}">${totalSign}${totalScore}</span>
+        </h3>
+    `;
 
         return html;
     }
 
-
-    function handleTileHover(row, col, event) {
+    async function handleTileHover(row, col, event) {
         positionPopup(event.pageX, event.pageY);
-        const neighbors = getNeighborsWithQoL(row, col, effectsTable);
-        renderNeighborsList(neighbors);
+        const data = await getNeighborsWithQoL(row, col);
+        renderNeighborsList(data);
         showPopup();
     }
 
@@ -169,37 +172,58 @@ document.addEventListener("DOMContentLoaded", () => {
         popup.style.top = `${y + offset}px`;
     }
 
-    function renderNeighborsList(neighbors) {
+    function renderNeighborsList(data) {
         neighborsList.innerHTML = '';
 
-        if (!neighbors || neighbors.length === 0) {
-            neighborsList.innerHTML = '<li class="text-slate-400">No neighbors with buildings</li>';
+        if (!data.categories || Object.keys(data.categories).length === 0) {
+            neighborsList.innerHTML = '<li class="text-slate-400 text-sm">Geen actieve QoL invloeden op deze cel</li>';
             return;
         }
 
-        neighbors.forEach(neighbor => {
-            const li = document.createElement('li');
-            li.className = 'flex justify-between items-center gap-4 py-0.5';
+        let html = '';
 
-            const directionName = neighbor.direction.charAt(0).toUpperCase() + neighbor.direction.slice(1);
+        for (const [categoryName, info] of Object.entries(data.categories)) {
+            const totalScore = Number(info.total);
 
-            let scoreClass = 'text-slate-400';
-            let scoreText = `${neighbor.qol_effect}`;
-
-            if (neighbor.qol_effect > 0) {
-                scoreClass = 'text-green-400 font-semibold';
-                scoreText = `+${neighbor.qol_effect}`;
-            } else if (neighbor.qol_effect < 0) {
-                scoreClass = 'text-red-400 font-semibold';
+            //To change the color depending on QOL-value
+            let catClass = 'text-slate-400';
+            if (totalScore > 0) {
+                catClass = 'text-green-600';
+            } else if (totalScore < 0) {
+                catClass = 'text-red-600';
             }
 
-            li.innerHTML = `
-                <span class="text-slate-300 font-medium">${directionName}: ${neighbor.function}</span>
-                <span class="${scoreClass}">${scoreText}</span>
-            `;
+            let catSign = totalScore > 0 ? '+' : '';
 
-            neighborsList.appendChild(li);
-        });
+            html += `
+                <div class="mb-2 last:mb-0 w-full">
+                    <div class="flex justify-between items-center gap-8">
+                        <span class="text-slate-200 font-medium text-sm">${categoryName}</span>
+                        <span class="${catClass} font-bold text-sm">${catSign}${totalScore}</span>
+                    </div>
+                </div>
+            `;
+        }
+
+        const finalTotal = Number(data.total_score);
+
+        let totalClass = 'text-slate-400';
+        if (finalTotal > 0) {
+            totalClass = 'text-green-600';
+        } else if (finalTotal < 0) {
+            totalClass = 'text-red-600';
+        }
+
+        let totalSign = finalTotal > 0 ? '+' : '';
+
+        html += `
+            <div class="flex justify-between items-center mt-3 pt-2 border-t border-slate-600/50 w-full">
+                <span class="text-slate-300 font-bold text-xs uppercase tracking-wider">Totale QoL:</span>
+                <span class="${totalClass} font-extrabold text-base">${totalSign}${finalTotal}</span>
+            </div>
+        `;
+
+        neighborsList.innerHTML = html;
     }
 
     function showPopup() {
@@ -218,7 +242,6 @@ document.addEventListener("DOMContentLoaded", () => {
         }, 150);
     }
 
-  
     items.forEach(item => {
         item.addEventListener("dragstart", e => {
             isDragging = true;
@@ -234,9 +257,7 @@ document.addEventListener("DOMContentLoaded", () => {
         });
     });
 
-
     cells.forEach(cell => {
-
         cell.addEventListener("dragstart", e => {
             const img = cell.querySelector(".grid-function-icon");
             if (!img) return;
@@ -264,7 +285,6 @@ document.addEventListener("DOMContentLoaded", () => {
         cell.addEventListener("dragleave", () => {
             cell.classList.remove("drag-over");
         });
-
 
         cell.addEventListener("drop", async e => {
             e.preventDefault();
@@ -327,7 +347,6 @@ document.addEventListener("DOMContentLoaded", () => {
             }
         });
 
-
         cell.addEventListener('mouseenter', (event) => {
             const row = parseInt(cell.dataset.row);
             const col = parseInt(cell.dataset.col);
@@ -342,7 +361,6 @@ document.addEventListener("DOMContentLoaded", () => {
             hidePopup();
         });
     });
-
 
     document.addEventListener("dragend", async (e) => {
         if (!draggedItem || !sourceCell) return;

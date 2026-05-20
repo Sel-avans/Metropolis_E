@@ -30,7 +30,7 @@ Route::get('/functions/manage', function () { return view('functions.manage'); }
 
 Route::post('/grid/update', [GridController::class, 'update']);
 Route::get('/qol/details', [QoLController::class, 'details'])->name('qol.details');
-
+Route::get('/qol/cell/{row}/{col}', [QoLController::class, 'cellHoverDetails']); // Nieuwe route voor de cel hover details
 
 Route::get('/dashboard', function () {
     return view('dashboard');
