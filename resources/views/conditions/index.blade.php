@@ -16,6 +16,14 @@
     </button>
 </div>
 
+    {{-- Toont de groene succesmeldingen bovenaan de pagina --}}
+    @if(session('success'))
+        <div class="alert alert-success alert-dismissible fade show mb-4 shadow-sm" role="alert" style="border-radius: 10px;">
+            <strong>✔ Success!</strong> {{ session('success') }}
+            <button type="button" class="btn-close" data-bs-dismiss="alert" aria-label="Close"></button>
+        </div>
+    @endif
+
     <div class="card shadow-lg border-0" style="border-radius: 14px;">
         <div class="card-header py-3" style="background: linear-gradient(90deg, #2563eb, #3b82f6); border-radius: 14px 14px 0 0;">
             <h5 class="mb-0 fw-semibold text-white">All adjacency rules</h5>
@@ -83,7 +91,7 @@
     @endphp
 
     <div class="modal fade" id="editModal{{ $condition->id }}" tabindex="-1" aria-hidden="true">
-        <div class="modal-dialog modal-dialog-centered" style="min-height: calc(100% - 3.5rem); display: flex; align-items: center;">
+        <div class="modal-dialog modal-dialog-centered">
             <form method="POST" action="{{ route('conditions.update', $condition->id) }}" class="edit-form">
                 @csrf
                 @method('PUT')
@@ -100,34 +108,28 @@
                     @endif
 
                     <div class="modal-body">
-
-                        {{-- FUNCTION A --}}
                         <div class="mb-3">
                             <label class="form-label fw-semibold">Function A</label>
                             <select name="function_a" class="form-select">
                                 @foreach($functions as $f)
-                                    <option value="{{ $f->id }}"
-                                        @selected(($pending['function_a'] ?? $condition->function_a) == $f->id)>
+                                    <option value="{{ $f->id }}" @selected(($pending['function_a'] ?? $condition->function_a) == $f->id)>
                                         {{ $f->name }}
                                     </option>
                                 @endforeach
                             </select>
                         </div>
 
-                        {{-- FUNCTION B --}}
                         <div class="mb-3">
                             <label class="form-label fw-semibold">Function B</label>
                             <select name="function_b" class="form-select">
                                 @foreach($functions as $f)
-                                    <option value="{{ $f->id }}"
-                                        @selected(($pending['function_b'] ?? $condition->function_b) == $f->id)>
+                                    <option value="{{ $f->id }}" @selected(($pending['function_b'] ?? $condition->function_b) == $f->id)>
                                         {{ $f->name }}
                                     </option>
                                 @endforeach
                             </select>
                         </div>
 
-                        {{-- TYPE --}}
                         <div class="mb-3">
                             <label class="form-label fw-semibold">Type</label>
                             <select name="type" class="form-select">
@@ -137,23 +139,16 @@
                             </select>
                         </div>
 
-                        {{-- VALUE --}}
                         <div class="mb-3">
                             <label class="form-label fw-semibold">Value</label>
-                            <input type="number" name="value" class="form-control"
-                                   value="{{ $pending['value'] ?? $condition->value }}">
+                            <input type="number" name="value" class="form-control" value="{{ $pending['value'] ?? $condition->value }}">
                         </div>
-
                     </div>
 
                     <div class="modal-footer">
                         <button type="button" class="btn btn-light" data-bs-dismiss="modal">Cancel</button>
-                        <button type="submit" class="btn btn-primary save-btn"
-                                data-id="{{ $condition->id }}">
-                            Save
-                        </button>
+                        <button type="submit" class="btn btn-primary">Save</button>
                     </div>
-
                 </div>
             </form>
         </div>
@@ -162,11 +157,11 @@
 
     {{-- CREATE MODAL --}}
     @php
-        $pending = session('pending_data') ?? [];
+        $pendingCreate = session('edit_id') === null ? (session('pending_data') ?? []) : [];
     @endphp
 
     <div class="modal fade" id="createModal" tabindex="-1" aria-hidden="true">
-        <div class="modal-dialog modal-dialog-centered" style="min-height: calc(100% - 3.5rem); display: flex; align-items: center;">
+        <div class="modal-dialog modal-dialog-centered">
             <form method="POST" action="{{ route('conditions.store') }}">
                 @csrf
 
@@ -182,57 +177,49 @@
                     @endif
 
                     <div class="modal-body">
-
-                        {{-- FUNCTION A --}}
                         <div class="mb-3">
                             <label class="form-label fw-semibold">Function A</label>
                             <select name="function_a" class="form-select">
+                                <option value="" disabled selected>Select function A</option>
                                 @foreach($functions as $f)
-                                    <option value="{{ $f->id }}"
-                                        @selected(($pending['function_a'] ?? '') == $f->id)>
+                                    <option value="{{ $f->id }}" @selected(($pendingCreate['function_a'] ?? '') == $f->id)>
                                         {{ $f->name }}
                                     </option>
                                 @endforeach
                             </select>
                         </div>
 
-                        {{-- FUNCTION B --}}
                         <div class="mb-3">
                             <label class="form-label fw-semibold">Function B</label>
                             <select name="function_b" class="form-select">
+                                <option value="" disabled selected>Select function B</option>
                                 @foreach($functions as $f)
-                                    <option value="{{ $f->id }}"
-                                        @selected(($pending['function_b'] ?? '') == $f->id)>
+                                    <option value="{{ $f->id }}" @selected(($pendingCreate['function_b'] ?? '') == $f->id)>
                                         {{ $f->name }}
                                     </option>
                                 @endforeach
                             </select>
                         </div>
 
-                        {{-- TYPE --}}
                         <div class="mb-3">
                             <label class="form-label fw-semibold">Type</label>
                             <select name="type" class="form-select">
-                                <option value="bonus" @selected(($pending['type'] ?? '') == 'bonus')>Bonus</option>
-                                <option value="penalty" @selected(($pending['type'] ?? '') == 'penalty')>Penalty</option>
-                                <option value="forbidden" @selected(($pending['type'] ?? '') == 'forbidden')>Forbidden</option>
+                                <option value="bonus" @selected(($pendingCreate['type'] ?? '') == 'bonus')>Bonus</option>
+                                <option value="penalty" @selected(($pendingCreate['type'] ?? '') == 'penalty')>Penalty</option>
+                                <option value="forbidden" @selected(($pendingCreate['type'] ?? '') == 'forbidden')>Forbidden</option>
                             </select>
                         </div>
 
-                        {{-- VALUE --}}
                         <div class="mb-3">
                             <label class="form-label fw-semibold">Value</label>
-                            <input type="number" name="value" class="form-control"
-                                   value="{{ $pending['value'] ?? '' }}">
+                            <input type="number" name="value" class="form-control" value="{{ $pendingCreate['value'] ?? '' }}">
                         </div>
-
                     </div>
 
                     <div class="modal-footer">
                         <button type="button" class="btn btn-light" data-bs-dismiss="modal">Cancel</button>
-                        <button class="btn btn-primary">Save</button>
+                        <button type="submit" class="btn btn-primary">Save</button>
                     </div>
-
                 </div>
             </form>
         </div>
@@ -240,19 +227,16 @@
 
     {{-- DELETE MODAL --}}
     <div class="modal fade" id="deleteConfirmModal" tabindex="-1" aria-hidden="true">
-        <div class="modal-dialog modal-dialog-centered" style="min-height: calc(100% - 3.5rem); display: flex; align-items: center;">
+        <div class="modal-dialog modal-dialog-centered">
             <div class="modal-content shadow-lg" style="border-radius: 14px;">
                 <div class="modal-header bg-danger text-white">
                     <h5 class="modal-title fw-bold">Delete Rule</h5>
                 </div>
-
                 <div class="modal-body">
                     <p class="fw-semibold mb-0">Are you sure you want to delete this rule?</p>
                 </div>
-
                 <div class="modal-footer">
                     <button class="btn btn-light" data-bs-dismiss="modal">Cancel</button>
-
                     <form id="deleteConfirmForm" method="POST">
                         @csrf
                         @method('DELETE')
@@ -265,7 +249,7 @@
 
 </div>
 
-{{-- SINGLE SCRIPT BLOCK --}}
+{{-- JAVASCRIPT LOGICA --}}
 <script>
 function confirmDelete(url) {
     document.getElementById('deleteConfirmForm').action = url;
@@ -273,48 +257,29 @@ function confirmDelete(url) {
 }
 
 document.addEventListener('DOMContentLoaded', function () {
-    // 1. Zorg dat foutmeldingen de JUISTE modal heropenen
+    // 1. Zorg dat foutmeldingen de JUISTE modal direct heropenen
     @if(session('_last_action') === 'error')
         @if(session('edit_id'))
-            // Haal specifiek de modal op die de fout veroorzaakte
             var errorModalEl = document.getElementById('editModal' + "{{ session('edit_id') }}");
             if (errorModalEl) {
-                var errorModal = bootstrap.Modal.getOrCreateInstance(errorModalEl);
-                errorModal.show();
+                bootstrap.Modal.getOrCreateInstance(errorModalEl).show();
             }
         @else
             var createModalEl = document.getElementById('createModal');
             if (createModalEl) {
-                var createModal = bootstrap.Modal.getOrCreateInstance(createModalEl);
-                createModal.show();
+                bootstrap.Modal.getOrCreateInstance(createModalEl).show();
             }
         @endif
-
     @endif
 
-    // 2. Behandel de confirm-update logica dynamisch op basis van de sessie-ID
-    @if(session('_confirm_update') && session('edit_id'))
-        const editId = "{{ session('edit_id') }}";
-        const targetModalEl = document.getElementById('editModal' + editId);
-        
-        if (targetModalEl) {
-            const modal = bootstrap.Modal.getOrCreateInstance(targetModalEl);
-            modal.show();
-
-            // Korte timeout om de animatie van de modal niet te breken
-            setTimeout(() => {
-                if (confirm("Are you sure you want to update this rule?")) {
-                    let form = targetModalEl.querySelector('form');
-                    let input = document.createElement('input');
-                    input.type = 'hidden';
-                    input.name = 'confirm';
-                    input.value = 'yes';
-                    form.appendChild(input);
-                    form.submit();
-                }
-            }, 300);
-        }
-    @endif
+    // 2. Oplossing voor je groepsgenoot: Directe bevestiging bij het submitten van een edit-formulier
+    document.querySelectorAll('.edit-form').forEach(form => {
+        form.addEventListener('submit', function (e) {
+            if (!confirm("Are you sure you want to update this rule?")) {
+                e.preventDefault(); // Annuleert het verzenden als er op 'Cancel' wordt geklikt
+            }
+        });
+    });
 });
 </script>
 

@@ -5,16 +5,17 @@ namespace App\Http\Controllers;
 use App\Models\Condition;
 use App\Models\CityFunction;
 use Illuminate\Http\Request;
+use Illuminate\Support\Facades\Cache; // Zorgt dat Cache::forget vlekkeloos werkt
 
 class ConditionsController extends Controller
 {   
-    
     public function index()
     {
         if (!session()->has('_last_action') || session('_last_action') !== 'error') {
-        session()->forget('error');
-        session()->forget('edit_id');
+            session()->forget('error');
+            session()->forget('edit_id');
         }
+
         $bonuses = Condition::with(['functionA', 'functionB'])
             ->where('type', 'bonus')
             ->get()
@@ -66,8 +67,6 @@ class ConditionsController extends Controller
         } else {
             $request->merge(['value' => abs($request->value)]);
         }
-
-
 
         if ($request->function_a == $request->function_b) {
             return back()
@@ -122,17 +121,16 @@ class ConditionsController extends Controller
             'value'      => $request->value,
         ]);
 
-        \App\Http\Controllers\QoLController::recalculateQoL();
+        Cache::forget('qol_data');
 
         return redirect()
             ->route('conditions.index')
-            ->with('_last_action', 'write')
             ->with('success', 'Rule successfully created.');
     }
 
     public function update(Request $request, Condition $condition)
     {
-        // 1. Check of er geen wijzigingen zijn
+        // Check of er daadwerkelijk iets gewijzigd is
         $noChanges =
             (int)$condition->function_a === (int)$request->function_a &&
             (int)$condition->function_b === (int)$request->function_b &&
@@ -140,12 +138,9 @@ class ConditionsController extends Controller
             (string)($condition->value ?? '') === (string)($request->value ?? '');
 
         if ($noChanges) {
-            return redirect()
-                ->route('conditions.index')
-                ->with('_last_action', 'none');
+            return redirect()->route('conditions.index');
         }
 
-        // 2. Validatie
         $request->validate([
             'function_a' => 'required|exists:city_functions,id',
             'function_b' => 'required|exists:city_functions,id',
@@ -153,18 +148,12 @@ class ConditionsController extends Controller
             'value'      => 'nullable|integer|min:-5|max:5',
         ]);
 
-        // Force negative value for penalty
         if ($request->type === 'penalty') {
             $request->merge(['value' => -abs($request->value)]);
         } else {
             $request->merge(['value' => abs($request->value)]);
         }
 
-        // Check of de functies daadwerkelijk gewijzigd zijn ten opzichte van de database
-        $functionsChanged = (int)$condition->function_a !== (int)$request->function_a || 
-                            (int)$condition->function_b !== (int)$request->function_b;
-
-        // 3. Checks
         if ($request->function_a == $request->function_b) {
             return back()
                 ->with('_last_action', 'error')
@@ -173,69 +162,7 @@ class ConditionsController extends Controller
                 ->with('pending_data', $request->all());
         }
 
-        if ($functionsChanged) {
-            $existsSame = Condition::where('id', '!=', $condition->id)
-                ->where('function_a', $request->function_a)
-                ->where('function_b', $request->function_b)
-                ->where('type', $request->type)
-                ->exists();
-
-            if ($existsSame) {
-                return back()
-                    ->with('_last_action', 'error')
-                    ->with('edit_id', $condition->id)
-                    ->with('error', 'This rule already exists.')
-                    ->with('pending_data', $request->all());
-            }
-
-            $existsDifferentType = Condition::where('id', '!=', $condition->id)
-                ->where('function_a', $request->function_a)
-                ->where('function_b', $request->function_b)
-                ->where('type', '!=', $request->type)
-                ->exists();
-
-            if ($existsDifferentType) {
-                return back()
-                    ->with('_last_action', 'error')
-                    ->with('edit_id', $condition->id)
-                    ->with('error', 'A rule with this function pair already exists with a different type.')
-                    ->with('pending_data', $request->all());
-            }
-
-            if (
-                (int)$condition->function_a === (int)$request->function_b &&
-                (int)$condition->function_b === (int)$request->function_a
-            ) {
-                return back()
-                    ->with('_last_action', 'error')
-                    ->with('edit_id', $condition->id)
-                    ->with('error', 'You cannot reverse the function order of an existing rule.')
-                    ->with('pending_data', $request->all());
-            }
-
-            $existsReverse = Condition::where('id', '!=', $condition->id)
-                ->where('function_a', $request->function_b)
-                ->where('function_b', $request->function_a)
-                ->exists();
-
-            if ($existsReverse) {
-                return back()
-                    ->with('_last_action', 'error')
-                    ->with('edit_id', $condition->id)
-                    ->with('error', 'The reversed combination already exists.')
-                    ->with('pending_data', $request->all());
-            }
-        }
-
-        // 4. CONFIRM FLOW
-        if ($request->confirm !== "yes") {
-            return back()
-                ->with('_confirm_update', true)
-                ->with('edit_id', $condition->id)
-                ->with('pending_data', $request->all());
-        }
-
-        // 5. UPDATE UITVOEREN
+        // Voer de update direct uit
         $condition->update([
             'function_a' => $request->function_a,
             'function_b' => $request->function_b,
@@ -243,19 +170,19 @@ class ConditionsController extends Controller
             'value'      => $request->value,
         ]);
 
+        // Belangrijk: Gooi de grid cache leeg!
+        Cache::forget('qol_data');
+
         return redirect()
             ->route('conditions.index')
-            ->with('_last_action', 'write')
             ->with('success', 'Rule successfully updated.');
     }
 
     public function destroy(Condition $condition)
     {
         $condition->delete();
+        Cache::forget('qol_data');
 
-        return redirect()
-            ->back()
-            ->with('_last_action', 'write')
-            ->with('success', 'Rule deleted and QoL updated.');
+        return back()->with('success', 'Rule deleted successfully.');
     }
 }
