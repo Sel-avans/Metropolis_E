@@ -10,6 +10,20 @@ class QoLController extends Controller
     public function details()
     {
         $cells = GridCell::with('function.effects')->get();
+
+        if ($cells->whereNotNull('function_id')->isEmpty()) {
+            return response()->json([
+                'categories' => [
+                    'Safety'      => ['total' => 0, 'items' => []],
+                    'Recreation'  => ['total' => 0, 'items' => []],
+                    'Environment' => ['total' => 0, 'items' => []],
+                    'Amenities'   => ['total' => 0, 'items' => []],
+                    'Mobility'    => ['total' => 0, 'items' => []],
+                ],
+                'total_score' => 0
+            ]);
+        }
+    
         $conditions = Condition::with(['functionA', 'functionB'])->get();
 
         $categories = [
@@ -28,9 +42,8 @@ class QoLController extends Controller
             'mobility'    => 0
         ];
 
-        // 1. BASE EFFECTS
         foreach ($cells as $cell) {
-            if (!$cell->function) continue;
+            if (!$cell->function_id || !$cell->function) continue;
 
             foreach ($cell->function->effects as $effect) {
                 $catKey = strtolower($effect->category);
@@ -44,9 +57,6 @@ class QoLController extends Controller
             }
         }
 
-        $processedPairs = [];
-
-        // 2. NEIGHBOR BONUSES AND PENALTIES
         foreach ($cells as $cell) {
             if (!$cell->function) continue;
 
@@ -58,8 +68,13 @@ class QoLController extends Controller
 
                 $funcB = $neighbor->function;
 
-                $pairKey = min($funcA->id, $funcB->id) . '-' . max($funcA->id, $funcB->id);
-                if (isset($processedPairs[$pairKey])) continue;
+                $isFirst =
+                    ($cell->row < $neighbor->row) ||
+                    ($cell->row == $neighbor->row && $cell->col < $neighbor->col);
+
+                if (!$isFirst) {
+                    continue;
+                }
 
                 $catA = strtolower($funcA->category);
                 $catB = strtolower($funcB->category);
@@ -101,7 +116,6 @@ class QoLController extends Controller
                     }
                 }
 
-                // SENSITIVE / POLLUTING PENALTIES
                 $isSensitiveA = $funcA->sensitivity === 'sensitive';
                 $isSensitiveB = $funcB->sensitivity === 'sensitive';
 
@@ -127,8 +141,6 @@ class QoLController extends Controller
                         $totals[$catB] -= 2;
                     }
                 }
-
-                $processedPairs[$pairKey] = true;
             }
         }
 
@@ -168,7 +180,6 @@ class QoLController extends Controller
         
         $breakdown = [];
 
-        // 1. Voeg basis effecten van het gebouw zelf toe
         foreach ($funcA->effects as $effect) {
             $catKey = strtolower($effect->category);
             if (isset($totals[$catKey])) {
@@ -177,7 +188,6 @@ class QoLController extends Controller
             }
         }
 
-        // 2. Bereken de impact van de buren
         foreach ($neighbors as $neighbor) {
             if (!$neighbor->function) continue;
 
@@ -185,7 +195,6 @@ class QoLController extends Controller
             $catA = strtolower($funcA->category);
             $catB = strtolower($funcB->category);
 
-            // Zelfde categorie bonus
             if ($catA === $catB) {
                 if (isset($totals[$catA])) {
                     $totals[$catA] += 2;
@@ -193,7 +202,6 @@ class QoLController extends Controller
                 }
             }
 
-            // Specifieke Condities (Bonussen / Penalties)
             $condition = $conditions->filter(fn($c) =>
                 ($c->function_a == $funcA->id && $c->function_b == $funcB->id) ||
                 ($c->function_a == $funcB->id && $c->function_b == $funcA->id)
@@ -208,7 +216,6 @@ class QoLController extends Controller
                 }
             }
 
-            // Gevoeligheid / Vervuiling Penalties
             $isSensitiveA = $funcA->sensitivity === 'sensitive';
             $isSensitiveB = $funcB->sensitivity === 'sensitive';
             $isPollutingA = $funcA->pollution === 'polluting';
@@ -280,7 +287,7 @@ class QoLController extends Controller
         return $neighbors;
     }
 
-    public static function recalculateQoL()
+    public static function recalculateQoL() 
     {
         $controller = new self();
         $response = $controller->details()->getData(true);

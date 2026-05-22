@@ -49,6 +49,7 @@
 
         <div class="flex flex-col mx-auto">
 
+
             {{-- QoL Score Display --}}
             <div class="w-auto h-min mt-4 border-4 border-gray-400 dark:bg-inherit dark:border-teal-600 rounded-md p-6">
                 <span id="qol-score" class="text-xl font-semibold mb-2 dark:text-teal-500">
@@ -57,6 +58,13 @@
 
                 <span id="old-qol-score" class="float-right">
                 </span>
+            </div>
+
+            <div class="mt-4">
+                <button id="undoButton" 
+                        class="px-4 py-2 bg-yellow-500 text-black font-semibold rounded shadow hover:bg-yellow-600 transition">
+                    Undo
+                </button>
             </div>
 
             {{-- Grid Display --}}

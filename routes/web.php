@@ -8,6 +8,7 @@ use App\Http\Controllers\FunctionController;
 use App\Http\Controllers\EffectsController;
 use App\Http\Controllers\FunctionManagementController;
 use App\Http\Controllers\ConditionsController;
+use App\Http\Controllers\UndoController;
 
 Route::get('/functions', [FunctionManagementController::class, 'index'])->name('functions.index');
 Route::get('/functions/create', [FunctionManagementController::class, 'create'])->name('functions.create');
@@ -30,7 +31,7 @@ Route::get('/functions/manage', function () { return view('functions.manage'); }
 
 Route::post('/grid/update', [GridController::class, 'update']);
 Route::get('/qol/details', [QoLController::class, 'details'])->name('qol.details');
-Route::get('/qol/cell/{row}/{col}', [QoLController::class, 'cellHoverDetails']); // Nieuwe route voor de cel hover details
+Route::get('/qol/cell/{row}/{col}', [QoLController::class, 'cellHoverDetails']); 
 
 Route::get('/dashboard', function () {
     return view('dashboard');
@@ -45,5 +46,7 @@ Route::middleware('auth')->group(function () {
 Route::delete('/grid/cell/{cell}/function', [GridController::class, 'removeFunction']);
 
 Route::resource('conditions', ConditionsController::class)->except(['show']);
+
+Route::post('/undo', [UndoController::class, 'undo']);
 
 require __DIR__.'/auth.php';

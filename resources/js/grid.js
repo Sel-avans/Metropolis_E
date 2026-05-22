@@ -286,54 +286,57 @@ document.addEventListener("DOMContentLoaded", () => {
             cell.classList.remove("drag-over");
         });
 
-        cell.addEventListener("drop", async e => {
-            e.preventDefault();
-            isDragging = false;
-            dropOccurred = true;
+    cell.addEventListener("drop", async e => {
+        e.preventDefault();
+        isDragging = false;
+        dropOccurred = true;
 
-            cell.classList.remove("drag-over");
+        cell.classList.remove("drag-over");
 
-            const newRow = cell.dataset.row;
-            const newCol = cell.dataset.col;
+        const newRow = cell.dataset.row;
+        const newCol = cell.dataset.col;
 
-            let oldRow = null;
-            let oldCol = null;
+        // ❗ BEPAAL ALTIJD DE OUDE CEL VIA sourceCell
+        let oldRow = null;
+        let oldCol = null;
 
-            if (sourceCell) {
-                oldRow = sourceCell.dataset.row;
-                oldCol = sourceCell.dataset.col;
+        if (sourceCell) {
+            oldRow = sourceCell.dataset.row;
+            oldCol = sourceCell.dataset.col;
 
-                sourceCell.innerHTML = "";
-                sourceCell.removeAttribute("draggable");
-                sourceCell.classList.remove("drag-source");
+            // ❗ Oude cel leegmaken
+            sourceCell.innerHTML = "";
+            sourceCell.removeAttribute("draggable");
+            sourceCell.classList.remove("drag-source");
+        }
 
-                sourceCell = null;
-            }
+        // ❗ Daarna pas sourceCell resetten
+        sourceCell = null;
 
-            cell.innerHTML = "";
+        // Nieuwe cel vullen
+        cell.innerHTML = "";
 
-            const img = document.createElement("img");
-            img.src = draggedItem.image;
-            img.alt = draggedItem.name;
-            img.dataset.functionId = draggedItem.id;
-            img.classList.add("grid-function-icon", "object-contain");
-            cell.appendChild(img);
+        const img = document.createElement("img");
+        img.src = draggedItem.image;
+        img.alt = draggedItem.name;
+        img.dataset.functionId = draggedItem.id;
+        img.classList.add("grid-function-icon", "object-contain");
+        cell.appendChild(img);
 
-            const deleteBtn = document.createElement("button");
-            deleteBtn.className =
-                "delete-btn absolute top-[2px] right-[2px] bg-red-600/80 text-white w-5 h-5 text-[14px] rounded cursor-pointer flex items-center justify-center";
-            deleteBtn.ariaLabel = "Remove function from grid";
-            deleteBtn.innerHTML = "✖";
-            cell.appendChild(deleteBtn);
+        const deleteBtn = document.createElement("button");
+        deleteBtn.className =
+            "delete-btn absolute top-[2px] right-[2px] bg-red-600/80 text-white w-5 h-5 text-[14px] rounded cursor-pointer flex items-center justify-center";
+        deleteBtn.innerHTML = "✖";
+        cell.appendChild(deleteBtn);
 
-            cell.setAttribute("draggable", "true");
+        cell.setAttribute("draggable", "true");
 
-            activateCell(cell);
+        activateCell(cell);
 
-            await saveMove(oldRow, oldCol, newRow, newCol);
+        await saveMove(oldRow, oldCol, newRow, newCol);
 
-            setTimeout(() => updateQoL(), 10);
-        });
+        setTimeout(() => updateQoL(), 10);
+    });
 
         cell.addEventListener("click", () => {
             if (isDragging) return;
@@ -362,7 +365,7 @@ document.addEventListener("DOMContentLoaded", () => {
         });
     });
 
-    document.addEventListener("dragend", async (e) => {
+        document.addEventListener("dragend", async (e) => {
         if (!draggedItem || !sourceCell) return;
 
         if (dropOccurred) {
@@ -409,4 +412,75 @@ document.addEventListener("DOMContentLoaded", () => {
     });
 
     updateQoL();
+
+   document.getElementById('undoButton').addEventListener('click', () => {
+    fetch('/undo', {
+        method: 'POST',
+        headers: {
+            'X-CSRF-TOKEN': document.querySelector('meta[name="csrf-token"]').content,
+            'Content-Type': 'application/json'
+        }
+    })
+    .then(res => res.json())
+    .then(data => {
+        console.log("UNDO RESPONSE:", data);
+
+        if (!data.success) return;
+
+        // 1. Actiecel herstellen
+        const targetCell = document.querySelector(
+            `[data-row="${data.cell.row}"][data-col="${data.cell.col}"]`
+        );
+
+        if (data.cell.function_id) {
+            targetCell.innerHTML = `
+                <img src="${data.cell.image}" 
+                     class="grid-function-icon object-contain"
+                     data-function-id="${data.cell.function_id}">
+                <button 
+                    class="delete-btn absolute top-[2px] right-[2px] bg-red-600/80 text-white w-5 h-5 text-[14px] rounded cursor-pointer flex items-center justify-center">
+                    ✖
+                </button>
+            `;
+            targetCell.setAttribute("draggable", "true");
+        } else {
+            targetCell.innerHTML = "";
+            targetCell.removeAttribute("draggable");
+        }
+
+        // 2. Nieuwe cel leegmaken (als backend 'cleared' meestuurt)
+        if (data.cleared && data.cleared.row !== null && data.cleared.col !== null) {
+            const clearedCell = document.querySelector(
+                `[data-row="${data.cleared.row}"][data-col="${data.cleared.col}"]`
+            );
+
+            if (clearedCell) {
+                clearedCell.innerHTML = "";
+                clearedCell.removeAttribute("draggable");
+            }
+        }
+
+        // 3. Extra safety: zorg dat deze functie nergens anders meer staat
+        if (data.cell.function_id) {
+            const allCells = document.querySelectorAll('.grid-cell');
+
+            allCells.forEach(otherCell => {
+                const row = otherCell.dataset.row;
+                const col = otherCell.dataset.col;
+
+                // sla de herstelde cel zelf over
+                if (row == data.cell.row && col == data.cell.col) return;
+
+                const img = otherCell.querySelector('img.grid-function-icon');
+
+                if (img && img.dataset.functionId == String(data.cell.function_id)) {
+                    otherCell.innerHTML = "";
+                    otherCell.removeAttribute("draggable");
+                }
+            });
+        }
+
+        setTimeout(() => updateQoL(), 10);
+    });
+});
 });
