@@ -105,8 +105,8 @@
 
                         {{-- FUNCTION A --}}
                         <div class="mb-3">
-                            <label class="form-label fw-semibold">Function A</label>
-                            <select name="function_a" class="form-select">
+                            <label for="function_a_{{ $condition->id }}" class="form-label fw-semibold">Function A</label>
+                            <select id="function_a_{{ $condition->id }}" name="function_a" class="form-select">
                                 @foreach($functions as $f)
                                     <option value="{{ $f->id }}"
                                         @selected(($pending['function_a'] ?? $condition->function_a) == $f->id)>
@@ -118,8 +118,8 @@
 
                         {{-- FUNCTION B --}}
                         <div class="mb-3">
-                            <label class="form-label fw-semibold">Function B</label>
-                            <select name="function_b" class="form-select">
+                            <label for="function_b_{{ $condition->id }}" class="form-label fw-semibold">Function B</label>
+                            <select id="function_b_{{ $condition->id }}" name="function_b" class="form-select">
                                 @foreach($functions as $f)
                                     <option value="{{ $f->id }}"
                                         @selected(($pending['function_b'] ?? $condition->function_b) == $f->id)>
@@ -131,8 +131,8 @@
 
                         {{-- TYPE --}}
                         <div class="mb-3">
-                            <label class="form-label fw-semibold">Type</label>
-                            <select name="type" class="form-select">
+                            <label for="type_{{ $condition->id }}" class="form-label fw-semibold">Type</label>
+                            <select id="type_{{ $condition->id }}" name="type" class="form-select">
                                 <option value="bonus" @selected(($pending['type'] ?? $condition->type) == 'bonus')>Bonus</option>
                                 <option value="penalty" @selected(($pending['type'] ?? $condition->type) == 'penalty')>Penalty</option>
                                 <option value="forbidden" @selected(($pending['type'] ?? $condition->type) == 'forbidden')>Forbidden</option>
@@ -141,8 +141,8 @@
 
                         {{-- VALUE --}}
                         <div class="mb-3">
-                            <label class="form-label fw-semibold">Value</label>
-                            <input type="number" name="value" class="form-control"
+                            <label for="value_{{ $condition->id }}" class="form-label fw-semibold">Value</label>
+                            <input id="value_{{ $condition->id }}" type="number" name="value" class="form-control"
                                    value="{{ $pending['value'] ?? $condition->value }}">
                         </div>
 
@@ -187,8 +187,8 @@
 
                         {{-- FUNCTION A --}}
                         <div class="mb-3">
-                            <label class="form-label fw-semibold">Function A</label>
-                            <select name="function_a" class="form-select">
+                            <label for="function_a_create" class="form-label fw-semibold">Function A</label>
+                            <select id="function_a_create" name="function_a" class="form-select">
                                 @foreach($functions as $f)
                                     <option value="{{ $f->id }}"
                                         @selected(($pending['function_a'] ?? '') == $f->id)>
@@ -200,8 +200,8 @@
 
                         {{-- FUNCTION B --}}
                         <div class="mb-3">
-                            <label class="form-label fw-semibold">Function B</label>
-                            <select name="function_b" class="form-select">
+                            <label for="function_b_create" class="form-label fw-semibold">Function B</label>
+                            <select id="function_b_create" name="function_b" class="form-select">
                                 @foreach($functions as $f)
                                     <option value="{{ $f->id }}"
                                         @selected(($pending['function_b'] ?? '') == $f->id)>
@@ -213,8 +213,8 @@
 
                         {{-- TYPE --}}
                         <div class="mb-3">
-                            <label class="form-label fw-semibold">Type</label>
-                            <select name="type" class="form-select">
+                            <label for="type_create" class="form-label fw-semibold">Type</label>
+                            <select id="type_create" name="type" class="form-select">
                                 <option value="bonus" @selected(($pending['type'] ?? '') == 'bonus')>Bonus</option>
                                 <option value="penalty" @selected(($pending['type'] ?? '') == 'penalty')>Penalty</option>
                                 <option value="forbidden" @selected(($pending['type'] ?? '') == 'forbidden')>Forbidden</option>
@@ -223,8 +223,8 @@
 
                         {{-- VALUE --}}
                         <div class="mb-3">
-                            <label class="form-label fw-semibold">Value</label>
-                            <input type="number" name="value" class="form-control"
+                            <label for="value_create" class="form-label fw-semibold">Value</label>
+                            <input id="value_create" type="number" name="value" class="form-control"
                                    value="{{ $pending['value'] ?? '' }}">
                         </div>
 

@@ -16,13 +16,13 @@
         @method('PUT')
 
         <div>
-            <label class="block text-sm text-white font-medium mb-1">Name</label>
-            <input type="text" name="name" value="{{ old('name', $function->name) }}"
+            <label for="name" class="block text-sm text-white font-medium mb-1">Name</label>
+            <input id="name" type="text" name="name" value="{{ old('name', $function->name) }}"
                 class="w-full border rounded px-3 py-2 text-sm" required>
         </div>
 
         <div class="relative">
-            <label class="block text-sm text-white font-medium mb-1">Category</label>
+            <label for="category-input" class="block text-sm text-white font-medium mb-1">Category</label>
 
             <input
                 type="text"

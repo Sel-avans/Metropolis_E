@@ -15,13 +15,13 @@
         @csrf
 
         <div>
-            <label class="block text-sm text-white font-medium mb-1">Name</label>
-            <input type="text" name="name" value="{{ old('name') }}"
+            <label for="name" class="block text-sm text-white font-medium mb-1">Name</label>
+            <input id="name" type="text" name="name" value="{{ old('name') }}"
                 class="w-full border rounded px-3 py-2 text-sm" required>
         </div>
 
         <div class="relative">
-            <label class="block text-sm text-white font-medium mb-1">Category</label>
+            <label for="category-input" class="block text-sm text-white font-medium mb-1">Category</label>
 
             <input
                 type="text"
@@ -54,7 +54,7 @@
         <div>
             <label class="block text-sm text-white font-medium mb-1">Icon / Image</label>
 
-            <label class="flex items-center gap-3 px-4 py-2 bg-gray-200 hover:bg-gray-300 
+                <label class="flex items-center gap-3 px-4 py-2 bg-gray-200 hover:bg-gray-300 
                text-gray-800 text-sm rounded-md cursor-pointer w-fit">
                 Choose file
                 <input type="file" name="icon" accept="image/*" class="hidden" id="fileInput">

@@ -7,9 +7,11 @@
     <aside class="w-1/3 bg-gray-100 p-6 overflow-y-auto">
         <h1 class="text-2xl font-bold mb-4">Function Library</h1>
 
+        <label for="searchInput" class="sr-only">{{ __('Search') }}</label>
         <input 
             id="searchInput"
             type="text"
+            aria-label="{{ __('Search') }}"
             placeholder="Search..."
             class="w-full mb-4 p-2 border rounded"
         >
