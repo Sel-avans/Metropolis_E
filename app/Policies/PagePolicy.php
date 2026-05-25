@@ -8,54 +8,106 @@ use App\Enums\UserRole;
 class PagePolicy
 {
     //Machtigingen meerdere rollen
-    public function ViewGridPage(User $user): bool
+    public function CanViewGridPage(User $user): bool
     {
-        return $user->role === UserRole::City_planner;
+        return in_array($user->role, [
+            UserRole::City_planner,
+            UserRole::Administrator,
+            UserRole::Municipal_Policy_Maker
+        ]);
     }
 
-    public function ViewEditPage(User $user): bool
+    public function CanViewFunctionPage(User $user): bool
     {
-        return $user->role === UserRole::City_planner;
+        return in_array($user->role, [
+            UserRole::City_planner,
+            UserRole::Administrator
+        ]);
     }
 
-    public function ViewEffectsPage(User $user): bool
+    public function CanViewEffectsPage(User $user): bool
     {
-        return $user->role === UserRole::City_planner;
+        return in_array($user->role, [
+            UserRole::City_planner,
+            UserRole::Administrator,
+        ]);
     }
 
-    public function ViewConditionsPage(User $user): bool
+    public function CanViewConditionsPage(User $user): bool
     {
-        return $user->role === UserRole::City_planner;
+        return in_array($user->role, [
+            UserRole::City_planner,
+            UserRole::Administrator,
+        ]);
     }
 
     //City planner en Muncipal policy maker
-    public function ApproveGrid(User $user): bool
+    public function CanApproveGrid(User $user): bool
     {
-        return $user->role === UserRole::Municipal_Policy_Maker;
+        return in_array($user->role, [
+            UserRole::City_planner,
+            UserRole::Municipal_Policy_Maker
+        ]);
     }
 
+        public function CanMakeComments(User $user): bool
+    {
+        return in_array($user->role, [
+            UserRole::City_planner,
+            UserRole::Municipal_Policy_Maker
+        ]);
+    }
 
     //Machtigingen City Planner
-    public function PlaceFunctions(User $user): bool
+    public function CanPlaceFunctions(User $user): bool
+    {
+        return $user->role === UserRole::City_planner;
+    }
+
+    public function CanModifyFunction(User $user): bool
+    {
+        return $user->role === UserRole::City_planner;
+    }
+
+    public function CanAddFunction(User $user): bool
+    {
+        return $user->role === UserRole::City_planner;
+    }
+
+    public function CanDeleteFunction(User $user): bool
     {
         return $user->role === UserRole::City_planner;
     }
 
     
-
-    public function ViewEditPage(User $user): bool
+    //Machtigingen Administrator
+    public function CanChangeQOLEffect(User $user): bool
     {
-        return $user->role === UserRole::City_planner;
+        return $user->role === UserRole::Administrator;
     }
 
-    //Machtigingen Administrator
+    public function CanEditConditions(User $user): bool
+    {
+        return $user->role === UserRole::Administrator;
+    }
+
+    public function CanAddNewConditions(User $user): bool
+    {
+        return $user->role === UserRole::Administrator;
+    }
+
+        public function CanDeleteConditions(User $user): bool
+    {
+        return $user->role === UserRole::Administrator;
+    }
+
 
     //Machtigingen Municipal Policy Maker
-
-
-    public function ApproveGrid(User $user): bool
+        public function canLockFunctions(User $user): bool
     {
         return $user->role === UserRole::Municipal_Policy_Maker;
     }
+
+    
 
 }
