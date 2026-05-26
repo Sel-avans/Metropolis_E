@@ -32,10 +32,11 @@
                             draggable="true"
                             data-function-id="{{ $function->id }}"
                             data-function-name="{{ $function->name }}"
-                            data-image="{{ asset($function->image) }}">
+                            data-image="{{ asset($function->image) }}"
+                            >
 
                             <img src="{{ asset($function->image) }}" 
-                                alt="{{ $function->name }}" 
+                                alt="image of {{ $function->name }}" 
                                 class="w-8 h-8 object-contain pointer-events-none">
 
                             <span class="library-name text-base">{{ $function->name }}</span>
@@ -78,6 +79,8 @@
                                 data-col="{{ $col }}"
                                 data-id="{{ $cell->id }}"
                                 draggable="{{ $cell ? 'true' : 'false' }}"
+                                role="button"
+                                aria-label="{{ !empty($cell) && !empty($cell->function) ? 'Grid cell row ' . $cell->row . ', column ' . $cell->col . ' containing ' . $cell->function->name : 'Empty grid cell row ' . $row . ', column ' . $col }}"
                             >
                                 @if(!empty($cell) && !empty($cell->function))
                                     <img 
@@ -88,9 +91,11 @@
                                     >
 
                                     <button 
+                                            type="button"
                                             class="delete-btn absolute top-[2px] right-[2px] bg-red-600/80 text-white w-5 h-5 text-[14px] rounded cursor-pointer flex items-center justify-center"
-                                        >
-                                            ✖
+                                            aria-label="Remove {{ $cell->function->name }} from grid cell"
+                                            title="Remove {{ $cell->function->name }} from grid cell">
+                                            <span class="sr-only">Remove {{ $cell->function->name }} from grid cell</span>✖
                                     </button>
 
                                 @endif

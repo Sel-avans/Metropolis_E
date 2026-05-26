@@ -65,12 +65,14 @@
                                 <td class="pe-4">
                                     <button class="btn btn-sm btn-outline-warning me-1"
                                             data-bs-toggle="modal"
-                                            data-bs-target="#editModal{{ $condition->id }}">
+                                            data-bs-target="#editModal{{ $condition->id }}"
+                                            aria-label="Modify {{ $condition->functionA->name }} and {{ $condition->functionB->name }} rule">
                                         Modify
                                     </button>
 
                                     <button class="btn btn-sm btn-outline-danger"
-                                            onclick="confirmDelete('{{ route('conditions.destroy', $condition) }}')">
+                                            onclick="confirmDelete('{{ route('conditions.destroy', $condition) }}')"
+                                            aria-label="Delete {{ $condition->functionA->name }} and {{ $condition->functionB->name }} rule">
                                         Delete
                                     </button>
                                 </td>
@@ -90,15 +92,15 @@
         $isThisModal = session('edit_id') == $condition->id;
     @endphp
 
-    <div class="modal fade" id="editModal{{ $condition->id }}" tabindex="-1" aria-hidden="true">
-        <div class="modal-dialog modal-dialog-centered">
+    <div class="modal fade" id="editModal{{ $condition->id }}" tabindex="-1" aria-hidden="true" aria-labelledby="editModal{{ $condition->id }}Label">
+        <div class="modal-dialog modal-dialog-centered" style="min-height: calc(100% - 3.5rem); display: flex; align-items: center;">
             <form method="POST" action="{{ route('conditions.update', $condition->id) }}" class="edit-form">
                 @csrf
                 @method('PUT')
 
                 <div class="modal-content shadow-lg" style="border-radius: 14px;">
                     <div class="modal-header" style="background:#2563eb; color:white;">
-                        <h5 class="modal-title fw-bold">Modify Rule</h5>
+                        <h5 class="modal-title fw-bold" id="editModal{{ $condition->id }}Label">Modify Rule</h5>
                     </div>
 
                     @if(session('_last_action') === 'error' && $isThisModal)
@@ -109,8 +111,8 @@
 
                     <div class="modal-body">
                         <div class="mb-3">
-                            <label class="form-label fw-semibold">Function A</label>
-                            <select name="function_a" class="form-select">
+                            <label for="function_a_{{ $condition->id }}" class="form-label fw-semibold">Function A</label>
+                            <select id="function_a_{{ $condition->id }}" name="function_a" class="form-select">
                                 @foreach($functions as $f)
                                     <option value="{{ $f->id }}" @selected(($pending['function_a'] ?? $condition->function_a) == $f->id)>
                                         {{ $f->name }}
@@ -120,8 +122,8 @@
                         </div>
 
                         <div class="mb-3">
-                            <label class="form-label fw-semibold">Function B</label>
-                            <select name="function_b" class="form-select">
+                            <label for="function_b_{{ $condition->id }}" class="form-label fw-semibold">Function B</label>
+                            <select id="function_b_{{ $condition->id }}" name="function_b" class="form-select">
                                 @foreach($functions as $f)
                                     <option value="{{ $f->id }}" @selected(($pending['function_b'] ?? $condition->function_b) == $f->id)>
                                         {{ $f->name }}
@@ -131,8 +133,8 @@
                         </div>
 
                         <div class="mb-3">
-                            <label class="form-label fw-semibold">Type</label>
-                            <select name="type" class="form-select">
+                            <label for="type_{{ $condition->id }}" class="form-label fw-semibold">Type</label>
+                            <select id="type_{{ $condition->id }}" name="type" class="form-select">
                                 <option value="bonus" @selected(($pending['type'] ?? $condition->type) == 'bonus')>Bonus</option>
                                 <option value="penalty" @selected(($pending['type'] ?? $condition->type) == 'penalty')>Penalty</option>
                                 <option value="forbidden" @selected(($pending['type'] ?? $condition->type) == 'forbidden')>Forbidden</option>
@@ -140,8 +142,9 @@
                         </div>
 
                         <div class="mb-3">
-                            <label class="form-label fw-semibold">Value</label>
-                            <input type="number" name="value" class="form-control" value="{{ $pending['value'] ?? $condition->value }}">
+                            <label for="value_{{ $condition->id }}" class="form-label fw-semibold">Value</label>
+                            <input id="value_{{ $condition->id }}" type="number" name="value" class="form-control"
+                                   value="{{ $pending['value'] ?? $condition->value }}">
                         </div>
                     </div>
 
@@ -160,14 +163,14 @@
         $pendingCreate = session('edit_id') === null ? (session('pending_data') ?? []) : [];
     @endphp
 
-    <div class="modal fade" id="createModal" tabindex="-1" aria-hidden="true">
-        <div class="modal-dialog modal-dialog-centered">
+    <div class="modal fade" id="createModal" tabindex="-1" aria-hidden="true" aria-labelledby="createModalLabel">
+        <div class="modal-dialog modal-dialog-centered" style="min-height: calc(100% - 3.5rem); display: flex; align-items: center;">
             <form method="POST" action="{{ route('conditions.store') }}">
                 @csrf
 
                 <div class="modal-content shadow-lg" style="border-radius: 14px;">
                     <div class="modal-header" style="background:#2563eb; color:white;">
-                        <h5 class="modal-title fw-bold">Add New Rule</h5>
+                        <h5 class="modal-title fw-bold" id="createModalLabel">Add New Rule</h5>
                     </div>
 
                     @if(session('_last_action') === 'error' && session('edit_id') === null)
@@ -178,9 +181,8 @@
 
                     <div class="modal-body">
                         <div class="mb-3">
-                            <label class="form-label fw-semibold">Function A</label>
-                            <select name="function_a" class="form-select">
-                                <option value="" disabled selected>Select function A</option>
+                            <label for="function_a_create" class="form-label fw-semibold">Function A</label>
+                            <select id="function_a_create" name="function_a" class="form-select">
                                 @foreach($functions as $f)
                                     <option value="{{ $f->id }}" @selected(($pendingCreate['function_a'] ?? '') == $f->id)>
                                         {{ $f->name }}
@@ -190,9 +192,8 @@
                         </div>
 
                         <div class="mb-3">
-                            <label class="form-label fw-semibold">Function B</label>
-                            <select name="function_b" class="form-select">
-                                <option value="" disabled selected>Select function B</option>
+                            <label for="function_b_create" class="form-label fw-semibold">Function B</label>
+                            <select id="function_b_create" name="function_b" class="form-select">
                                 @foreach($functions as $f)
                                     <option value="{{ $f->id }}" @selected(($pendingCreate['function_b'] ?? '') == $f->id)>
                                         {{ $f->name }}
@@ -202,17 +203,18 @@
                         </div>
 
                         <div class="mb-3">
-                            <label class="form-label fw-semibold">Type</label>
-                            <select name="type" class="form-select">
-                                <option value="bonus" @selected(($pendingCreate['type'] ?? '') == 'bonus')>Bonus</option>
-                                <option value="penalty" @selected(($pendingCreate['type'] ?? '') == 'penalty')>Penalty</option>
-                                <option value="forbidden" @selected(($pendingCreate['type'] ?? '') == 'forbidden')>Forbidden</option>
+                            <label for="type_create" class="form-label fw-semibold">Type</label>
+                            <select id="type_create" name="type" class="form-select">
+                                <option value="bonus" @selected(($pending['type'] ?? '') == 'bonus')>Bonus</option>
+                                <option value="penalty" @selected(($pending['type'] ?? '') == 'penalty')>Penalty</option>
+                                <option value="forbidden" @selected(($pending['type'] ?? '') == 'forbidden')>Forbidden</option>
                             </select>
                         </div>
 
                         <div class="mb-3">
-                            <label class="form-label fw-semibold">Value</label>
-                            <input type="number" name="value" class="form-control" value="{{ $pendingCreate['value'] ?? '' }}">
+                            <label for="value_create" class="form-label fw-semibold">Value</label>
+                            <input id="value_create" type="number" name="value" class="form-control"
+                                   value="{{ $pending['value'] ?? '' }}">
                         </div>
                     </div>
 
@@ -226,11 +228,11 @@
     </div>
 
     {{-- DELETE MODAL --}}
-    <div class="modal fade" id="deleteConfirmModal" tabindex="-1" aria-hidden="true">
-        <div class="modal-dialog modal-dialog-centered">
+    <div class="modal fade" id="deleteConfirmModal" tabindex="-1" aria-hidden="true" aria-labelledby="deleteConfirmModalLabel">
+        <div class="modal-dialog modal-dialog-centered" style="min-height: calc(100% - 3.5rem); display: flex; align-items: center;">
             <div class="modal-content shadow-lg" style="border-radius: 14px;">
                 <div class="modal-header bg-danger text-white">
-                    <h5 class="modal-title fw-bold">Delete Rule</h5>
+                    <h5 class="modal-title fw-bold" id="deleteConfirmModalLabel">Delete Rule</h5>
                 </div>
                 <div class="modal-body">
                     <p class="fw-semibold mb-0">Are you sure you want to delete this rule?</p>

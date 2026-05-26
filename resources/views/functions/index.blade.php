@@ -33,6 +33,7 @@
                     <tr class="h-20 border-b hover:bg-gray-300 hover:dark:bg-indigo-950 transition">
                         <td class="p-3 text-center align-middle">
                             <img src="{{ asset($function->image) }}"
+                                alt="{{ $function->name }}"
                                 class="w-16 h-16 object-contain mx-auto">
                         </td>
 

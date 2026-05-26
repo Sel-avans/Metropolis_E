@@ -27,7 +27,7 @@
             @foreach($functions as $function)
                 <tr data-row="{{ $function->id }}" class="hover:bg-gray-300 hover:dark:bg-indigo-950 transition">
                     <td class="p-3 font-medium flex gap-3 dark:text-white">
-                        <img src="{{ asset($function->image) }}" class="w-8 h-8 object-contain pointer-events-none">
+                        <img src="{{ asset($function->image) }}" alt="{{ $function->name }}" class="w-8 h-8 object-contain pointer-events-none">
                         {{ $function->name }}
                     </td>
 
@@ -40,9 +40,13 @@
                         <td class="p-3 text-center">
                             <div class="flex items-center justify-center gap-3">
 
-                                <button class="minus-btn w-7 h-7 flex items-center justify-center 
+                                <button type="button" class="minus-btn w-7 h-7 flex items-center justify-center 
                                     bg-red-500 hover:bg-red-600 text-white rounded-md transition shadow-sm"
-                                    data-category="{{ $cat }}">–</button>
+                                    data-category="{{ $cat }}"
+                                    aria-label="Decrease {{ ucfirst($cat) }} effect for {{ $function->name }}"
+                                    title="Decrease {{ ucfirst($cat) }} effect for {{ $function->name }}">
+                                    <span class="sr-only">Decrease {{ ucfirst($cat) }} effect for {{ $function->name }}</span>–
+                                </button>
 
                                 <span class="effect-value w-8 inline-block text-center font-semibold dark:text-white"
                                       data-category="{{ $cat }}"
@@ -50,9 +54,13 @@
                                     {{ $value }}
                                 </span>
 
-                                <button class="plus-btn w-7 h-7 flex items-center justify-center 
+                                <button type="button" class="plus-btn w-7 h-7 flex items-center justify-center 
                                     bg-green-500 hover:bg-green-600 text-white rounded-md transition shadow-sm"
-                                    data-category="{{ $cat }}">+</button>
+                                    data-category="{{ $cat }}"
+                                    aria-label="Increase {{ ucfirst($cat) }} effect for {{ $function->name }}"
+                                    title="Increase {{ ucfirst($cat) }} effect for {{ $function->name }}">
+                                    <span class="sr-only">Increase {{ ucfirst($cat) }} effect for {{ $function->name }}</span>+
+                                </button>
 
                             </div>
                         </td>
@@ -61,7 +69,8 @@
                     <td class="p-3 text-center">
                         <button class="save-row-btn px-4 py-1.5 bg-blue-600 hover:bg-blue-700 
                             text-white rounded-md shadow-sm transition"
-                            data-id="{{ $function->id }}">
+                            data-id="{{ $function->id }}"
+                            aria-label="Save effects for {{ $function->name }}">
                             Save
                         </button>
                     </td>
