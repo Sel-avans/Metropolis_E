@@ -317,44 +317,72 @@ document.addEventListener("DOMContentLoaded", () => {
 
     updateQoL();
 
-    document.getElementById('undoButton').addEventListener('click', () => {
-        fetch('/undo', {
-            method: 'POST',
-            headers: {
-                'X-CSRF-TOKEN': document.querySelector('meta[name="csrf-token"]').content,
-                'Content-Type': 'application/json'
-            }
-        })
-        .then(res => res.json())
-        .then(data => {
-            console.log("UNDO RESPONSE:", data);
-            if (!data.success) return;
+document.getElementById('undoButton').addEventListener('click', () => {
+    fetch('/undo', {
+        method: 'POST',
+        headers: {
+            'X-CSRF-TOKEN': document.querySelector('meta[name="csrf-token"]').content,
+            'Content-Type': 'application/json'
+        }
+    })
+    .then(res => res.json())
+    .then(data => {
+        console.log("UNDO RESPONSE:", data);
+        if (!data.success) return;
 
-            // 1. Oude cel terugzetten
-            const targetCell = document.querySelector(`[data-row="${data.cell.row}"][data-col="${data.cell.col}"]`);
-            if (targetCell) {
-                if (data.cell.function_id) {
-                    targetCell.innerHTML = `
-                        <img src="${data.cell.image}" class="grid-function-icon object-contain" data-function-id="${data.cell.function_id}">
-                        <button class="delete-btn absolute top-[2px] right-[2px] bg-red-600/80 text-white w-5 h-5 text-[14px] rounded cursor-pointer flex items-center justify-center">✖</button>`;
-                    targetCell.setAttribute("draggable", "true");
-                } else {
-                    targetCell.innerHTML = "";
-                    targetCell.removeAttribute("draggable");
-                }
-                activateCell(targetCell);
-            }
+        // 1. Oude cel herstellen (Zet het gebouw terug)
+        const targetCell = document.querySelector(
+            `[data-row="${data.cell.row}"][data-col="${data.cell.col}"]`
+        );
 
-            // 2. Foutief gesleepte cel leegmaken (UI kant)
-            if (data.cleared) {
-                const clearedCell = document.querySelector(`[data-row="${data.cleared.row}"][data-col="${data.cleared.col}"]`);
-                if (clearedCell) {
-                    clearedCell.innerHTML = "";
-                    clearedCell.removeAttribute("draggable");
-                }
+        if (targetCell) {
+            if (data.cell.function_id) {
+                targetCell.innerHTML = `
+                    <img src="${data.cell.image}" 
+                         class="grid-function-icon object-contain"
+                         data-function-id="${data.cell.function_id}">
+                    <button 
+                        class="delete-btn absolute top-[2px] right-[2px] bg-red-600/80 text-white w-5 h-5 text-[14px] rounded cursor-pointer flex items-center justify-center">
+                        ✖
+                    </button>
+                `;
+                targetCell.setAttribute("draggable", "true");
+            } else {
+                targetCell.innerHTML = "";
+                targetCell.removeAttribute("draggable");
             }
+            activateCell(targetCell);
+        }
 
-            setTimeout(() => updateQoL(), 50);
+        // 2. Nieuwe cel leegmaken (UI kant) - Nu met typesafe conversie
+        if (data.cleared) {
+            const clearedCell = document.querySelector(
+                `[data-row="${data.cleared.row}"][data-col="${data.cleared.col}"]`
+            );
+
+            if (clearedCell) {
+                clearedCell.innerHTML = "";
+                clearedCell.removeAttribute("draggable");
+                clearedCell.classList.remove("selected"); // Zorg dat de selectie ook weg is
+            }
+        }
+
+        // 3. Opgeschoonde Safety Check: Alleen controleren op exacte matches
+        document.querySelectorAll('.grid-cell').forEach(c => {
+            const cRow = Number(c.dataset.row);
+            const cCol = Number(c.dataset.col);
+
+            // Sla de herstelde (oude) cel over
+            if (cRow === Number(data.cell.row) && cCol === Number(data.cell.col)) return;
+
+            // Als dit de cel is die leeg hoort te zijn (data.cleared), check extra of hij echt leeg is
+            if (data.cleared && cRow === Number(data.cleared.row) && cCol === Number(data.cleared.col)) {
+                c.innerHTML = "";
+                c.removeAttribute("draggable");
+            }
         });
+
+        setTimeout(() => updateQoL(), 50);
     });
+});
 });

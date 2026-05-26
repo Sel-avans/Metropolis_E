@@ -129,6 +129,7 @@ class GridController extends Controller
             ['function_id' => $function->id]
         );
 
+
         $freshQol = QoLController::recalculateQoL();
 
         return response()->json([
