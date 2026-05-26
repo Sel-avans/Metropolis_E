@@ -5,18 +5,23 @@
           
             <div class="flex flex-col margin-bottom-4 gap-3">    
                 <h1 class="text-2xl dark:text-teal-500 font-bold mb-4">Function Library</h1>
+
+                {{-- kleine toevoeging: focus ring voor keyboard users --}}
                 <a href="{{ route('effects.index') }}" 
-                    class="px-3 py-1.5 bg-teal-600 text-white rounded hover:bg-teal-700 text-base shadow">
+                    class="px-3 py-1.5 bg-teal-600 text-white rounded hover:bg-teal-700 text-xs shadow
+                           focus:outline-none focus:ring-2 focus:ring-teal-500">
                     Effect Functions
                 </a>
 
                 <a href="{{ route('functions.index') }}" 
-                   class="px-3 py-1.5 bg-blue-600 text-white rounded hover:bg-blue-700 text-base shadow">
+                   class="px-3 py-1.5 bg-blue-600 text-white rounded hover:bg-blue-700 text-xs shadow
+                          focus:outline-none focus:ring-2 focus:ring-blue-500">
                     Function Management
                 </a>
 
                 <a href="{{ route('conditions.index') }}" 
-                   class="px-3 py-1.5 bg-blue-600 text-white rounded hover:bg-blue-700 text-base shadow">
+                   class="px-3 py-1.5 bg-blue-600 text-white rounded hover:bg-blue-700 text-xs shadow
+                          focus:outline-none focus:ring-2 focus:ring-blue-500">
                     Conditions
                 </a>
             </div>
@@ -28,7 +33,8 @@
 
                 <ul class="mt-2 space-y-2 dark:text-white">
                     @foreach($items as $function)
-                        <li class="library-item flex items-center gap-2 px-4 py-2 border dark:bg-blue-950 border-gray-400 dark:border-white rounded cursor-pointer"
+                        <li class="library-item flex items-center gap-2 px-4 py-2 border border-gray-400 dark:border-white rounded cursor-pointer
+                                   focus:outline-none focus:ring-2 focus:ring-blue-500"
                             draggable="true"
                             data-function-id="{{ $function->id }}"
                             data-function-name="{{ $function->name }}"
@@ -51,8 +57,8 @@
         <div class="flex flex-col mx-auto">
 
             {{-- QoL Score Display --}}
-            <div class="w-auto h-min mt-4 border-4 border-gray-400 dark:bg-inherit dark:border-teal-600 rounded-md p-6">
-                <span id="qol-score" class="text-xl font-semibold mb-2 dark:text-teal-500">
+            <div class="w-auto h-min mt-4 border-4 border-gray-400 dark:bg-indigo-800 dark:border-teal-600 rounded-md p-6">
+                <span id="qol-score" class="text-xl font-semibold mb-2 dark:text-teal-300">
                     QoL score: <span id="qol-score-value"></span>
                 </span>
 
@@ -62,7 +68,9 @@
 
             {{-- Grid Display --}}
             <div class="w-auto p-6">
-                <h1 class="text-2xl text-center font-bold mb-4 dark:text-teal-500">City Grid (3x4)</h1>
+                <h1 class="text-2xl text-center font-bold mb-4 dark:text-teal-300">
+                    City Grid (3x4)
+                </h1>
 
                 <div class="city-grid grid grid-flow-col grid-rows-4 gap-3 w-min">
                     @for($col = 1; $col <= 3; $col++)
@@ -74,7 +82,8 @@
                                 });
                             @endphp
                             <div 
-                                class="grid-cell relative border-2 bg-gray-300 border-gray-800 dark:bg-blue-950 dark:border-gray-300 w-32 h-32 items-center justify-center hover:bg-gray-400 hover:dark:bg-gray-100 cursor-pointer transition"
+                                class="grid-cell border-2 bg-gray-300 border-gray-800 dark:bg-blue-950 dark:border-gray-300 w-32 h-32 items-center justify-center hover:bg-gray-400 hover:dark:bg-gray-100 cursor-pointer transition
+                                   focus:outline-none focus:ring-2 focus:ring-blue-500"
                                 data-row="{{ $row }}"
                                 data-col="{{ $col }}"
                                 data-id="{{ $cell->id }}"
