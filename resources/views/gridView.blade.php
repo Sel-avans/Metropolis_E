@@ -66,6 +66,11 @@
                 </span>
             </div>
 
+            {{-- Undo knop toegevoegd --}}
+            <button id="undo-btn" class="px-3 py-1.5 bg-gray-500 text-white rounded disabled:opacity-40 mt-4 mb-2" disabled>
+                Undo
+            </button>
+
             {{-- Grid Display --}}
             <div class="w-auto p-6">
                 <h1 class="text-2xl text-center font-bold mb-4 dark:text-teal-300">
@@ -82,7 +87,7 @@
                                 });
                             @endphp
                             <div 
-                                class="grid-cell border-2 bg-gray-300 border-gray-800 dark:bg-blue-950 dark:border-gray-300 w-32 h-32 items-center justify-center hover:bg-gray-400 hover:dark:bg-gray-100 cursor-pointer transition
+                                class="grid-cell relative border-2 bg-gray-300 border-gray-800 dark:bg-blue-950 dark:border-gray-300 w-32 h-32 items-center justify-center hover:bg-gray-400 hover:dark:bg-gray-100 cursor-pointer transition
                                    focus:outline-none focus:ring-2 focus:ring-blue-500"
                                 data-row="{{ $row }}"
                                 data-col="{{ $col }}"
