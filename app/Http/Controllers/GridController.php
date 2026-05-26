@@ -6,7 +6,10 @@ use App\Models\CityFunction;
 use App\Models\GridCell;
 use App\Models\AdjacencyRule;
 use App\Models\UndoAction;
+<<<<<<< Updated upstream
 use Illuminate\Http\Request;
+=======
+>>>>>>> Stashed changes
 use App\Http\Controllers\QoLController;
 
 class GridController extends Controller
@@ -52,6 +55,7 @@ class GridController extends Controller
         $newCol = $request->input('new_col') !== null ? intval($request->input('new_col')) : null;
         $functionId = $request->input('function_id');
 
+<<<<<<< Updated upstream
         // Bepaal het type actie vooraf om fouten te voorkomen
         $isMove = ($oldRow !== null && $oldCol !== null && $newRow !== null && $newCol !== null);
         $isRemoveDragOff = ($functionId === null && $newRow !== null && $newCol !== null);
@@ -111,21 +115,80 @@ class GridController extends Controller
         }
 
         // Maak de oude cel leeg als het een verplaatsing betreft
+=======
+        // Bepaal vooraf de logica-cel voor de UndoAction
+        if ($oldRow !== null && $oldCol !== null) {
+            // Bij een verplaatsing (move) loggen we de startlocatie, want daar moet de undo hem terugzetten
+            $actionRow = $oldRow;
+            $actionCol = $oldCol;
+        } else {
+            // Bij een nieuwe plaatsing of drag-off loggen we de doelcel
+            $actionRow = $newRow;
+            $actionCol = $newCol;
+        }
+
+        $actionCell = GridCell::where('row', $actionRow)
+                            ->where('col', $actionCol)
+                            ->first();
+
+        // Sla de UndoAction op (Zonder new_row en new_col om database-fouten te voorkomen!)
+        UndoAction::truncate();
+        UndoAction::create([
+            'row' => $actionRow,
+            'col' => $actionCol,
+            'previous_function_id' => $actionCell ? $actionCell->function_id : null,
+            'action_type' => $oldRow !== null 
+                ? 'move' 
+                : ($functionId === null 
+                    ? 'remove' 
+                    : ($actionCell && $actionCell->function_id ? 'replace' : 'insert')),
+        ]);
+
+        // 1. Maak de oude cel leeg als het een verplaatsing (move) is
+>>>>>>> Stashed changes
         if ($oldRow !== null && $oldCol !== null) {
             GridCell::where('row', $oldRow)
                     ->where('col', $oldCol)
                     ->update(['function_id' => null]);
         }
 
+<<<<<<< Updated upstream
         // Valideer of de te plaatsen functie bestaat
+=======
+        // 2. Als het een drag-off is van de grid (verwijderen)
+        if ($functionId === null) {
+            GridCell::where('row', $newRow)
+                    ->where('col', $newCol)
+                    ->update(['function_id' => null]);
+
+            // Bereken direct de schone QoL na verwijdering via drag-off
+            $freshQol = QoLController::recalculateQoL();
+            return response()->json([
+                'success' => true,
+                'qol_data' => $freshQol
+            ]);
+        }
+
+>>>>>>> Stashed changes
         $function = CityFunction::find($functionId);
         if (!$function) {
             return response()->json(['error' => 'Function not found'], 404);
         }
 
+<<<<<<< Updated upstream
         // Naburigheidsregels (AdjacencyRules) controleren
         $force = filter_var($request->input('force'), FILTER_VALIDATE_BOOLEAN);
         $dirs = [[0, 1], [1, 0], [0, -1], [-1, 0]]; // Boven, rechts, onder, links
+=======
+        // Naburigheidsregels controleren
+        $force = filter_var($request->input('force'), FILTER_VALIDATE_BOOLEAN);
+        $dirs = [
+            [0, 1],
+            [1, 0],
+            [0, -1],
+            [-1, 0],
+        ];
+>>>>>>> Stashed changes
 
         foreach ($dirs as [$dr, $dc]) {
             $r = $newRow + $dr;
@@ -143,6 +206,10 @@ class GridController extends Controller
                     ->first();
 
                 if ($rule && $rule->type === 'forbidden' && !$force) {
+                    // Als het mislukt, herstellen we de oude cel indien het een move was
+                    if ($oldRow !== null && $oldCol !== null && $actionCell) {
+                        $actionCell->update(['function_id' => $actionCell->function_id]);
+                    }
                     return response()->json([
                         'success' => false,
                         'error' => 'placement_forbidden'
@@ -151,17 +218,26 @@ class GridController extends Controller
             }
         }
 
+<<<<<<< Updated upstream
         // Plaats of update de functie op de nieuwe cel
+=======
+        // 3. Update de nieuwe cel met de functie
+>>>>>>> Stashed changes
         GridCell::updateOrCreate(
             ['row' => $newRow, 'col' => $newCol],
             ['function_id' => $function->id]
         );
 
+<<<<<<< Updated upstream
         // Bereken de QoL geforceerd opnieuw op basis van de actuele database status
+=======
+        // BEREKEN DE QOL DIRECT OPNIEUW NA PLAATSEN OF VERPLAATSEN
+>>>>>>> Stashed changes
         $freshQol = QoLController::recalculateQoL();
 
         return response()->json([
             'success' => true,
+<<<<<<< Updated upstream
             'qol_data' => $freshQol // Stuur de schone QoL data terug naar de frontend
         ]);
     }
@@ -169,31 +245,53 @@ class GridController extends Controller
     /**
      * Verwijdert een functie via het kruisje (specifiek op cel-niveau).
      */
+=======
+            'qol_data' => $freshQol // Stuur de verse QoL data mee terug naar de frontend!
+        ]);
+    }
+
+>>>>>>> Stashed changes
     public function removeFunction(GridCell $cell)
     {
         UndoAction::truncate();
 
+<<<<<<< Updated upstream
         // Sla de undo-actie op voor exact deze specifieke celcoördinaten
         UndoAction::create([
             'row' => $cell->row,
             'col' => $cell->col,
             'new_row' => null,
             'new_col' => null,
+=======
+        UndoAction::create([
+            'row' => $cell->row,
+            'col' => $cell->col,
+>>>>>>> Stashed changes
             'previous_function_id' => $cell->function_id,
             'action_type' => 'remove',
         ]);
 
+<<<<<<< Updated upstream
         // Alleen deze specifieke cel leegmaken (voorkomt duplicaten-bug)
+=======
+>>>>>>> Stashed changes
         $cell->update([
             'function_id' => null
         ]);
 
+<<<<<<< Updated upstream
         // Bereken de QoL opnieuw
+=======
+>>>>>>> Stashed changes
         $freshQol = QoLController::recalculateQoL();
 
         return response()->json([
             'success' => true,
+<<<<<<< Updated upstream
             'qol_data' => $freshQol
+=======
+            'qol_data' => $freshQol // Stuur ook hier de QoL mee terug
+>>>>>>> Stashed changes
         ]);
     }
 }

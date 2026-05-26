@@ -20,7 +20,11 @@
     "isEntry": true
   },
   "resources/js/grid.js": {
+<<<<<<< Updated upstream
     "file": "assets/grid-Cw7eaBLI.js",
+=======
+    "file": "assets/grid-B3LfgrgA.js",
+>>>>>>> Stashed changes
     "name": "grid",
     "src": "resources/js/grid.js",
     "isEntry": true

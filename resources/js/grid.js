@@ -118,7 +118,6 @@ document.addEventListener("DOMContentLoaded", () => {
         for (const [category, info] of Object.entries(data.categories)) {
             const score = Number(info.total);
 
-            // Bepaal de kleur: groen bij positief, rood bij negatief, grijs bij 0
             let scoreClass = 'text-slate-400';
             if (score > 0) {
                 scoreClass = 'text-green-600';
@@ -126,7 +125,6 @@ document.addEventListener("DOMContentLoaded", () => {
                 scoreClass = 'text-red-600';
             }
 
-            // Voeg een + toe als de score positief is
             let scoreSign = score > 0 ? '+' : '';
 
             html += `
@@ -185,7 +183,6 @@ document.addEventListener("DOMContentLoaded", () => {
         for (const [categoryName, info] of Object.entries(data.categories)) {
             const totalScore = Number(info.total);
 
-            //To change the color depending on QOL-value
             let catClass = 'text-slate-400';
             if (totalScore > 0) {
                 catClass = 'text-green-600';
@@ -286,57 +283,55 @@ document.addEventListener("DOMContentLoaded", () => {
             cell.classList.remove("drag-over");
         });
 
-    cell.addEventListener("drop", async e => {
-        e.preventDefault();
-        isDragging = false;
-        dropOccurred = true;
+        cell.addEventListener("drop", async e => {
+            e.preventDefault();
+            isDragging = false;
+            dropOccurred = true;
 
-        cell.classList.remove("drag-over");
+            cell.classList.remove("drag-over");
 
-        const newRow = cell.dataset.row;
-        const newCol = cell.dataset.col;
+            const newRow = cell.dataset.row;
+            const newCol = cell.dataset.col;
 
-        // ❗ BEPAAL ALTIJD DE OUDE CEL VIA sourceCell
-        let oldRow = null;
-        let oldCol = null;
+            let oldRow = null;
+            let oldCol = null;
 
-        if (sourceCell) {
-            oldRow = sourceCell.dataset.row;
-            oldCol = sourceCell.dataset.col;
+            if (sourceCell) {
+                oldRow = sourceCell.dataset.row;
+                oldCol = sourceCell.dataset.col;
 
-            // ❗ Oude cel leegmaken
-            sourceCell.innerHTML = "";
-            sourceCell.removeAttribute("draggable");
-            sourceCell.classList.remove("drag-source");
-        }
+                sourceCell.innerHTML = "";
+                sourceCell.removeAttribute("draggable");
+                sourceCell.classList.remove("drag-source");
+            }
 
-        // ❗ Daarna pas sourceCell resetten
-        sourceCell = null;
+            sourceCell = null;
 
-        // Nieuwe cel vullen
-        cell.innerHTML = "";
+            cell.innerHTML = "";
 
-        const img = document.createElement("img");
-        img.src = draggedItem.image;
-        img.alt = draggedItem.name;
-        img.dataset.functionId = draggedItem.id;
-        img.classList.add("grid-function-icon", "object-contain");
-        cell.appendChild(img);
+            const img = document.createElement("img");
+            img.src = draggedItem.image;
+            img.alt = draggedItem.name;
+            img.dataset.functionId = draggedItem.id;
+            img.classList.add("grid-function-icon", "object-contain");
+            cell.appendChild(img);
 
-        const deleteBtn = document.createElement("button");
-        deleteBtn.className =
-            "delete-btn absolute top-[2px] right-[2px] bg-red-600/80 text-white w-5 h-5 text-[14px] rounded cursor-pointer flex items-center justify-center";
-        deleteBtn.innerHTML = "✖";
-        cell.appendChild(deleteBtn);
+            const deleteBtn = document.createElement("button");
+            deleteBtn.className =
+                "delete-btn absolute top-[2px] right-[2px] bg-red-600/80 text-white w-5 h-5 text-[14px] rounded cursor-pointer flex items-center justify-center";
+            deleteBtn.innerHTML = "✖";
+            cell.appendChild(deleteBtn);
 
-        cell.setAttribute("draggable", "true");
+            cell.setAttribute("draggable", "true");
 
-        activateCell(cell);
+            activateCell(cell);
 
-        await saveMove(oldRow, oldCol, newRow, newCol);
+            // Wacht tot de database-wijziging in de backend echt klaar is
+            await saveMove(oldRow, oldCol, newRow, newCol);
 
-        setTimeout(() => updateQoL(), 10);
-    });
+            // Haal daarna pas de correcte, nieuwe QoL-score op
+            updateQoL();
+        });
 
         cell.addEventListener("click", () => {
             if (isDragging) return;
@@ -365,7 +360,7 @@ document.addEventListener("DOMContentLoaded", () => {
         });
     });
 
-        document.addEventListener("dragend", async (e) => {
+    document.addEventListener("dragend", async (e) => {
         if (!draggedItem || !sourceCell) return;
 
         if (dropOccurred) {
@@ -411,76 +406,49 @@ document.addEventListener("DOMContentLoaded", () => {
         setTimeout(() => updateQoL(), 10);
     });
 
+    // Eerste QoL-meting bij het laden van de pagina
     updateQoL();
 
-   document.getElementById('undoButton').addEventListener('click', () => {
-    fetch('/undo', {
-        method: 'POST',
-        headers: {
-            'X-CSRF-TOKEN': document.querySelector('meta[name="csrf-token"]').content,
-            'Content-Type': 'application/json'
-        }
-    })
-    .then(res => res.json())
-    .then(data => {
-        console.log("UNDO RESPONSE:", data);
+    document.getElementById('undoButton').addEventListener('click', () => {
+        fetch('/undo', {
+            method: 'POST',
+            headers: {
+                'X-CSRF-TOKEN': document.querySelector('meta[name="csrf-token"]').content,
+                'Content-Type': 'application/json'
+            }
+        })
+        .then(res => res.json())
+        .then(data => {
+            console.log("UNDO RESPONSE:", data);
 
-        if (!data.success) return;
+            if (!data.success) return;
 
-        // 1. Actiecel herstellen
-        const targetCell = document.querySelector(
-            `[data-row="${data.cell.row}"][data-col="${data.cell.col}"]`
-        );
-
-        if (data.cell.function_id) {
-            targetCell.innerHTML = `
-                <img src="${data.cell.image}" 
-                     class="grid-function-icon object-contain"
-                     data-function-id="${data.cell.function_id}">
-                <button 
-                    class="delete-btn absolute top-[2px] right-[2px] bg-red-600/80 text-white w-5 h-5 text-[14px] rounded cursor-pointer flex items-center justify-center">
-                    ✖
-                </button>
-            `;
-            targetCell.setAttribute("draggable", "true");
-        } else {
-            targetCell.innerHTML = "";
-            targetCell.removeAttribute("draggable");
-        }
-
-        // 2. Nieuwe cel leegmaken (als backend 'cleared' meestuurt)
-        if (data.cleared && data.cleared.row !== null && data.cleared.col !== null) {
-            const clearedCell = document.querySelector(
-                `[data-row="${data.cleared.row}"][data-col="${data.cleared.col}"]`
+            // 1. Actiecel herstellen naar hoe hij was vóór de fout
+            const targetCell = document.querySelector(
+                `[data-row="${data.cell.row}"][data-col="${data.cell.col}"]`
             );
 
-            if (clearedCell) {
-                clearedCell.innerHTML = "";
-                clearedCell.removeAttribute("draggable");
-            }
-        }
-
-        // 3. Extra safety: zorg dat deze functie nergens anders meer staat
-        if (data.cell.function_id) {
-            const allCells = document.querySelectorAll('.grid-cell');
-
-            allCells.forEach(otherCell => {
-                const row = otherCell.dataset.row;
-                const col = otherCell.dataset.col;
-
-                // sla de herstelde cel zelf over
-                if (row == data.cell.row && col == data.cell.col) return;
-
-                const img = otherCell.querySelector('img.grid-function-icon');
-
-                if (img && img.dataset.functionId == String(data.cell.function_id)) {
-                    otherCell.innerHTML = "";
-                    otherCell.removeAttribute("draggable");
+            if (targetCell) {
+                if (data.cell.function_id) {
+                    targetCell.innerHTML = `
+                        <img src="${data.cell.image}" 
+                             class="grid-function-icon object-contain"
+                             data-function-id="${data.cell.function_id}">
+                        <button 
+                            class="delete-btn absolute top-[2px] right-[2px] bg-red-600/80 text-white w-5 h-5 text-[14px] rounded cursor-pointer flex items-center justify-center">
+                            ✖
+                        </button>
+                    `;
+                    targetCell.setAttribute("draggable", "true");
+                } else {
+                    targetCell.innerHTML = "";
+                    targetCell.removeAttribute("draggable");
                 }
-            });
-        }
+                activateCell(targetCell);
+            }
 
-        setTimeout(() => updateQoL(), 10);
+            // Geef de DOM héél even de tijd om te renderen en bereken dan de QoL direct goed via de backend
+            setTimeout(() => updateQoL(), 50);
+        });
     });
-});
 });
