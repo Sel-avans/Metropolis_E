@@ -13,6 +13,9 @@ document.addEventListener("DOMContentLoaded", () => {
     let dropOccurred = false;
     let old_score;
 
+    // slaat de laatste actie op zodat undo weet wat teruggezet moet worden
+    let lastAction = null;
+
     const HOVER_DELAY_MS = 300;
     let hoverTimer = null;
 
@@ -96,7 +99,10 @@ document.addEventListener("DOMContentLoaded", () => {
     function compareScores(data) {
         let html = '';
 
-        if (old_score !== undefined) {
+        if (old_score === undefined) {
+            html+=''; 
+        }
+        else {
             const delta_score = data.total_score - old_score;
             html += `
                 <span class="text-xl float-right ${delta_score < 0 ? 'text-red-600' : 'text-green-600'}">
@@ -352,6 +358,18 @@ document.addEventListener("DOMContentLoaded", () => {
 
             activateCell(cell);
 
+            lastAction = {
+                oldRow: oldRow,
+                oldCol: oldCol,
+                newRow: newRow,
+                newCol: newCol,
+                functionId: draggedItem.id
+            };
+
+            // undo knop aanzetten zodra er iets is gebeurd
+            const undoBtnEl = document.getElementById("undo-btn");
+            if (undoBtnEl) undoBtnEl.disabled = false;
+
             await saveMove(oldRow, oldCol, newRow, newCol);
 
             setTimeout(() => updateQoL(), 10);
@@ -383,6 +401,43 @@ document.addEventListener("DOMContentLoaded", () => {
             hidePopup();
         });
     });
+    // undo knop oppakken en handler toevoegen
+    const undoBtn = document.getElementById("undo-btn");
+
+    if (undoBtn) {
+        undoBtn.addEventListener("click", async () => {
+
+            // als er niks is om terug te draaien, doe niks
+            if (!lastAction) return;
+
+            // zet de vorige staat terug (swap new met old)
+            await fetch('/grid/update', {
+                method: 'POST',
+                headers: {
+                    'Content-Type': 'application/json',
+                    'X-CSRF-TOKEN': document.querySelector('meta[name="csrf-token"]').content
+                },
+                body: JSON.stringify({
+                    old_row: lastAction.newRow,
+                    old_col: lastAction.newCol,
+                    new_row: lastAction.oldRow,
+                    new_col: lastAction.oldCol,
+                    function_id: lastAction.functionId,
+                    force: true
+                })
+            });
+
+            // undo wissen zodat je niet meerdere keren terug kan
+            lastAction = null;
+
+            // undo knop weer uitzetten
+            undoBtn.disabled = true;
+
+            // qol opnieuw ophalen en grid verversen
+            updateQoL();
+            location.reload();
+        });
+    }
 
     document.addEventListener("dragend", async (e) => {
         if (!draggedItem || !sourceCell) return;
