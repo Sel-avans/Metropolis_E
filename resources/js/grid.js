@@ -293,6 +293,21 @@ document.addEventListener("DOMContentLoaded", () => {
 
             cell.classList.remove("drag-over");
 
+            // Verify if the target cell already has an image (is occupied)
+            const isOccupied = cell.querySelector("img") !== null;
+
+            if (isOccupied) {
+                const wantsToReplace = window.confirm("Are you sure you want to replace this feature?");
+                
+                if (!wantsToReplace) {
+                    // Revert the source cell state if the action is cancelled
+                    if (sourceCell) {
+                        sourceCell.classList.remove("drag-source");
+                    }
+                    return; 
+                }
+            }
+
             const newRow = cell.dataset.row;
             const newCol = cell.dataset.col;
 
