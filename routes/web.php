@@ -59,7 +59,7 @@ Route::middleware('auth')->group(function () {
     Route::middleware('can:CanViewEffectsPage,' . PagePolicy::class)->group(function () {
         Route::get('/effects', [EffectsController::class, 'index'])->name('effects.index');
         // Updaten van effecten mag alleen de Administrator (CanChangeQOLEffect)
-        Route::post('/effects/update', [EffectsController::class, 'update'])->middleware('can:CanChangeQOLEffect,' . PagePolicy::class);
+        Route::post('/effects/update', [EffectsController::class, 'update'])->middleware('can:CanChangeQOLEffect,' . PagePolicy::class)->name('effects.update');
     });
 
     // === CONDITIONS (Resource Route) ===
