@@ -5,6 +5,7 @@ namespace App\Http\Controllers;
 use App\Models\CityFunction;
 use App\Models\GridCell;
 use App\Models\AdjacencyRule;
+use App\Models\Condition;
 use Illuminate\Http\Request;
 use App\Models\UndoAction;
 use App\Http\Controllers\QoLController;
@@ -54,9 +55,11 @@ class GridController extends Controller
         }
 
         $actionCell = GridCell::where('row', $actionRow)
-                            ->where('col', $actionCol)
-                            ->first();
+                    ->where('col', $actionCol)
+                    ->first();
 
+        // Capture previous function id for rollback if needed
+        $previousFunctionId = $actionCell ? $actionCell->function_id : null;
         // Sla de UndoAction op, nu inclusief new_row en new_col!
         UndoAction::truncate();
         UndoAction::create([
@@ -112,12 +115,24 @@ class GridController extends Controller
                 $fa = min($functionId, $neighborFuncId);
                 $fb = max($functionId, $neighborFuncId);
 
-                $rule = AdjacencyRule::where('function_a', $fa)->where('function_b', $fb)->first();
+                $rule = AdjacencyRule::where(function($q) use ($fa, $fb) {
+                    $q->where('function_a', $fa)->where('function_b', $fb);
+                })->orWhere(function($q) use ($fa, $fb) {
+                    $q->where('function_a', $fb)->where('function_b', $fa);
+                })->first();
 
-                if ($rule && $rule->type === 'forbidden' && !$force) {
-                    if ($oldRow !== null && $oldCol !== null && $actionCell) {
-                        $actionCell->update(['function_id' => $actionCell->function_id]);
+                $cond = Condition::where(function($q) use ($fa, $fb) {
+                    $q->where('function_a', $fa)->where('function_b', $fb);
+                })->orWhere(function($q) use ($fa, $fb) {
+                    $q->where('function_a', $fb)->where('function_b', $fa);
+                })->where('type', 'forbidden')->first();
+
+                if ((($rule && $rule->type === 'forbidden') || $cond) && !$force) {
+                    // Rollback: restore previous function id on the action cell (if any)
+                    if ($actionCell) {
+                        $actionCell->update(['function_id' => $previousFunctionId]);
                     }
+
                     return response()->json(['success' => false, 'error' => 'placement_forbidden'], 409);
                 }
             }

@@ -4,6 +4,7 @@ namespace App\Http\Controllers;
 
 use App\Models\GridCell;
 use App\Models\Condition;
+use App\Models\AdjacencyRule;
 
 class QoLController extends Controller
 {
