@@ -34,10 +34,13 @@ class FunctionManagementController extends Controller
     public function store(Request $request)
     {
         $data = $request->validate([
-            'name'      => 'required|string|max:255',
+            'name'      => 'required|string|max:255|unique:city_functions,name',
             'category'  => 'required|string|max:255',
             'icon'      => 'nullable|image|max:2048',
+        ], [
+        'name.unique' => 'This function already exists in the library',
         ]);
+    
 
         $inputCategory = strtolower(trim($request->category));
 
@@ -88,9 +91,11 @@ class FunctionManagementController extends Controller
     public function update(Request $request, CityFunction $function)
     {
         $data = $request->validate([
-            'name'      => 'required|string|max:255',
+            'name'      => 'required|string|max:255|unique:city_functions,name,' . $function->id,
             'category'  => 'required|string|max:255',
             'icon'      => 'nullable|image|max:2048',
+        ], [
+            'name.unique' => 'This name is already in use by another function',
         ]);
 
         $inputCategory = strtolower(trim($request->category));
