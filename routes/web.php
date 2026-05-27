@@ -8,6 +8,7 @@ use App\Http\Controllers\FunctionController;
 use App\Http\Controllers\EffectsController;
 use App\Http\Controllers\FunctionManagementController;
 use App\Http\Controllers\ConditionsController;
+use App\Http\Controllers\UndoController;
 use App\Policies\PagePolicy;
 
 // Publieke route
@@ -35,6 +36,7 @@ Route::middleware('auth')->group(function () {
         
         // Functies plaatsen/verwijderen op het grid (City Planner)
         Route::post('/grid/update', [GridController::class, 'update'])->middleware('can:CanPlaceFunctions,' . PagePolicy::class);
+        Route::post('/undo', [UndoController::class, 'undo'])->middleware('can:CanPlaceFunctions,' . PagePolicy::class);
         Route::delete('/grid/cell/{cell}/function', [GridController::class, 'removeFunction'])->middleware('can:CanPlaceFunctions,' . PagePolicy::class);
     });
 
