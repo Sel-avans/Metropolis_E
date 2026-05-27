@@ -61,6 +61,12 @@ Route::middleware('auth')->group(function () {
     Route::middleware('can:CanViewEffectsPage,' . PagePolicy::class)->group(function () {
         Route::get('/effects', [EffectsController::class, 'index'])->name('effects.index');
         // Updaten van effecten mag alleen de Administrator (CanChangeQOLEffect)
+        Route::get('/functions/create', [FunctionManagementController::class, 'create'])->middleware('can:CanChangeQOLEffect,' . PagePolicy::class)->name('functions.create');
+        Route::post('/functions', [FunctionManagementController::class, 'store'])->name('functions.store');
+        Route::get('/functions/{function}/edit', [FunctionManagementController::class, 'edit'])->name('functions.edit');
+        Route::delete('/functions/{function}', [FunctionManagementController::class, 'destroy'])->name('functions.destroy');
+
+        Route::put('/functions/{function}', [FunctionManagementController::class, 'update'])->middleware('can:CanChangeQOLEffect,' . PagePolicy::class)->name('functions.update');
         Route::post('/effects/update', [EffectsController::class, 'update'])->middleware('can:CanChangeQOLEffect,' . PagePolicy::class)->name('effects.update');
     });
 

@@ -20,7 +20,6 @@ class PagePolicy
     public function CanViewFunctionPage(User $user): bool
     {
         return in_array($user->role, [
-            UserRole::City_planner,
             UserRole::Administrator
         ]);
     }
@@ -28,15 +27,13 @@ class PagePolicy
     public function CanViewEffectsPage(User $user): bool
     {
         return in_array($user->role, [
-            UserRole::City_planner,
-            UserRole::Administrator,
+            UserRole::Administrator
         ]);
     }
 
     public function CanViewConditionsPage(User $user): bool
     {
         return in_array($user->role, [
-            UserRole::City_planner,
             UserRole::Administrator,
         ]);
     }
@@ -70,14 +67,18 @@ class PagePolicy
     {
         return in_array($user->role, [
             UserRole::City_planner,
-            UserRole::Municipal_Policy_Maker
+            UserRole::Municipal_Policy_Makerm,
+            UserRole::Administrator
         ]);
     }
 
     //Machtigingen City Planner
     public function CanPlaceFunctions(User $user): bool
     {
-        return $user->role === UserRole::City_planner;
+        return  in_array($user->role, [
+            UserRole::City_planner,
+            UserRole::Administrator
+            ]);
     }
 
     public function CanModifyFunction(User $user): bool
