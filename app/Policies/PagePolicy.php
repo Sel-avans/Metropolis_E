@@ -41,6 +41,22 @@ class PagePolicy
         ]);
     }
 
+    public function CanViewDashboard(User $user): bool
+    {
+        return in_array($user->role, [
+            UserRole::City_planner,
+            UserRole::Administrator,
+        ]);
+    }
+
+    public function CanViewProfile(User $user): bool
+    {
+        return in_array($user->role, [
+            UserRole::City_planner,
+            UserRole::Administrator,
+        ]);
+    }
+
     //City planner en Muncipal policy maker
     public function CanApproveGrid(User $user): bool
     {

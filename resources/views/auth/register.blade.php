@@ -45,9 +45,9 @@
 
             <select id="role" name="role" class="block mt-1 w-full rounded-md border-gray-300 focus:border-indigo-500 focus:ring-indigo-500 dark:bg-gray-700 dark:border-gray-600 dark:text-white" required>
                 <option value="" disabled selected>{{ __('Select a role') }}</option>
-                <option value="admin" {{ old('role') === 'admin' ? 'selected' : '' }}>{{ __('Admin') }}</option>
-                <option value="editor" {{ old('role') === 'editor' ? 'selected' : '' }}>{{ __('Editor') }}</option>
-                <option value="viewer" {{ old('role') === 'viewer' ? 'selected' : '' }}>{{ __('Viewer') }}</option>
+                <option value="Administrator" {{ old('role') === 'Administrator' ? 'selected' : '' }}>{{ __('Administrator') }}</option>
+                <option value="City Planner" {{ old('role') === 'City Planner' ? 'selected' : '' }}>{{ __('City Planner') }}</option>
+                <option value="Municipal Policy Maker" {{ old('role') === 'Municipal Policy Maker' ? 'selected' : '' }}>{{ __('Municipal Policy Maker') }}</option>
             </select>
 
             <x-input-error :messages="$errors->get('role')" class="mt-2" />
