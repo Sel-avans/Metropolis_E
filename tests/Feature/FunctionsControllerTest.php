@@ -4,20 +4,30 @@ namespace Tests\Feature;
 
 use Tests\TestCase;
 use App\Models\CityFunction;
+use App\Models\User;
 use Illuminate\Foundation\Testing\RefreshDatabase;
 
 class FunctionsControllerTest extends TestCase
 {
     use RefreshDatabase;
 
+    protected function adminUser(): User
+    {
+        return User::factory()->create();
+    }
+
     //Tests voor BES.2
     public function test_admin_can_create_function()
     {
-        $response = $this->post(route('functions.store'), [
-            'name' => 'School',
-            'category' => 'voorzieningen',
-            'icon' => null
-        ]);
+        $admin = $this->adminUser();
+
+        $response = $this->withMiddleware()
+            ->actingAs($admin)
+            ->post(route('functions.store'), [
+                'name' => 'School',
+                'category' => 'voorzieningen',
+                'icon' => null
+            ]);
 
         $response->assertRedirect(route('functions.index'));
 
@@ -29,19 +39,22 @@ class FunctionsControllerTest extends TestCase
 
     public function test_admin_can_edit_function()
     {
+        $admin = $this->adminUser();
         $function = CityFunction::factory()->create([
             'name' => 'Old Name',
             'category' => 'veiligheid'
         ]);
 
-        $response = $this->put(
-            route('functions.update', $function->id),
-            [
-                'name' => 'New Name',
-                'category' => 'mobiliteit',
-                'icon' => null
-            ]
-        );
+        $response = $this->withMiddleware()
+            ->actingAs($admin)
+            ->put(
+                route('functions.update', $function->id),
+                [
+                    'name' => 'New Name',
+                    'category' => 'mobiliteit',
+                    'icon' => null
+                ]
+            );
 
         $response->assertRedirect(route('functions.index'));
 
@@ -54,11 +67,14 @@ class FunctionsControllerTest extends TestCase
 
     public function test_admin_can_delete_function()
     {
+        $admin = $this->adminUser();
         $function = CityFunction::factory()->create();
 
-        $response = $this->delete(
-            route('functions.destroy', $function->id)
-        );
+        $response = $this->withMiddleware()
+            ->actingAs($admin)
+            ->delete(
+                route('functions.destroy', $function->id)
+            );
 
         $response->assertRedirect(route('functions.index'));
 
