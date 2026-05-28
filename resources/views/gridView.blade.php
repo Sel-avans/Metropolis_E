@@ -6,24 +6,34 @@
             <div class="flex flex-col margin-bottom-4 gap-3">    
                 <h1 class="text-2xl dark:text-teal-500 font-bold mb-4">Function Library</h1>
 
-                {{-- kleine toevoeging: focus ring voor keyboard users --}}
-                <a href="{{ route('effects.index') }}" 
-                    class="px-3 py-1.5 bg-teal-600 text-white rounded hover:bg-teal-700 text-xs shadow
-                           focus:outline-none focus:ring-2 focus:ring-teal-500">
-                    Effect Functions
-                </a>
+                    <div class="grid grid-cols-2 gap-3 w-full">
 
-                <a href="{{ route('functions.index') }}" 
-                   class="px-3 py-1.5 bg-blue-600 text-white rounded hover:bg-blue-700 text-xs shadow
-                          focus:outline-none focus:ring-2 focus:ring-blue-500">
-                    Function Management
-                </a>
+                        <a href="{{ route('functions.index') }}"
+                        class="px-3 py-2 bg-blue-600 text-white rounded hover:bg-blue-700 text-sm shadow text-center
+                                focus:outline-none focus:ring-2 focus:ring-blue-500">
+                            Function Management
+                        </a>
 
-                <a href="{{ route('conditions.index') }}" 
-                   class="px-3 py-1.5 bg-blue-600 text-white rounded hover:bg-blue-700 text-xs shadow
-                          focus:outline-none focus:ring-2 focus:ring-blue-500">
-                    Conditions
-                </a>
+                        <a href="{{ route('effects.index') }}"
+                        class="px-3 py-2 bg-green-600 text-white rounded hover:bg-green-700 text-sm shadow text-center
+                                focus:outline-none focus:ring-2 focus:ring-green-500">
+                            Effect Management
+                        </a>
+
+                        <a href="{{ route('conditions.index') }}"
+                        class="px-3 py-2 bg-blue-600 text-white rounded hover:bg-blue-700 text-sm shadow text-center
+                                focus:outline-none focus:ring-2 focus:ring-blue-500">
+                            Condition Management
+                        </a>
+
+                        <a href="{{ route('events.index') }}"
+                        class="px-3 py-2 bg-purple-600 text-white rounded hover:bg-purple-700 text-sm shadow text-center
+                                focus:outline-none focus:ring-2 focus:ring-purple-500">
+                            Events
+                        </a>
+
+                    </div>
+
             </div>
 
             @forelse($functions as $category => $items)

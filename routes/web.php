@@ -10,6 +10,7 @@ use App\Http\Controllers\FunctionManagementController;
 use App\Http\Controllers\ConditionsController;
 use App\Http\Controllers\UndoController;
 use App\Policies\PagePolicy;
+use App\Http\Controllers\EventController;
 
 // Publieke route
 Route::get('/', function () {
@@ -46,6 +47,7 @@ Route::middleware('auth')->group(function () {
         Route::get('/functions', [FunctionManagementController::class, 'index'])->name('functions.index');
         Route::get('/library', [FunctionController::class, 'index'])->name('library');
         Route::get('/functions/manage', function () { return view('functions.manage'); })->name('functions.manage');
+        Route::get('/events', [EventController::class, 'index'])->name('events.index');
     });
 
     // Functies aanmaken, aanpassen en verwijderen (Alleen City Planner)
