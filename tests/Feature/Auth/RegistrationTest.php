@@ -9,6 +9,13 @@ class RegistrationTest extends TestCase
 {
     use RefreshDatabase;
 
+        protected function setUp(): void
+    {
+        parent::setUp();
+
+        $this->withMiddleware();
+    }
+
     public function test_registration_screen_can_be_rendered(): void
     {
         $response = $this->get('/register');
@@ -23,7 +30,7 @@ class RegistrationTest extends TestCase
             'email' => 'test@example.com',
             'password' => 'password',
             'password_confirmation' => 'password',
-            'role' => 'Admin'
+            'role' => 'Administrator'
         ]);
 
         $this->assertAuthenticated();
