@@ -88,20 +88,21 @@ Route::middleware('auth')->group(function () {
     });
 
     
-// 1. MANAGING (Zet deze groep NU BOVENAAN)
-Route::middleware(['auth', 'can:CanManageEvents,' . PagePolicy::class])->group(function () {
-    Route::get('/events/create', [SimulationEventController::class, 'create'])->name('events.create');
-    Route::post('/events', [SimulationEventController::class, 'store'])->name('events.store');
-    Route::get('/events/{event}/edit', [SimulationEventController::class, 'edit'])->name('events.edit');
-    Route::put('/events/{event}', [SimulationEventController::class, 'update'])->name('events.update');
-    Route::delete('/events/{event}', [SimulationEventController::class, 'destroy'])->name('events.destroy');
-});
+// === SIMULATION EVENTS ===
+    // 1. MANAGING: Only accessible by Administrator and Municipal Policy Maker
+    Route::middleware('can:CanManageEvents,' . PagePolicy::class)->group(function () {
+        Route::get('/events/create', [SimulationEventController::class, 'create'])->name('events.create');
+        Route::post('/events', [SimulationEventController::class, 'store'])->name('events.store');
+        Route::get('/events/{event}/edit', [SimulationEventController::class, 'edit'])->name('events.edit');
+        Route::put('/events/{event}', [SimulationEventController::class, 'update'])->name('events.update');
+        Route::delete('/events/{event}', [SimulationEventController::class, 'destroy'])->name('events.destroy');
+    });
 
-// 2. VIEWING (Zet deze groep eronder)
-Route::middleware(['auth', 'can:CanViewGridPage,' . PagePolicy::class])->group(function () {
-    Route::get('/events', [SimulationEventController::class, 'index'])->name('events.index');
-    Route::get('/events/{event}', [SimulationEventController::class, 'show'])->name('events.show');
-});
+    // 2. VIEWING: Accessible by anyone who can see the grid
+    Route::middleware('can:CanViewGridPage,' . PagePolicy::class)->group(function () {
+        Route::get('/events', [SimulationEventController::class, 'index'])->name('events.index');
+        Route::get('/events/{event}', [SimulationEventController::class, 'show'])->name('events.show');
+    });
 
 });
 

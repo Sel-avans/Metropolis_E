@@ -12,15 +12,15 @@ class SimulationEventController extends Controller
      */
     public function index()
     {
-        // Fetch all events from the database
         $events = SimulationEvent::all();
-        
         return view('events.index', compact('events'));
     }
 
+    /**
+     * Display the specified event.
+     */
     public function show(SimulationEvent $event)
     {
-        
         return view('events.show', compact('event'));
     }
 
@@ -37,19 +37,24 @@ class SimulationEventController extends Controller
      */
     public function store(Request $request)
     {
-        // Dynamically validate fields based on the chosen event type (one-off or recurring)
-        $validated = $request->validate([
+        $request->validate([
             'name' => 'required|string|max:255',
             'description' => 'nullable|string',
             'type' => 'required|in:one-off,recurring',
-            'start_moment' => 'required_if:type,one-off|nullable|date',
-            'end_moment' => 'required_if:type,one-off|nullable|date|after_or_equal:start_moment',
-            'recurring_schedule' => 'required_if:type,recurring|nullable|string',
         ]);
 
-        // Create the event in the database
-        SimulationEvent::create($validated);
+        if ($request->type === 'one-off') {
+            $request->validate([
+                'start_moment' => 'required|date',
+                'end_moment' => 'required|date|after_or_equal:start_moment',
+            ]);
+        } else {
+            $request->validate([
+                'recurring_schedule' => 'required|string',
+            ]);
+        }
 
+        SimulationEvent::create($request->all());
         return redirect()->route('events.index')->with('success', 'Event created successfully.');
     }
 
@@ -66,30 +71,32 @@ class SimulationEventController extends Controller
      */
     public function update(Request $request, SimulationEvent $event)
     {
-        // Apply the same dynamic validation rules for updating
-        $validated = $request->validate([
+        $request->validate([
             'name' => 'required|string|max:255',
             'description' => 'nullable|string',
             'type' => 'required|in:one-off,recurring',
-            'start_moment' => 'required_if:type,one-off|nullable|date',
-            'end_moment' => 'required_if:type,one-off|nullable|date|after_or_equal:start_moment',
-            'recurring_schedule' => 'required_if:type,recurring|nullable|string',
         ]);
 
-        // Update the database record
-        $event->update($validated);
+        if ($request->type === 'one-off') {
+            $request->validate([
+                'start_moment' => 'required|date',
+                'end_moment' => 'required|date|after_or_equal:start_moment',
+            ]);
+        } else {
+            $request->validate([
+                'recurring_schedule' => 'required|string',
+            ]);
+        }
 
+        $event->update($request->all());
         return redirect()->route('events.index')->with('success', 'Event updated successfully.');
     }
-
     /**
      * Remove the specified event from storage.
      */
     public function destroy(SimulationEvent $event)
     {
-        // Delete the event
         $event->delete();
-
         return redirect()->route('events.index')->with('success', 'Event deleted successfully.');
     }
 }
