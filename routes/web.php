@@ -10,6 +10,7 @@ use App\Http\Controllers\FunctionManagementController;
 use App\Http\Controllers\ConditionsController;
 use App\Http\Controllers\UndoController;
 use App\Policies\PagePolicy;
+use App\Http\Controllers\SimulationEventController;
 
 // Publieke route
 Route::get('/', function () {
@@ -84,6 +85,11 @@ Route::middleware('auth')->group(function () {
         Route::put('/conditions/{condition}', [ConditionsController::class, 'update'])->name('conditions.update');
         Route::delete('/conditions/{condition}', [ConditionsController::class, 'destroy'])->name('conditions.destroy');
     });
+
+    // === EVENTS (active events endpoint voor UI) ===
+    // kleine toevoeging: endpoint om actieve events op te halen voor de UI
+    Route::get('/events/active', [SimulationEventController::class, 'active'])
+        ->name('events.active');
 
 });
 

@@ -123,7 +123,24 @@
 
         </div>
 
-        <div id="breakdown-qol-score" class="border-solid border-l border-gray-400 dark:border-white w-2/12 p-3 ml-auto">
+        <div class="border-solid border-l border-gray-400 dark:border-white w-2/12 p-3 ml-auto flex flex-col gap-4">
+
+            <div id="breakdown-qol-score">
+            </div>
+
+            {{-- kleine toevoeging: paneel voor actieve events --}}
+            <div id="active-events-panel">
+                <h3 class="text-lg font-semibold mb-2 dark:text-teal-500">Active Events</h3>
+
+                <div id="active-events-empty" class="text-sm text-gray-500 dark:text-gray-300">
+                    No active events right now.
+                </div>
+
+                <ul id="active-events-list" class="space-y-2 text-sm dark:text-white">
+                    {{-- wordt gevuld via JS --}}
+                </ul>
+            </div>
+
         </div>
 
     </div>
