@@ -37,5 +37,8 @@ class AppServiceProvider extends ServiceProvider
         if (!app()->runningInConsole()) {
             // \App\Models\CityFunction::observe(\App\Observers\CityFunctionObserver::class);
         }
+
+        
+        Gate::define('CanManageEvents', [PagePolicy::class, 'CanManageEvents']);
     }
 }

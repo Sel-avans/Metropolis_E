@@ -10,6 +10,8 @@ use App\Http\Controllers\FunctionManagementController;
 use App\Http\Controllers\ConditionsController;
 use App\Http\Controllers\UndoController;
 use App\Policies\PagePolicy;
+use App\Http\Controllers\SimulationEventController;
+
 
 // Publieke route
 Route::get('/', function () {
@@ -84,6 +86,22 @@ Route::middleware('auth')->group(function () {
         Route::put('/conditions/{condition}', [ConditionsController::class, 'update'])->name('conditions.update');
         Route::delete('/conditions/{condition}', [ConditionsController::class, 'destroy'])->name('conditions.destroy');
     });
+
+    
+// 1. MANAGING (Zet deze groep NU BOVENAAN)
+Route::middleware(['auth', 'can:CanManageEvents,' . PagePolicy::class])->group(function () {
+    Route::get('/events/create', [SimulationEventController::class, 'create'])->name('events.create');
+    Route::post('/events', [SimulationEventController::class, 'store'])->name('events.store');
+    Route::get('/events/{event}/edit', [SimulationEventController::class, 'edit'])->name('events.edit');
+    Route::put('/events/{event}', [SimulationEventController::class, 'update'])->name('events.update');
+    Route::delete('/events/{event}', [SimulationEventController::class, 'destroy'])->name('events.destroy');
+});
+
+// 2. VIEWING (Zet deze groep eronder)
+Route::middleware(['auth', 'can:CanViewGridPage,' . PagePolicy::class])->group(function () {
+    Route::get('/events', [SimulationEventController::class, 'index'])->name('events.index');
+    Route::get('/events/{event}', [SimulationEventController::class, 'show'])->name('events.show');
+});
 
 });
 
