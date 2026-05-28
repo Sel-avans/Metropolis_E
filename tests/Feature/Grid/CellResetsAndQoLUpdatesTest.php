@@ -2,14 +2,28 @@
 
 namespace Tests\Feature\Grid;
 
-use Tests\TestCase;
-use App\Models\GridCell;
+use App\Enums\UserRole;
 use App\Models\CityFunction;
+use App\Models\GridCell;
+use App\Models\User;
 use Illuminate\Foundation\Testing\RefreshDatabase;
+use Tests\TestCase;
 
 class CellResetsAndQoLUpdatesTest extends TestCase
 {
     use RefreshDatabase;
+
+    private User $user;
+
+    protected function setUp(): void
+    {
+        parent::setUp();
+
+        $this->withMiddleware();
+        $this->user = User::factory()->create([
+            'role' => UserRole::Administrator->value,
+        ]);
+    }
 
     public function test_removing_a_function_resets_cell_and_updates_qol()
     {
@@ -17,8 +31,10 @@ class CellResetsAndQoLUpdatesTest extends TestCase
         $cell = GridCell::factory()->create([
             'row' => 3,
             'col' => 1,
-            'function_id' => $function->id
+            'function_id' => $function->id,
         ]);
+
+        $this->actingAs($this->user);
 
         $this->get('/qol/details')->assertStatus(200);
 
