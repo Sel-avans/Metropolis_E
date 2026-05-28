@@ -7,19 +7,24 @@ use Illuminate\Support\Facades\Schema;
 return new class extends Migration
 {
     /**
-     * Run the migrations.
-     */
-    public function up()
-{
-    Schema::table('users', function (Blueprint $table) {
-        $table->string('role')->default('User');
-    });
-}
+    * Run the migrations.
+    */
 
-public function down()
-{
-    Schema::table('users', function (Blueprint $table) {
-        $table->dropColumn('role');
-    });
-}
+    public function up(): void
+    {
+        if (!Schema::hasColumn('users', 'role')) {
+            Schema::table('users', function (Blueprint $table) {
+                $table->string('role')->default('User');
+            });
+        }
+    }
+
+    public function down(): void
+    {
+        if (Schema::hasColumn('users', 'role')) {
+            Schema::table('users', function (Blueprint $table) {
+                $table->dropColumn('role');
+            });
+        }
+    }
 };

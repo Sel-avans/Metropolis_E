@@ -10,25 +10,33 @@
 
                         <a href="{{ route('functions.index') }}"
                         class="px-3 py-2 bg-blue-600 text-white rounded hover:bg-blue-700 text-sm shadow text-center
-                                focus:outline-none focus:ring-2 focus:ring-blue-500">
+                                focus:outline-none focus:ring-2 focus:ring-blue-500"
+                        aria-label="Navigate to Function Management page"
+                                >
                             Function Management
                         </a>
 
                         <a href="{{ route('effects.index') }}"
                         class="px-3 py-2 bg-green-600 text-white rounded hover:bg-green-700 text-sm shadow text-center
-                                focus:outline-none focus:ring-2 focus:ring-green-500">
+                                focus:outline-none focus:ring-2 focus:ring-green-500"
+                        aria-label="Navigate to Effect Management page"
+                                >
                             Effect Management
                         </a>
 
                         <a href="{{ route('conditions.index') }}"
                         class="px-3 py-2 bg-blue-600 text-white rounded hover:bg-blue-700 text-sm shadow text-center
-                                focus:outline-none focus:ring-2 focus:ring-blue-500">
+                                focus:outline-none focus:ring-2 focus:ring-blue-500"
+                        aria-label="Navigate to Condition Management page"
+                                >
                             Condition Management
                         </a>
 
                         <a href="{{ route('events.index') }}"
                         class="px-3 py-2 bg-purple-600 text-white rounded hover:bg-purple-700 text-sm shadow text-center
-                                focus:outline-none focus:ring-2 focus:ring-purple-500">
+                                focus:outline-none focus:ring-2 focus:ring-purple-500"
+                        aria-label="Navigate to Events page"
+                                >
                             Events
                         </a>
 
