@@ -9,10 +9,9 @@ use App\Http\Controllers\EffectsController;
 use App\Http\Controllers\FunctionManagementController;
 use App\Http\Controllers\ConditionsController;
 use App\Http\Controllers\UndoController;
+
 use App\Policies\PagePolicy;
 
-// Beide hebben een event controller momenteel. nog terug naar te blikken voor duplicate etc.
-use App\Http\Controllers\EventController;
 use App\Http\Controllers\SimulationEventController;
 
 
@@ -102,15 +101,15 @@ Route::middleware('auth')->group(function () {
         Route::delete('/events/{event}', [SimulationEventController::class, 'destroy'])->name('events.destroy');
     });
 
-    // 2. VIEWING: Accessible by anyone who can see the grid
+    // 2. VIEWING & ACTIVE ENDPOINT: Accessible by anyone who can see the grid
     Route::middleware('can:CanViewGridPage,' . PagePolicy::class)->group(function () {
+        // EERST de specifieke actieve route:
+        Route::get('/events/active', [SimulationEventController::class, 'active'])->name('events.active');
+        
+        // DAARNA pas de algemene routes en wildcards:
         Route::get('/events', [SimulationEventController::class, 'index'])->name('events.index');
         Route::get('/events/{event}', [SimulationEventController::class, 'show'])->name('events.show');
     });
-    // === EVENTS (active events endpoint voor UI) ===
-    // kleine toevoeging: endpoint om actieve events op te halen voor de UI
-    Route::get('/events/active', [SimulationEventController::class, 'active'])
-        ->name('events.active');
 
 });
 

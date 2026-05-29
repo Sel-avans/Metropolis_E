@@ -13,15 +13,34 @@
         </div>
     </x-slot>
 
+    @if (session('success'))
+        <div id="success-toast" class="fixed top-20 right-10 z-50 bg-green-500 text-white px-6 py-4 rounded-lg shadow-xl flex items-center gap-3 transition-opacity duration-500">
+            <svg class="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24" xmlns="http://www.w3.org/2000/svg">
+                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M5 13l4 4L19 7"></path>
+            </svg>
+            
+            <span class="font-medium">{{ session('success') }}</span>
+            
+            <button onclick="document.getElementById('success-toast').style.display='none'" class="ml-4 focus:outline-none hover:text-green-200">
+                <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24" xmlns="http://www.w3.org/2000/svg">
+                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M6 18L18 6M6 6l12 12"></path>
+                </svg>
+            </button>
+        </div>
+
+        <script>
+            setTimeout(function() {
+                let toast = document.getElementById('success-toast');
+                if (toast) {
+                    toast.style.opacity = '0';
+                    setTimeout(() => toast.style.display = 'none', 500);
+                }
+            }, 4000);
+        </script>
+    @endif
+
     <div class="py-12">
         <div class="max-w-7xl mx-auto sm:px-6 lg:px-8">
-            
-            @if (session('success'))
-                <div class="bg-green-100 border border-green-400 text-green-700 px-4 py-3 rounded relative mb-4" role="alert">
-                    <span class="block sm:inline">{{ session('success') }}</span>
-                </div>
-            @endif
-
             <div class="bg-white overflow-hidden shadow-sm sm:rounded-lg">
                 <div class="p-6 text-gray-900">
                     

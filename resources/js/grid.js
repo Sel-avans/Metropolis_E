@@ -22,6 +22,40 @@ document.addEventListener("DOMContentLoaded", () => {
     const popup = document.getElementById('qol-popup');
     const neighborsList = document.getElementById('popup-neighbors-list');
 
+    // === NIEUW: Functie om actieve events op te halen en te tonen ===
+    async function updateActiveEvents() {
+        const listEl = document.getElementById('active-events-list');
+        const emptyEl = document.getElementById('active-events-empty');
+
+        if (!listEl || !emptyEl) return;
+
+        try {
+            const response = await fetch('/events/active');
+            const data = await response.json();
+
+            // data.events is dankzij de ->values() in de controller nu een schone array
+            if (data.events && data.events.length > 0) {
+                emptyEl.classList.add('hidden');
+                listEl.innerHTML = ''; // Maak de lijst leeg
+
+                data.events.forEach(event => {
+                    const li = document.createElement('li');
+                    li.className = "p-2 bg-purple-100 dark:bg-purple-950/40 border border-purple-300 dark:border-purple-800 rounded shadow-sm";
+                    li.innerHTML = `
+                        <div class="font-semibold text-purple-900 dark:text-purple-300">${event.name}</div>
+                        <div class="text-xs text-gray-600 dark:text-gray-400">${event.timing}</div>
+                    `;
+                    listEl.appendChild(li);
+                });
+            } else {
+                emptyEl.classList.remove('hidden');
+                listEl.innerHTML = '';
+            }
+        } catch (err) {
+            console.error("Fout bij ophalen actieve events:", err);
+        }
+    }
+
     document.addEventListener("click", async (e) => {
         if (!e.target.classList.contains("delete-btn")) return;
 
@@ -251,14 +285,12 @@ document.addEventListener("DOMContentLoaded", () => {
             dropOccurred = true;
             cell.classList.remove("drag-over");
 
-            // Verify if the target cell already has an image (is occupied)
             const isOccupied = cell.querySelector("img") !== null;
 
             if (isOccupied) {
                 const wantsToReplace = window.confirm("Are you sure you want to replace this feature?");
                 
                 if (!wantsToReplace) {
-                    // Revert the source cell state if the action is cancelled
                     if (sourceCell) {
                         sourceCell.classList.remove("drag-source");
                     }
@@ -271,7 +303,7 @@ document.addEventListener("DOMContentLoaded", () => {
             let oldRow = null;
             let oldCol = null;
 
-            const originalSourceCell = sourceCell; // keep reference for potential rollback
+            const originalSourceCell = sourceCell;
 
             if (sourceCell) {
                 oldRow = sourceCell.dataset.row;
@@ -316,22 +348,18 @@ document.addEventListener("DOMContentLoaded", () => {
                 functionId: draggedItem.id
             };
 
-            // undo knop aanzetten zodra er iets is gebeurd
             const undoBtnEl = document.getElementById("undo-btn");
             if (undoBtnEl) undoBtnEl.disabled = false;
 
             const res = await saveMove(oldRow, oldCol, newRow, newCol, false);
 
-            // If the server returned a forbidden placement (409), prompt user to force or rollback
             if (res && res.status === 409) {
                 const forceChoice = window.confirm("Placement is forbidden by adjacency rules. Force placement anyway?");
 
                 if (forceChoice) {
                     const res2 = await saveMove(oldRow, oldCol, newRow, newCol, true);
                     if (!res2 || !res2.ok) {
-                        // Failed even after forcing; revert UI
                         if (originalSourceCell) {
-                            // restore source cell UI
                             originalSourceCell.innerHTML = `<img src="${draggedItem.image}" alt="${draggedItem.name}" data-function-id="${draggedItem.id}" class="grid-function-icon object-contain"><button class="delete-btn absolute top-[2px] right-[2px] bg-red-600/80 text-white w-5 h-5 text-[14px] rounded cursor-pointer flex items-center justify-center">✖</button>`;
                             originalSourceCell.setAttribute('draggable', 'true');
                         }
@@ -342,7 +370,6 @@ document.addEventListener("DOMContentLoaded", () => {
                         return;
                     }
                 } else {
-                    // User declined forcing: rollback UI
                     if (originalSourceCell) {
                         originalSourceCell.innerHTML = `<img src="${draggedItem.image}" alt="${draggedItem.name}" data-function-id="${draggedItem.id}" class="grid-function-icon object-contain"><button class="delete-btn absolute top-[2px] right-[2px] bg-red-600/80 text-white w-5 h-5 text-[14px] rounded cursor-pointer flex items-center justify-center">✖</button>`;
                         originalSourceCell.setAttribute('draggable', 'true');
@@ -369,16 +396,13 @@ document.addEventListener("DOMContentLoaded", () => {
 
         cell.addEventListener('mouseleave', () => { clearTimeout(hoverTimer); hidePopup(); });
     });
-    // undo knop oppakken en handler toevoegen
+
     const undoBtn = document.getElementById("undo-btn");
 
     if (undoBtn) {
         undoBtn.addEventListener("click", async () => {
-
-            // als er niks is om terug te draaien, doe niks
             if (!lastAction) return;
 
-            // zet de vorige staat terug (swap new met old)
             await fetch('/grid/update', {
                 method: 'POST',
                 headers: {
@@ -395,13 +419,9 @@ document.addEventListener("DOMContentLoaded", () => {
                 })
             });
 
-            // undo wissen zodat je niet meerdere keren terug kan
             lastAction = null;
-
-            // undo knop weer uitzetten
             undoBtn.disabled = true;
 
-            // qol opnieuw ophalen en grid verversen
             updateQoL();
             location.reload();
         });
@@ -433,74 +453,74 @@ document.addEventListener("DOMContentLoaded", () => {
         setTimeout(() => updateQoL(), 10);
     });
 
+    // === INITIËLE CALLS BIJ PAGINA LOAD ===
     updateQoL();
+    updateActiveEvents(); // <-- Roept de nieuwe event logica aan bij het laden
 
-document.getElementById('undoButton').addEventListener('click', () => {
-    fetch('/undo', {
-        method: 'POST',
-        headers: {
-            'X-CSRF-TOKEN': document.querySelector('meta[name="csrf-token"]').content,
-            'Content-Type': 'application/json'
-        }
-    })
-    .then(res => res.json())
-    .then(data => {
-        console.log("UNDO RESPONSE:", data);
-        if (!data.success) return;
+    const undoButtonAlternative = document.getElementById('undoButton');
+    if (undoButtonAlternative) {
+        undoButtonAlternative.addEventListener('click', () => {
+            fetch('/undo', {
+                method: 'POST',
+                headers: {
+                    'X-CSRF-TOKEN': document.querySelector('meta[name="csrf-token"]').content,
+                    'Content-Type': 'application/json'
+                }
+            })
+            .then(res => res.json())
+            .then(data => {
+                console.log("UNDO RESPONSE:", data);
+                if (!data.success) return;
 
-        // 1. Oude cel herstellen (Zet het gebouw terug)
-        const targetCell = document.querySelector(
-            `[data-row="${data.cell.row}"][data-col="${data.cell.col}"]`
-        );
+                const targetCell = document.querySelector(
+                    `[data-row="${data.cell.row}"][data-col="${data.cell.col}"]`
+                );
 
-        if (targetCell) {
-            if (data.cell.function_id) {
-                targetCell.innerHTML = `
-                    <img src="${data.cell.image}" 
-                         class="grid-function-icon object-contain"
-                         data-function-id="${data.cell.function_id}">
-                    <button 
-                        class="delete-btn absolute top-[2px] right-[2px] bg-red-600/80 text-white w-5 h-5 text-[14px] rounded cursor-pointer flex items-center justify-center">
-                        ✖
-                    </button>
-                `;
-                targetCell.setAttribute("draggable", "true");
-            } else {
-                targetCell.innerHTML = "";
-                targetCell.removeAttribute("draggable");
-            }
-            activateCell(targetCell);
-        }
+                if (targetCell) {
+                    if (data.cell.function_id) {
+                        targetCell.innerHTML = `
+                            <img src="${data.cell.image}" 
+                                 class="grid-function-icon object-contain"
+                                 data-function-id="${data.cell.function_id}">
+                            <button 
+                                class="delete-btn absolute top-[2px] right-[2px] bg-red-600/80 text-white w-5 h-5 text-[14px] rounded cursor-pointer flex items-center justify-center">
+                                ✖
+                            </button>
+                        `;
+                        targetCell.setAttribute("draggable", "true");
+                    } else {
+                        targetCell.innerHTML = "";
+                        targetCell.removeAttribute("draggable");
+                    }
+                    activateCell(targetCell);
+                }
 
-        // 2. Nieuwe cel leegmaken (UI kant) - Nu met typesafe conversie
-        if (data.cleared) {
-            const clearedCell = document.querySelector(
-                `[data-row="${data.cleared.row}"][data-col="${data.cleared.col}"]`
-            );
+                if (data.cleared) {
+                    const clearedCell = document.querySelector(
+                        `[data-row="${data.cleared.row}"][data-col="${data.cleared.col}"]`
+                    );
 
-            if (clearedCell) {
-                clearedCell.innerHTML = "";
-                clearedCell.removeAttribute("draggable");
-                clearedCell.classList.remove("selected"); // Zorg dat de selectie ook weg is
-            }
-        }
+                    if (clearedCell) {
+                        clearedCell.innerHTML = "";
+                        clearedCell.removeAttribute("draggable");
+                        clearedCell.classList.remove("selected");
+                    }
+                }
 
-        // 3. Opgeschoonde Safety Check: Alleen controleren op exacte matches
-        document.querySelectorAll('.grid-cell').forEach(c => {
-            const cRow = Number(c.dataset.row);
-            const cCol = Number(c.dataset.col);
+                document.querySelectorAll('.grid-cell').forEach(c => {
+                    const cRow = Number(c.dataset.row);
+                    const cCol = Number(c.dataset.col);
 
-            // Sla de herstelde (oude) cel over
-            if (cRow === Number(data.cell.row) && cCol === Number(data.cell.col)) return;
+                    if (cRow === Number(data.cell.row) && cCol === Number(data.cell.col)) return;
 
-            // Als dit de cel is die leeg hoort te zijn (data.cleared), check extra of hij echt leeg is
-            if (data.cleared && cRow === Number(data.cleared.row) && cCol === Number(data.cleared.col)) {
-                c.innerHTML = "";
-                c.removeAttribute("draggable");
-            }
+                    if (data.cleared && cRow === Number(data.cleared.row) && cCol === Number(data.cleared.col)) {
+                        c.innerHTML = "";
+                        c.removeAttribute("draggable");
+                    }
+                });
+
+                setTimeout(() => updateQoL(), 50);
+            });
         });
-
-        setTimeout(() => updateQoL(), 50);
-    });
-});
+    }
 });

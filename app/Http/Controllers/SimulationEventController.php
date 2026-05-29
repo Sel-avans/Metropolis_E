@@ -94,52 +94,52 @@ class SimulationEventController extends Controller
         return redirect()->route('events.index')->with('success', 'Event deleted successfully.');
     }
 
-    // kleine toevoeging: geeft actieve events terug voor de UI
     public function active()
-    {
-        $now = Carbon::now();
+{
+    // Gebruik de juiste tijdzone (Nederlandse tijd)
+    $now = Carbon::now('Europe/Amsterdam');
 
-        $events = SimulationEvent::all()
-            ->map(function ($event) use ($now) {
+    $events = SimulationEvent::all()
+        ->map(function ($event) use ($now) {
 
-                $isActive = false;
-                $timing = '';
+            $isActive = false;
+            $timing = '';
 
-                // simpele check voor one-off events
-                if ($event->type === 'one-off' && $event->start_moment && $event->end_moment) {
-                    $start = Carbon::parse($event->start_moment);
-                    $end = Carbon::parse($event->end_moment);
+            // Check voor one-off events
+            if ($event->type === 'one-off' && $event->start_moment && $event->end_moment) {
+                $start = Carbon::parse($event->start_moment, 'Europe/Amsterdam');
+                $end = Carbon::parse($event->end_moment, 'Europe/Amsterdam');
 
-                    if ($now->between($start, $end)) {
-                        $isActive = true;
-
-                        $mins = $now->diffInMinutes($end);
-                        $timing = 'Ends in ' . $mins . ' min';
-                    }
-                }
-
-                // simpele check voor recurring events
-                if ($event->type === 'recurring') {
+                if ($now->between($start, $end)) {
                     $isActive = true;
-                    $timing = 'Next: ' . ($event->recurring_schedule ?? 'unknown');
+                    $mins = $now->diffInMinutes($end);
+                    $timing = 'Ends in ' . $mins . ' min';
                 }
+            }
 
-                if (! $isActive) {
-                    return null;
-                }
+            // Check voor recurring events
+            if ($event->type === 'recurring') {
+                $isActive = true;
+                $timing = 'Next: ' . ($event->recurring_schedule ?? 'unknown');
+            }
 
-                return [
-                    'id' => $event->id,
-                    'name' => $event->name,
-                    'type' => $event->type,
-                    'timing' => $timing,
-                    // placeholder tot andere subtask klaar is
-                    'affected_functions' => 'Functions modified (from other subtask)',
-                ];
-            })
-            ->filter()
-            ->values();
+            // Als het event niet actief is, skippen we hem
+            if (!$isActive) {
+                return null;
+            }
 
-        return response()->json(['events' => $events]);
-    }
+            // Dit sturen we terug voor actieve events
+            return [
+                'id' => $event->id,
+                'name' => $event->name,
+                'type' => $event->type,
+                'timing' => $timing,
+                'affected_functions' => 'Functions modified (from other subtask)',
+            ];
+        })
+        ->filter()  // Verwijdert de 'null' waardes
+        ->values(); // RESET de keys (0, 1, 2...) zodat het gegarandeerd een JSON array [] wordt
+
+    return response()->json(['events' => $events]);
+}
 }
