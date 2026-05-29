@@ -91,4 +91,44 @@ class GridSoftBlockTest extends TestCase
             'function_id' => $gasStation->id,
         ]);
     }
+
+    public function test_move_forbidden_placement_restores_original_cell()
+    {
+        $park = CityFunction::create(['name' => 'Park', 'category' => 'groen']);
+        $gasStation = CityFunction::create(['name' => 'Tankstation', 'category' => 'mobiliteit']);
+
+        GridCell::create(['row' => 1, 'col' => 1, 'function_id' => $park->id]);
+        GridCell::create(['row' => 1, 'col' => 3, 'function_id' => $gasStation->id]);
+
+        AdjacencyRule::create([
+            'function_a' => $park->id,
+            'function_b' => $gasStation->id,
+            'type' => 'forbidden',
+            'value' => 0
+        ]);
+
+        $response = $this->postJson('/grid/update', [
+            'old_row' => 1,
+            'old_col' => 1,
+            'new_row' => 1,
+            'new_col' => 2,
+            'function_id' => $park->id,
+            'force' => false
+        ]);
+
+        $response->assertStatus(409)
+                 ->assertJson(['success' => false]);
+
+        $this->assertDatabaseHas('grid_cells', [
+            'row' => 1,
+            'col' => 1,
+            'function_id' => $park->id,
+        ]);
+
+        $this->assertDatabaseMissing('grid_cells', [
+            'row' => 1,
+            'col' => 2,
+            'function_id' => $park->id,
+        ]);
+    }
 }

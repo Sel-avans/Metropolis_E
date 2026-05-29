@@ -334,10 +334,10 @@ document.addEventListener("DOMContentLoaded", () => {
                             // restore source cell UI
                             originalSourceCell.innerHTML = `<img src="${draggedItem.image}" alt="${draggedItem.name}" data-function-id="${draggedItem.id}" class="grid-function-icon object-contain"><button class="delete-btn absolute top-[2px] right-[2px] bg-red-600/80 text-white w-5 h-5 text-[14px] rounded cursor-pointer flex items-center justify-center">✖</button>`;
                             originalSourceCell.setAttribute('draggable', 'true');
-                        } else {
-                            cell.innerHTML = "";
-                            cell.removeAttribute('draggable');
                         }
+
+                        cell.innerHTML = "";
+                        cell.removeAttribute('draggable');
                         updateQoL();
                         return;
                     }
@@ -346,10 +346,10 @@ document.addEventListener("DOMContentLoaded", () => {
                     if (originalSourceCell) {
                         originalSourceCell.innerHTML = `<img src="${draggedItem.image}" alt="${draggedItem.name}" data-function-id="${draggedItem.id}" class="grid-function-icon object-contain"><button class="delete-btn absolute top-[2px] right-[2px] bg-red-600/80 text-white w-5 h-5 text-[14px] rounded cursor-pointer flex items-center justify-center">✖</button>`;
                         originalSourceCell.setAttribute('draggable', 'true');
-                    } else {
-                        cell.innerHTML = "";
-                        cell.removeAttribute('draggable');
                     }
+
+                    cell.innerHTML = "";
+                    cell.removeAttribute('draggable');
                     updateQoL();
                     return;
                 }

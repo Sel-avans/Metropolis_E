@@ -122,15 +122,18 @@ class GridController extends Controller
                 })->first();
 
                 $cond = Condition::where(function($q) use ($fa, $fb) {
-                    $q->where('function_a', $fa)->where('function_b', $fb);
-                })->orWhere(function($q) use ($fa, $fb) {
-                    $q->where('function_a', $fb)->where('function_b', $fa);
+                    $q->where(function($q2) use ($fa, $fb) {
+                        $q2->where('function_a', $fa)->where('function_b', $fb);
+                    })->orWhere(function($q2) use ($fa, $fb) {
+                        $q2->where('function_a', $fb)->where('function_b', $fa);
+                    });
                 })->where('type', 'forbidden')->first();
 
                 if ((($rule && $rule->type === 'forbidden') || $cond) && !$force) {
                     // Rollback: restore previous function id on the action cell (if any)
                     if ($actionCell) {
-                        $actionCell->update(['function_id' => $previousFunctionId]);
+                        GridCell::where('id', $actionCell->id)
+                            ->update(['function_id' => $previousFunctionId]);
                     }
 
                     return response()->json(['success' => false, 'error' => 'placement_forbidden'], 409);
