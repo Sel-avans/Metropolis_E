@@ -11,6 +11,7 @@ use App\Http\Controllers\ConditionsController;
 use App\Http\Controllers\UndoController;
 use App\Policies\PagePolicy;
 
+// Beide hebben een event controller momenteel. nog terug naar te blikken voor duplicate etc.
 use App\Http\Controllers\EventController;
 use App\Http\Controllers\SimulationEventController;
 
