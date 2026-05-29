@@ -10,7 +10,10 @@ use App\Http\Controllers\FunctionManagementController;
 use App\Http\Controllers\ConditionsController;
 use App\Http\Controllers\UndoController;
 use App\Policies\PagePolicy;
+
 use App\Http\Controllers\EventController;
+use App\Http\Controllers\SimulationEventController;
+
 
 // Publieke route
 Route::get('/', function () {
@@ -85,6 +88,23 @@ Route::middleware('auth')->group(function () {
         Route::get('/conditions/{condition}/edit', [ConditionsController::class, 'edit'])->name('conditions.edit');
         Route::put('/conditions/{condition}', [ConditionsController::class, 'update'])->name('conditions.update');
         Route::delete('/conditions/{condition}', [ConditionsController::class, 'destroy'])->name('conditions.destroy');
+    });
+
+    
+// === SIMULATION EVENTS ===
+    // 1. MANAGING: Only accessible by Administrator and Municipal Policy Maker
+    Route::middleware('can:CanManageEvents,' . PagePolicy::class)->group(function () {
+        Route::get('/events/create', [SimulationEventController::class, 'create'])->name('events.create');
+        Route::post('/events', [SimulationEventController::class, 'store'])->name('events.store');
+        Route::get('/events/{event}/edit', [SimulationEventController::class, 'edit'])->name('events.edit');
+        Route::put('/events/{event}', [SimulationEventController::class, 'update'])->name('events.update');
+        Route::delete('/events/{event}', [SimulationEventController::class, 'destroy'])->name('events.destroy');
+    });
+
+    // 2. VIEWING: Accessible by anyone who can see the grid
+    Route::middleware('can:CanViewGridPage,' . PagePolicy::class)->group(function () {
+        Route::get('/events', [SimulationEventController::class, 'index'])->name('events.index');
+        Route::get('/events/{event}', [SimulationEventController::class, 'show'])->name('events.show');
     });
 
 });
