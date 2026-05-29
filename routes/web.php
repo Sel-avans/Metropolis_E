@@ -107,6 +107,10 @@ Route::middleware('auth')->group(function () {
         Route::get('/events', [SimulationEventController::class, 'index'])->name('events.index');
         Route::get('/events/{event}', [SimulationEventController::class, 'show'])->name('events.show');
     });
+    // === EVENTS (active events endpoint voor UI) ===
+    // kleine toevoeging: endpoint om actieve events op te halen voor de UI
+    Route::get('/events/active', [SimulationEventController::class, 'active'])
+        ->name('events.active');
 
 });
 
