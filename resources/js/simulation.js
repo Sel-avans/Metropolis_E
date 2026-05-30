@@ -2,7 +2,7 @@ export const setSimulationSpeed = async (speed) => {
     
     document.getElementById('active-speed-display').innerText = speed + '×';
     
-    // Update de knop die actief is qua kleur
+    // Updates the styling of active button
     document.querySelectorAll('.speed-btn').forEach(btn => {
         const isSelected = parseInt(btn.getAttribute('data-speed')) === speed;
         btn.classList.toggle('bg-teal-600', isSelected);
@@ -26,5 +26,5 @@ export const setSimulationSpeed = async (speed) => {
     }
 };
 
-// Functie globaal beschikbaar voor inline onclicks
+// Code to make function global for inline clicks
 window.setSimulationSpeed = setSimulationSpeed;
