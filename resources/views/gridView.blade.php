@@ -2,6 +2,7 @@
     <div class="flex gap-4">
         
         <div class="w-auto p-6 max-h-[93vh] overflow-y-auto">
+            <!-- Section Library -->
             <div class="flex flex-col mb-4 gap-3">    
                 <h1 class="text-2xl dark:text-teal-500 font-bold mb-4">Function Library</h1>
 
@@ -40,6 +41,7 @@
             @endforelse
         </div>
 
+        <!-- Section Total QoL-score -->
         <div class="flex flex-col mx-auto">
             <div class="w-auto h-min mt-4 border-4 border-gray-400 dark:bg-indigo-900 dark:border-teal-600 rounded-md p-6">
                 <span id="qol-score" class="text-xl font-semibold dark:text-teal-300">
@@ -48,12 +50,14 @@
                 <span id="old-qol-score" class="float-right text-gray-500"></span>
             </div>
 
+            <!-- Section Undo Button -->
             <button id="undoButton" class="mt-4 px-4 py-2 bg-yellow-500 text-black font-semibold rounded shadow hover:bg-yellow-600 transition focus:ring-2 focus:ring-yellow-400">
                 Undo
             </button>
 
+            <!-- Section City Grid -->
             <div class="w-auto p-6">
-                <h1 class="text-2xl text-center font-bold mb-4 dark:text-teal-300">City Grid (3x4)</h1>
+                <h1 class="text-2xl text-center font-bold mb-4 dark:text-teal-300">City Grid</h1>
 
                 <div class="city-grid grid grid-flow-col grid-rows-4 gap-3 w-min">
                     @for($col = 1; $col <= 3; $col++)
@@ -76,6 +80,7 @@
                 </div>
             </div>
 
+            <!-- Section Simulation Controls -->
             <section id="simulation-controls" class="mt-6 p-4 border-t border-gray-300 dark:border-gray-700">
                 <h3 class="text-lg font-semibold mb-3 dark:text-teal-500">Simulation Speed</h3>
                 <div class="flex gap-2">
@@ -89,6 +94,7 @@
             </section>
         </div>
 
+        <!-- Section QoL Breakdown and Active Events --> 
         <div class="border-l border-gray-400 dark:border-gray-700 w-2/12 p-3 ml-auto flex flex-col gap-4">
             <div id="breakdown-qol-score"></div>
             <div id="active-events-panel">
