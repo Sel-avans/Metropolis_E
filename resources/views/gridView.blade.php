@@ -2,22 +2,22 @@
     <div class="flex gap-4">
         
         <div class="w-auto p-6 max-h-[93vh] overflow-y-auto">
-            <!-- Section Library -->
+            {{-- Section Library --}}
             <div class="flex flex-col mb-4 gap-3">    
                 <h1 class="text-2xl dark:text-teal-500 font-bold mb-4">Function Library</h1>
 
                 <a href="{{ route('effects.index') }}" 
-                   class="px-4 py-2 bg-teal-600 text-white text-xs font-semibold rounded shadow hover:bg-teal-700 transition focus:outline-none focus:ring-2 focus:ring-teal-500">
+                    class="px-4 py-2 bg-teal-600 text-white text-xs font-semibold rounded shadow hover:bg-teal-700 transition focus:outline-none focus:ring-2 focus:ring-teal-500">
                     Effect Functions
                 </a>
 
                 <a href="{{ route('functions.index') }}" 
-                   class="px-4 py-2 bg-blue-600 text-white text-xs font-semibold rounded shadow hover:bg-blue-700 transition focus:outline-none focus:ring-2 focus:ring-blue-500">
+                    class="px-4 py-2 bg-blue-600 text-white text-xs font-semibold rounded shadow hover:bg-blue-700 transition focus:outline-none focus:ring-2 focus:ring-blue-500">
                     Function Management
                 </a>
 
                 <a href="{{ route('conditions.index') }}" 
-                   class="px-4 py-2 bg-blue-600 text-white text-xs font-semibold rounded shadow hover:bg-blue-700 transition focus:outline-none focus:ring-2 focus:ring-blue-500">
+                    class="px-4 py-2 bg-blue-600 text-white text-xs font-semibold rounded shadow hover:bg-blue-700 transition focus:outline-none focus:ring-2 focus:ring-blue-500">
                     Conditions
                 </a>
             </div>
@@ -41,7 +41,7 @@
             @endforelse
         </div>
 
-        <!-- Section Total QoL-score -->
+        {{-- Section Total QoL-score --}}
         <div class="flex flex-col mx-auto">
             <div class="w-auto h-min mt-4 border-4 border-gray-400 dark:bg-indigo-900 dark:border-teal-600 rounded-md p-6">
                 <span id="qol-score" class="text-xl font-semibold dark:text-teal-300">
@@ -50,18 +50,18 @@
                 <span id="old-qol-score" class="float-right text-gray-500"></span>
             </div>
 
-            <!-- Section Undo Button -->
+            {{-- Section Undo Button --}}
             <button id="undoButton" class="mt-4 px-4 py-2 bg-yellow-500 text-black font-semibold rounded shadow hover:bg-yellow-600 transition focus:ring-2 focus:ring-yellow-400">
                 Undo
             </button>
 
-            <!-- Section City Grid -->
+            {{-- Section City Grid --}}
             <div class="w-auto p-6">
                 <h1 class="text-2xl text-center font-bold mb-4 dark:text-teal-300">City Grid</h1>
 
-                <div class="city-grid grid grid-flow-col grid-rows-4 gap-3 w-min">
-                    @for($col = 1; $col <= 3; $col++)
-                        @for($row = 1; $row <= 4; $row++)
+                <div class="city-grid grid grid-flow-col grid-rows-3 gap-3 w-min">
+                    @for($col = 1; $col <= 4; $col++)
+                        @for($row = 1; $row <= 3; $row++)
                             @php
                                 $cell = $grid->first(fn($c) => $c->row == $row && $c->col == $col);
                             @endphp
@@ -80,21 +80,23 @@
                 </div>
             </div>
 
-            <!-- Section Simulation Controls -->
+            {{-- Section Simulation Controls --}}
             <section id="simulation-controls" class="mt-6 p-4 border-t border-gray-300 dark:border-gray-700">
                 <h3 class="text-lg font-semibold mb-3 dark:text-teal-500">Simulation Speed</h3>
                 <div class="flex gap-2">
                     @foreach([1, 2, 5] as $speed)
                         <button type="button" onclick="setSimulationSpeed({{ $speed }})" 
-                                class="speed-btn px-4 py-2 bg-gray-200 dark:bg-gray-700 hover:bg-teal-600 hover:text-white rounded transition"
+                                class="speed-btn px-4 py-2 bg-gray-200 dark:bg-gray-700 hover:bg-teal-600 hover:text-white text-gray-800 dark:text-gray-200 font-medium rounded transition"
                                 data-speed="{{ $speed }}">{{ $speed }}×</button>
                     @endforeach
                 </div>
-                <p class="mt-2 text-sm">Active: <span id="active-speed-display" class="font-bold text-teal-600">1×</span></p>
+                <p class="mt-2 text-sm text-gray-600 dark:text-gray-400">
+                    Active: <span id="active-speed-display" class="font-bold text-teal-600 dark:text-teal-400">1×</span>
+                </p>
             </section>
         </div>
 
-        <!-- Section QoL Breakdown and Active Events --> 
+        {{-- Section QoL Breakdown and Active Events --}} 
         <div class="border-l border-gray-400 dark:border-gray-700 w-2/12 p-3 ml-auto flex flex-col gap-4">
             <div id="breakdown-qol-score"></div>
             <div id="active-events-panel">
