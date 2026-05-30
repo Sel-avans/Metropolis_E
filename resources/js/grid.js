@@ -1,4 +1,5 @@
 import { getNeighborsWithQoL } from './neighbours.js';
+import './simulation.js';
 
 document.addEventListener("DOMContentLoaded", () => {
     const cells = document.querySelectorAll(".grid-cell");
