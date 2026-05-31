@@ -20,7 +20,7 @@
                     </div>
                 @endif
 
-                <form method="POST" action="{{ route('events.update', $event) }}">
+                <form method="POST" action="{{ route('events.update', $event) }}" onsubmit="return confirm('Are you sure you want to modify this event?');" novalidate>
                     @csrf
                     @method('PUT')
 
