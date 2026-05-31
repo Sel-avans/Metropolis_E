@@ -4,6 +4,7 @@ namespace App\Models;
 
 use Illuminate\Database\Eloquent\Attributes\Fillable;
 use Illuminate\Database\Eloquent\Model;
+use Illuminate\Database\Eloquent\Relations\HasMany;
 
 class SimulationEvent extends Model
 {
@@ -15,4 +16,9 @@ class SimulationEvent extends Model
         'end_moment', 
         'recurring_schedule'    
     ];
+
+    public function effects()
+        {
+            return $this->hasMany(Effect::class, 'simulation_event_id');
+        }
 }

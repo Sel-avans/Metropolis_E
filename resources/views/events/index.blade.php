@@ -67,7 +67,9 @@
                             @forelse ($events as $event)
                                 <tr>
                                     <td class="px-5 py-5 border-b border-gray-200 bg-white text-sm">
-                                        <p class="text-gray-900 whitespace-no-wrap font-bold">{{ $event->name }}</p>
+                                        <a href="{{ route('events.show', $event) }}" class="text-blue-600 hover:text-blue-900 font-bold hover:underline transition-colors">
+                                            {{ $event->name }}
+                                        </a>
                                         <p class="text-gray-500 whitespace-no-wrap text-xs">{{ $event->description }}</p>
                                     </td>
                                     <td class="px-5 py-5 border-b border-gray-200 bg-white text-sm">

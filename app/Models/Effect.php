@@ -15,10 +15,16 @@ class Effect extends Model
         'function_id',
         'category',
         'value',
+        'simulation_event_id',
     ];
 
     public function function()
     {
         return $this->belongsTo(CityFunction::class, 'function_id');
     }
+
+    public function simulationEvent()
+{
+    return $this->belongsTo(SimulationEvent::class, 'simulation_event_id');
+}
 }

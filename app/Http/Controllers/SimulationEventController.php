@@ -4,7 +4,7 @@ namespace App\Http\Controllers;
 
 use App\Models\SimulationEvent;
 use Illuminate\Http\Request;
-use Carbon\Carbon; // toegevoegd voor tijd berekeningen
+use Carbon\Carbon; 
 
 class SimulationEventController extends Controller
 {
@@ -21,10 +21,10 @@ class SimulationEventController extends Controller
      * Display the specified event.
      */
     public function show(SimulationEvent $event)
-    {
-        return view('events.show', compact('event'));
-    }
-
+        {
+            $event->load('effects');
+            return view('events.show', compact('event'));
+        }
     /**
      * Show the form for creating a new event.
      */
@@ -38,7 +38,6 @@ class SimulationEventController extends Controller
      */
     public function store(Request $request)
     {
-        // Dynamically validate fields based on the chosen event type (one-off or recurring)
         $validated = $request->validate([
             'name' => 'required|string|max:255',
             'description' => 'nullable|string',
@@ -48,7 +47,6 @@ class SimulationEventController extends Controller
             'recurring_schedule' => 'required_if:type,recurring|nullable|string',
         ]);
 
-        // Create the event in the database
         SimulationEvent::create($validated);
 
         return redirect()->route('events.index')->with('success', 'Event created successfully.');
@@ -67,7 +65,6 @@ class SimulationEventController extends Controller
      */
     public function update(Request $request, SimulationEvent $event)
     {
-        // Apply the same dynamic validation rules for updating
         $validated = $request->validate([
             'name' => 'required|string|max:255',
             'description' => 'nullable|string',
@@ -77,7 +74,6 @@ class SimulationEventController extends Controller
             'recurring_schedule' => 'required_if:type,recurring|nullable|string',
         ]);
 
-        // Update the database record
         $event->update($validated);
 
         return redirect()->route('events.index')->with('success', 'Event updated successfully.');
@@ -88,19 +84,21 @@ class SimulationEventController extends Controller
      */
     public function destroy(SimulationEvent $event)
     {
-        // Delete the event
         $event->delete();
 
         return redirect()->route('events.index')->with('success', 'Event deleted successfully.');
     }
 
-    public function active()
+   public function active()
 {
-    // Gebruik de juiste tijdzone (Nederlandse tijd)
     $now = Carbon::now('Europe/Amsterdam');
 
-    $events = SimulationEvent::all()
+    $events = SimulationEvent::with('effects')
+        ->get()
         ->map(function ($event) use ($now) {
+            
+            // Dwing Laravel om de meest recente effects uit de database te trekken (voorkomt cache-smetjes)
+            $event->load('effects'); 
 
             $isActive = false;
             $timing = '';
@@ -112,34 +110,40 @@ class SimulationEventController extends Controller
 
                 if ($now->between($start, $end)) {
                     $isActive = true;
-                    $mins = $now->diffInMinutes($end);
+                    $mins = round($now->diffInMinutes($end));
                     $timing = 'Ends in ' . $mins . ' min';
                 }
             }
 
             // Check voor recurring events
             if ($event->type === 'recurring') {
-                $isActive = true;
-                $timing = 'Next: ' . ($event->recurring_schedule ?? 'unknown');
+                $isActive = true; 
+                $timing = 'Pattern: ' . ($event->recurring_schedule ?? 'unknown');
             }
 
-            // Als het event niet actief is, skippen we hem
             if (!$isActive) {
                 return null;
             }
 
-            // Dit sturen we terug voor actieve events
+            // Haal de categorieën en waarden op
+            $modifiers = $event->effects->pluck('value', 'category');
+
             return [
                 'id' => $event->id,
                 'name' => $event->name,
                 'type' => $event->type,
                 'timing' => $timing,
-                'affected_functions' => 'Functions modified (from other subtask)',
+                // Forceert altijd een JSON-object {}, ook als deze leeg is
+                'modifiers' => $modifiers->isEmpty() ? (object)[] : $modifiers->toArray(),
             ];
         })
-        ->filter()  // Verwijdert de 'null' waardes
-        ->values(); // RESET de keys (0, 1, 2...) zodat het gegarandeerd een JSON array [] wordt
+        ->filter()  
+        ->values(); 
 
-    return response()->json(['events' => $events]);
+    return response()->json([
+        'status' => 'success',
+        'timestamp' => $now->toIso8601String(),
+        'events' => $events
+    ]);
 }
 }
