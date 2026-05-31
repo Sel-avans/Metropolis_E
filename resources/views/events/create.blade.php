@@ -9,12 +9,23 @@
         <div class="max-w-7xl mx-auto sm:px-6 lg:px-8">
             <div class="bg-white overflow-hidden shadow-sm sm:rounded-lg p-6">
                 
+            @if ($errors->any())
+                    <div class="bg-red-600 text-white p-4 mb-6 shadow-md rounded-md" role="alert">
+                        <p class="font-bold text-lg mb-2">Please correct the following errors before proceeding:</p>
+                        <ul class="list-disc list-inside font-medium space-y-1">
+                            @foreach ($errors->all() as $error)
+                                <li>{{ $error }}</li>
+                            @endforeach
+                        </ul>
+                    </div>
+                @endif
+
                 <form method="POST" action="{{ route('events.store') }}">
                     @csrf
 
                     <div class="mb-4">
                         <label for="name" class="block text-gray-700 font-bold mb-2">Event Name</label>
-                        <input type="text" id="name" name="name" class="shadow appearance-none border rounded w-full py-2 px-3 text-gray-700 leading-tight focus:outline-none focus:shadow-outline" required>
+                        <input type="text" id="name" name="name" class="shadow appearance-none border rounded w-full py-2 px-3 text-gray-700 leading-tight focus:outline-none focus:shadow-outline">
                     </div>
 
                     <div class="mb-4">
