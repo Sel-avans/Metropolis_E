@@ -14,7 +14,11 @@ class SimulationEvent extends Model
         'type', 
         'start_moment', 
         'end_moment', 
-        'recurring_schedule'    
+        'recurring_schedule',
+        'recurring_start_date',
+        'recurring_end_date',
+        'recurring_start_time',
+        'recurring_end_time'
     ];
 
     public function effects()
