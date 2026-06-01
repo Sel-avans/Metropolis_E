@@ -29,6 +29,7 @@
         </div>
 
         <script>
+            // Automatically hide the toast after 4 seconds
             setTimeout(function() {
                 let toast = document.getElementById('success-toast');
                 if (toast) {
@@ -79,23 +80,25 @@
                                         </span>
                                     </td>
                                     <td class="px-5 py-5 border-b border-gray-200 bg-white text-sm">
+                                        
                                         @if($event->type === 'one-off')
-                                            <p class="text-gray-900 whitespace-no-wrap">
-                                                From: {{ \App\Services\EventModifierService::formatForDisplay($event->start_moment) }}<br>
-                                                To: {{ \App\Services\EventModifierService::formatForDisplay($event->end_moment) }}
-                                                <span class="text-xs text-gray-500">(Nederlandse tijd)</span>
-                                            </p>
-                                            @php
-                                                $isActive = \App\Services\EventModifierService::isActive($event);
-                                            @endphp
-                                            <p class="text-xs mt-1 {{ $isActive ? 'text-green-600 font-semibold' : 'text-gray-500' }}">
-                                                {{ $isActive ? 'Nu actief' : 'Niet actief' }}
-                                            </p>
+                                            <div class="text-sm text-gray-900 whitespace-no-wrap">
+                                                <span class="font-semibold">Start:</span> {{ $event->start_moment ? \Carbon\Carbon::parse($event->start_moment)->format('d-m-Y H:i') : 'N/A' }}
+                                                <br>
+                                                <span class="font-semibold">End:</span> {{ $event->end_moment ? \Carbon\Carbon::parse($event->end_moment)->format('d-m-Y H:i') : 'N/A' }}
+                                            </div>
                                         @else
-                                            <p class="text-gray-900 whitespace-no-wrap">
-                                                Repeats: <strong>{{ ucfirst($event->recurring_schedule) }}</strong>
-                                            </p>
+                                            <div class="text-sm text-gray-900 whitespace-no-wrap">
+                                                <span class="font-semibold">Repeats:</span> {{ ucfirst($event->recurring_schedule) }}
+                                                <br>
+                                                <span class="text-gray-500">
+                                                    From: {{ $event->recurring_start_date ? \Carbon\Carbon::parse($event->recurring_start_date)->format('d-m-Y') : 'N/A' }}
+                                                    ({{ $event->recurring_start_time ? \Carbon\Carbon::parse($event->recurring_start_time)->format('H:i') : 'N/A' }} 
+                                                    - {{ $event->recurring_end_time ? \Carbon\Carbon::parse($event->recurring_end_time)->format('H:i') : 'N/A' }})
+                                                </span>
+                                            </div>
                                         @endif
+
                                     </td>
                                     
                                     @can('CanManageEvents', App\Policies\PagePolicy::class)

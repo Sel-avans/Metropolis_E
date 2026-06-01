@@ -46,6 +46,10 @@ class SimulationEventController extends Controller
             'start_moment' => 'required_if:type,one-off|nullable|date',
             'end_moment' => 'required_if:type,one-off|nullable|date|after_or_equal:start_moment',
             'recurring_schedule' => 'required_if:type,recurring|nullable|string',
+            'recurring_start_date' => 'required_if:type,recurring|nullable|date',
+            'recurring_end_date' => 'nullable|date|after_or_equal:recurring_start_date',
+            'recurring_start_time' => 'required_if:type,recurring|nullable',
+            'recurring_end_time'   => 'required_if:type,recurring|nullable',
         ]);
 
         SimulationEvent::create(EventModifierService::normalizeEventMoments($validated));
@@ -73,6 +77,10 @@ class SimulationEventController extends Controller
             'start_moment' => 'required_if:type,one-off|nullable|date',
             'end_moment' => 'required_if:type,one-off|nullable|date|after_or_equal:start_moment',
             'recurring_schedule' => 'required_if:type,recurring|nullable|string',
+            'recurring_start_date' => 'required_if:type,recurring|nullable|date',
+            'recurring_end_date'   => 'required_if:type,recurring|nullable|date|after_or_equal:recurring_start_date',
+            'recurring_start_time' => 'required_if:type,recurring|nullable',
+            'recurring_end_time'   => 'required_if:type,recurring|nullable',
         ]);
 
         $event->update(EventModifierService::normalizeEventMoments($validated));
@@ -94,9 +102,12 @@ class SimulationEventController extends Controller
     {
         $now = EventModifierService::now();
 
-        $events = EventModifierService::getActiveEvents()
-            ->map(function (SimulationEvent $event) use ($now) {
-                $timing = '';
+    $events = SimulationEvent::with('effects')
+        ->get()
+        ->map(function ($event) use ($now) {
+            
+            // Dwing Laravel om de meest recente effects uit de database te trekken (voorkomt cache-smetjes)
+             $event->load('effects'); 
 
                 if ($event->type === 'one-off' && $event->end_moment) {
                     $end = EventModifierService::parseMoment($event->end_moment);

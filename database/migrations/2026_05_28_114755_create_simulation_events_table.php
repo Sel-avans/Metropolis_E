@@ -23,8 +23,12 @@ return new class extends Migration
             $table->dateTime('start_moment')->nullable();
             $table->dateTime('end_moment')->nullable();
     
-            // Field for recurring events (e.g., 'daily', 'weekly', 'weekends')
+            // Fields for recurring events
             $table->string('recurring_schedule')->nullable(); 
+            $table->date('recurring_start_date')->nullable();
+            $table->date('recurring_end_date')->nullable(); // Dit is de optionele (nullable) end date!
+            $table->time('recurring_start_time')->nullable();
+            $table->time('recurring_end_time')->nullable();
     
             $table->timestamps();
         });
