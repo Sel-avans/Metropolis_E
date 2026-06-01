@@ -19,6 +19,7 @@ class CityFunction extends Model
 
     public function effects()
     {
-        return $this->hasMany(Effect::class, 'function_id');
+        return $this->hasMany(Effect::class, 'function_id')
+            ->whereNull('simulation_event_id');
     }
 }

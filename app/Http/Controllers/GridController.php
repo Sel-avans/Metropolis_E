@@ -9,6 +9,7 @@ use App\Models\Condition;
 use Illuminate\Http\Request;
 use App\Models\UndoAction;
 use App\Http\Controllers\QoLController;
+use App\Services\EventModifierService;
 
 class GridController extends Controller
 {
@@ -27,10 +28,13 @@ class GridController extends Controller
         $items = CityFunction::all();
         $functions = $items->groupBy('category');
 
+        $activeEvents = EventModifierService::getActiveEvents();
+
         return response()
             ->view('gridView', [
                 'functions' => $functions,
-                'grid' => $grid
+                'grid' => $grid,
+                'activeEvents' => $activeEvents
             ])
             ->header('Cache-Control', 'no-cache, no-store, must-revalidate')
             ->header('Pragma', 'no-cache')

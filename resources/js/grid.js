@@ -13,7 +13,7 @@ document.addEventListener("DOMContentLoaded", () => {
     let dropOccurred = false;
     let old_score;
 
-    // slaat de laatste actie op zodat undo weet wat teruggezet moet worden
+    // Slaat de laatste actie op zodat undo weet wat teruggezet moet worden
     let lastAction = null;
 
     const HOVER_DELAY_MS = 300;
@@ -23,8 +23,39 @@ document.addEventListener("DOMContentLoaded", () => {
     const neighborsList = document.getElementById('popup-neighbors-list');
 
     let eventTimerInterval = null;
+    let lastActiveEventSignature = '';
 
-    async function updateActiveEvents() {
+    function formatModifiers(modifiers) {
+        if (!modifiers || typeof modifiers !== 'object') {
+            return '';
+        }
+
+        const items = Object.entries(modifiers)
+            .map(([category, value]) => {
+                const num = Number(value);
+                const sign = num >= 0 ? '+' : '';
+                const label = category.charAt(0).toUpperCase() + category.slice(1);
+                return `<li class="text-amber-400">- ${label}: ${sign}${num}</li>`;
+            });
+
+        if (items.length === 0) {
+            return '';
+        }
+
+        return `<ul class="text-[11px] text-gray-400 mt-1 space-y-0.5 list-none pl-0">${items.join('')}</ul>`;
+    }
+
+    function buildEventSignature(events) {
+        return JSON.stringify(
+            (events || []).map(event => ({
+                id: event.id,
+                end_at: event.end_at ?? null,
+                modifiers: event.modifiers ?? {},
+            }))
+        );
+    }
+
+    async function updateActiveEvents({ forceQolRefresh = false } = {}) {
         const listEl = document.getElementById('active-events-list');
         const emptyEl = document.getElementById('active-events-empty');
 
@@ -37,53 +68,71 @@ document.addEventListener("DOMContentLoaded", () => {
             const data = await response.json();
             if (!data || !data.events) return;
 
+            const signature = buildEventSignature(data.events);
+            if (signature !== lastActiveEventSignature) {
+                lastActiveEventSignature = signature;
+                updateQoL();
+            } else if (forceQolRefresh) {
+                updateQoL();
+            }
+
             if (data.events.length > 0) {
                 emptyEl.classList.add('hidden');
-                listEl.innerHTML = ''; 
+                listEl.innerHTML = '';
 
                 const activeTimers = [];
 
                 data.events.forEach((event, index) => {
                     const li = document.createElement('li');
-                    li.className = "p-3 bg-purple-100 dark:bg-purple-950/40 border border-purple-300 dark:border-purple-800 rounded shadow-sm mb-2";
-                    
+                    li.className = "p-3 bg-slate-800 border-l-4 border-amber-500 rounded shadow-sm mb-2 text-sm";
+
                     const timerId = `event-timer-${index}`;
+                    const modifiersHtml = formatModifiers(event.modifiers);
+                    const endsAtHtml = event.ends_at_display
+                        ? `<div class="text-[11px] text-gray-500 mt-0.5">Eindigt om ${event.ends_at_display} (NL)</div>`
+                        : '';
 
                     li.innerHTML = `
-                        <div class="font-semibold text-purple-900 dark:text-purple-300">${event.name || 'Naamloos event'}</div>
-                        <div id="${timerId}" class="text-xs text-gray-600 dark:text-gray-400 font-mono mt-1">
+                        <div class="font-semibold text-slate-200">${event.name || 'Naamloos event'}</div>
+                        ${modifiersHtml}
+                        ${endsAtHtml}
+                        <div id="${timerId}" class="text-[11px] text-emerald-400 font-mono mt-1 font-bold">
                             Laden...
                         </div>
                     `;
                     listEl.appendChild(li);
 
-                    // Als end_at aanwezig is, gaan we de timer instellen
                     if (event.end_at) {
                         let endTimeMs = 0;
                         if (typeof event.end_at === 'number' || (!isNaN(event.end_at) && !isNaN(parseFloat(event.end_at)))) {
                             endTimeMs = Number(event.end_at) * 1000;
                         } else {
-                            const formattedString = event.end_at.replace(' ', 'T');
+                            const formattedString = String(event.end_at).replace(' ', 'T');
                             endTimeMs = new Date(formattedString).getTime();
                         }
 
                         if (!isNaN(endTimeMs) && endTimeMs > 0) {
-                            activeTimers.push({
-                                elementId: timerId,
-                                endTimeMs: endTimeMs
-                            });
+                            activeTimers.push({ elementId: timerId, endTimeMs });
+                        }
+                    } else if (event.type === 'recurring') {
+                        const timerEl = document.getElementById(timerId);
+                        if (timerEl) {
+                            timerEl.textContent = event.timing || 'Recurring';
+                            timerEl.className = "text-[11px] text-teal-400 mt-1";
                         }
                     } else {
-                        document.getElementById(timerId).textContent = "Geen eindtijd bekend";
+                        const timerEl = document.getElementById(timerId);
+                        if (timerEl) timerEl.textContent = "Geen eindtijd bekend";
                     }
                 });
 
-                if (activeTimers.length > 0) {
-                    if (eventTimerInterval) clearInterval(eventTimerInterval);
+                if (eventTimerInterval) clearInterval(eventTimerInterval);
 
+                if (activeTimers.length > 0) {
                     const tick = () => {
-                        const nowMs = new Date().getTime();
-                        let activeCount = 0;
+                        const nowMs = Date.now();
+                        let stillRunning = false;
+                        let anyExpired = false;
 
                         activeTimers.forEach(timer => {
                             const timerEl = document.getElementById(timer.elementId);
@@ -92,46 +141,42 @@ document.addEventListener("DOMContentLoaded", () => {
                             const distance = timer.endTimeMs - nowMs;
 
                             if (distance <= 0) {
-                                timerEl.textContent = "Finished";
-                                timerEl.className = "text-xs text-red-500 font-bold mt-1";
+                                timerEl.textContent = "Afgelopen";
+                                timerEl.className = "text-[11px] text-red-500 font-bold mt-1";
+                                anyExpired = true;
                             } else {
-                                activeCount++;
+                                stillRunning = true;
                                 const totalSeconds = Math.floor(distance / 1000);
                                 const minutes = Math.floor(totalSeconds / 60);
                                 const seconds = totalSeconds % 60;
-
-                                const mm = String(minutes).padStart(2, '0');
-                                const ss = String(seconds).padStart(2, '0');
-
-                                timerEl.textContent = `Remaining: ${mm}:${ss}`;
+                                timerEl.textContent = `Tijd over: ${String(minutes).padStart(2, '0')}:${String(seconds).padStart(2, '0')}`;
                             }
                         });
 
-                        if (activeCount === 0) {
+                        if (anyExpired && !stillRunning) {
                             clearInterval(eventTimerInterval);
+                            eventTimerInterval = null;
+                            updateActiveEvents();
                         }
                     };
 
-                    tick(); 
-                    eventTimerInterval = setInterval(tick, 1000); 
+                    tick();
+                    eventTimerInterval = setInterval(tick, 1000);
                 }
-
             } else {
                 emptyEl.classList.remove('hidden');
                 listEl.innerHTML = '';
-                if (eventTimerInterval) clearInterval(eventTimerInterval);
+                if (eventTimerInterval) {
+                    clearInterval(eventTimerInterval);
+                    eventTimerInterval = null;
+                }
             }
         } catch (err) {
             console.error("Fout bij updaten events:", err);
         }
     }
 
-    // === DE REFRESH-LOZE MOTOR ===
-    // 1. Haal direct bij het laden van de pagina de events op
-    updateActiveEvents();
-
-    // 2. Check ELKE 5 seconden op de achtergrond of er een nieuw event is aangemaakt.
-    // Hierdoor verschijnt je event LIVE op het scherm zonder dat je de pagina refresht!
+    updateActiveEvents({ forceQolRefresh: true });
     setInterval(updateActiveEvents, 5000);
 
     document.addEventListener("click", async (e) => {
@@ -214,9 +259,8 @@ document.addEventListener("DOMContentLoaded", () => {
         let html = '';
 
         if (old_score === undefined) {
-            html+=''; 
-        }
-        else {
+            html += ''; 
+        } else {
             const delta_score = data.total_score - old_score;
             html += `
                 <span class="text-xl float-right ${delta_score < 0 ? 'text-red-600' : 'text-green-600'}">
@@ -230,7 +274,8 @@ document.addEventListener("DOMContentLoaded", () => {
 
     function renderQoLBreakdown(data) {
         let html = '';
-        html += '<h3 class="text-xl font-semibold dark:text-teal-500">Breakdown QoL Score</h3>';
+        html += '<h3 class="text-xl font-semibold dark:text-teal-500 mb-2">Breakdown QoL Score</h3>';
+        html += '<ul class="space-y-1 list-none pl-0 text-sm">';
 
         for (const [category, info] of Object.entries(data.categories)) {
             const score = Number(info.total);
@@ -238,23 +283,25 @@ document.addEventListener("DOMContentLoaded", () => {
             if (score > 0) scoreClass = 'text-green-600';
             else if (score < 0) scoreClass = 'text-red-600';
 
-            let scoreSign = score > 0 ? '+' : '';
+            const scoreSign = score > 0 ? '+' : '';
             html += `
-            <h3 class="font-semibold mt-3 dark:text-teal-600">
-                ${category}: <span class="${scoreClass}">${scoreSign}${score}</span>
-            </h3>`;
+                <li class="font-semibold dark:text-teal-600">
+                    - ${category}: <span class="${scoreClass}">${scoreSign}${score}</span>
+                </li>`;
         }
+
+        html += '</ul>';
 
         const totalScore = Number(data.total_score);
         let totalClass = 'text-slate-400';
         if (totalScore > 0) totalClass = 'text-green-600';
         else if (totalScore < 0) totalClass = 'text-red-600';
 
-        let totalSign = totalScore > 0 ? '+' : '';
+        const totalSign = totalScore > 0 ? '+' : '';
         html += `
-        <h3 class="font-bold mt-4 dark:text-teal-600">
+        <p class="font-bold mt-4 dark:text-teal-600">
             Total QoL: <span class="${totalClass}">${totalSign}${totalScore}</span>
-        </h3>`;
+        </p>`;
 
         return html;
     }
@@ -279,33 +326,45 @@ document.addEventListener("DOMContentLoaded", () => {
             return;
         }
 
+        const eventModifiers = data.event_modifiers || {};
+        const categoryKeys = {
+            Safety: 'safety',
+            Recreation: 'recreation',
+            Environment: 'environment',
+            Amenities: 'amenities',
+            Mobility: 'mobility',
+        };
+
         let html = '';
         for (const [categoryName, info] of Object.entries(data.categories)) {
-            const totalScore = Number(info.total);
-            let catClass = 'text-slate-400';
-            if (totalScore > 0) catClass = 'text-green-600';
-            else if (totalScore < 0) catClass = 'text-red-600';
+            const cellScore = Number(info.total);
+            const eventScore = Number(eventModifiers[categoryKeys[categoryName]] || 0);
+            const displayScore = cellScore + eventScore;
 
-            let catSign = totalScore > 0 ? '+' : '';
+            let scoreClass = 'text-slate-400';
+            if (displayScore > 0) scoreClass = 'text-green-600';
+            else if (displayScore < 0) scoreClass = 'text-red-600';
+
+            const scoreSign = displayScore > 0 ? '+' : '';
             html += `
                 <div class="mb-2 last:mb-0 w-full">
                     <div class="flex justify-between items-center gap-8">
                         <span class="text-slate-200 font-medium text-sm">${categoryName}</span>
-                        <span class="${catClass} font-bold text-sm">${catSign}${totalScore}</span>
+                        <span class="${scoreClass} font-bold text-sm">${scoreSign}${displayScore}</span>
                     </div>
                 </div>`;
         }
 
-        const finalTotal = Number(data.total_score);
+        const cellTotal = Number(data.total_score);
         let totalClass = 'text-slate-400';
-        if (finalTotal > 0) totalClass = 'text-green-600';
-        else if (finalTotal < 0) totalClass = 'text-red-600';
+        if (cellTotal > 0) totalClass = 'text-green-600';
+        else if (cellTotal < 0) totalClass = 'text-red-600';
 
-        let totalSign = finalTotal > 0 ? '+' : '';
+        const totalSign = cellTotal > 0 ? '+' : '';
         html += `
             <div class="flex justify-between items-center mt-3 pt-2 border-t border-slate-600/50 w-full">
                 <span class="text-slate-300 font-bold text-xs uppercase tracking-wider">Total QoL:</span>
-                <span class="${totalClass} font-extrabold text-base">${totalSign}${finalTotal}</span>
+                <span class="${totalClass} font-extrabold text-base">${totalSign}${cellTotal}</span>
             </div>`;
 
         neighborsList.innerHTML = html;
@@ -337,6 +396,7 @@ document.addEventListener("DOMContentLoaded", () => {
         });
     });
 
+    // === HIER ZIT DE GECORRIGEERDE CELLS LUS ===
     cells.forEach(cell => {
         cell.addEventListener("dragstart", e => {
             const img = cell.querySelector(".grid-function-icon");
@@ -367,11 +427,8 @@ document.addEventListener("DOMContentLoaded", () => {
 
             if (isOccupied) {
                 const wantsToReplace = window.confirm("Are you sure you want to replace this feature?");
-                
                 if (!wantsToReplace) {
-                    if (sourceCell) {
-                        sourceCell.classList.remove("drag-source");
-                    }
+                    if (sourceCell) sourceCell.classList.remove("drag-source");
                     return; 
                 }
             }
@@ -380,7 +437,6 @@ document.addEventListener("DOMContentLoaded", () => {
             const newCol = cell.dataset.col;
             let oldRow = null;
             let oldCol = null;
-
             const originalSourceCell = sourceCell;
 
             if (sourceCell) {
@@ -403,11 +459,11 @@ document.addEventListener("DOMContentLoaded", () => {
 
             const deleteBtn = document.createElement("button");
             deleteBtn.type = "button";
-            deleteBtn.className =
-                "delete-btn absolute top-[2px] right-[2px] bg-red-600/80 text-white w-5 h-5 text-[14px] rounded cursor-pointer flex items-center justify-center";
+            deleteBtn.className = "delete-btn absolute top-[2px] right-[2px] bg-red-600/80 text-white w-5 h-5 text-[14px] rounded cursor-pointer flex items-center justify-center";
             const deleteText = `Remove ${draggedItem.name} from grid cell`;
             deleteBtn.setAttribute("aria-label", deleteText);
             deleteBtn.setAttribute("title", deleteText);
+            
             const srText = document.createElement("span");
             srText.className = "sr-only";
             srText.textContent = deleteText;
@@ -441,7 +497,6 @@ document.addEventListener("DOMContentLoaded", () => {
                             originalSourceCell.innerHTML = `<img src="${draggedItem.image}" alt="${draggedItem.name}" data-function-id="${draggedItem.id}" class="grid-function-icon object-contain"><button class="delete-btn absolute top-[2px] right-[2px] bg-red-600/80 text-white w-5 h-5 text-[14px] rounded cursor-pointer flex items-center justify-center">✖</button>`;
                             originalSourceCell.setAttribute('draggable', 'true');
                         }
-
                         cell.innerHTML = "";
                         cell.removeAttribute('draggable');
                         updateQoL();
@@ -452,14 +507,12 @@ document.addEventListener("DOMContentLoaded", () => {
                         originalSourceCell.innerHTML = `<img src="${draggedItem.image}" alt="${draggedItem.name}" data-function-id="${draggedItem.id}" class="grid-function-icon object-contain"><button class="delete-btn absolute top-[2px] right-[2px] bg-red-600/80 text-white w-5 h-5 text-[14px] rounded cursor-pointer flex items-center justify-center">✖</button>`;
                         originalSourceCell.setAttribute('draggable', 'true');
                     }
-
                     cell.innerHTML = "";
                     cell.removeAttribute('draggable');
                     updateQoL();
                     return;
                 }
             }
-
             updateQoL();
         });
 
@@ -469,14 +522,19 @@ document.addEventListener("DOMContentLoaded", () => {
         cell.addEventListener('mouseenter', (event) => {
             const row = parseInt(cell.dataset.row);
             const col = parseInt(cell.dataset.col);
-            hoverTimer = setTimeout(() => { handleTileHover(row, col, event); }, HOVER_DELAY_MS);
+            clearTimeout(hoverTimer); 
+            hoverTimer = setTimeout(() => { 
+                handleTileHover(row, col, event); 
+            }, HOVER_DELAY_MS);
         });
 
-        cell.addEventListener('mouseleave', () => { clearTimeout(hoverTimer); hidePopup(); });
-    });
+        cell.addEventListener('mouseleave', () => { 
+            clearTimeout(hoverTimer); 
+            hidePopup(); 
+        });
+    }); // <-- Dit sloot in jouw code de cells-loop niet af! Nu wel.
 
     const undoBtn = document.getElementById("undo-btn");
-
     if (undoBtn) {
         undoBtn.addEventListener("click", async () => {
             if (!lastAction) return;
@@ -532,8 +590,6 @@ document.addEventListener("DOMContentLoaded", () => {
     });
 
     // === INITIËLE CALLS BIJ PAGINA LOAD ===
-    updateQoL();
-    updateActiveEvents(); // <-- Roept de nieuwe event logica aan bij het laden
 
     const undoButtonAlternative = document.getElementById('undoButton');
     if (undoButtonAlternative) {
@@ -547,7 +603,6 @@ document.addEventListener("DOMContentLoaded", () => {
             })
             .then(res => res.json())
             .then(data => {
-                console.log("UNDO RESPONSE:", data);
                 if (!data.success) return;
 
                 const targetCell = document.querySelector(

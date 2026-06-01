@@ -3,6 +3,7 @@
 namespace App\Http\Controllers;
 
 use App\Models\SimulationEvent;
+use App\Services\EventModifierService;
 use Illuminate\Http\Request;
 use Carbon\Carbon; 
 
@@ -47,7 +48,7 @@ class SimulationEventController extends Controller
             'recurring_schedule' => 'required_if:type,recurring|nullable|string',
         ]);
 
-        SimulationEvent::create($validated);
+        SimulationEvent::create(EventModifierService::normalizeEventMoments($validated));
 
         return redirect()->route('events.index')->with('success', 'Event created successfully.');
     }
@@ -74,7 +75,7 @@ class SimulationEventController extends Controller
             'recurring_schedule' => 'required_if:type,recurring|nullable|string',
         ]);
 
-        $event->update($validated);
+        $event->update(EventModifierService::normalizeEventMoments($validated));
 
         return redirect()->route('events.index')->with('success', 'Event updated successfully.');
     }
@@ -89,62 +90,48 @@ class SimulationEventController extends Controller
         return redirect()->route('events.index')->with('success', 'Event deleted successfully.');
     }
 
-   public function active()
+    public function active()
     {
-        $now = Carbon::now('Europe/Amsterdam');
+        $now = EventModifierService::now();
 
-        $events = SimulationEvent::with('effects')
-            ->get()
-            ->map(function ($event) use ($now) {
-                
-                // Dwing Laravel om de meest recente effects uit de database te trekken (voorkomt cache-smetjes)
-                $event->load('effects'); 
-
-                $isActive = false;
+        $events = EventModifierService::getActiveEvents()
+            ->map(function (SimulationEvent $event) use ($now) {
                 $timing = '';
 
-                // Check voor one-off events
-                if ($event->type === 'one-off' && $event->start_moment && $event->end_moment) {
-                    $start = Carbon::parse($event->start_moment, 'Europe/Amsterdam');
-                    $end = Carbon::parse($event->end_moment, 'Europe/Amsterdam');
-
-                    if ($now->between($start, $end)) {
-                        $isActive = true;
-                        $mins = round($now->diffInMinutes($end));
-                        $timing = 'Ends in ' . $mins . ' min';
-                    }
+                if ($event->type === 'one-off' && $event->end_moment) {
+                    $end = EventModifierService::parseMoment($event->end_moment);
+                    $mins = max(0, (int) round($now->diffInMinutes($end, false)));
+                    $timing = 'Ends in ' . $mins . ' min';
                 }
 
-                // Check voor recurring events
                 if ($event->type === 'recurring') {
-                    $isActive = true; 
                     $timing = 'Pattern: ' . ($event->recurring_schedule ?? 'unknown');
                 }
 
-                if (!$isActive) {
-                    return null;
-                }
-
-                // Haal de categorieën en waarden op
-                $modifiers = $event->effects->pluck('value', 'category');
+                $modifiers = $event->effects->mapWithKeys(function ($effect) {
+                    return [strtolower($effect->category) => (float) $effect->value];
+                });
 
                 return [
                     'id' => $event->id,
                     'name' => $event->name,
                     'type' => $event->type,
                     'timing' => $timing,
-                    'end_at' => $event->end_moment ? Carbon::parse($event->end_moment, 'Europe/Amsterdam')->timestamp : null,
-                    // Forceert altijd een JSON-object {}, ook als deze leeg is
-                    'modifiers' => $modifiers->isEmpty() ? (object)[] : $modifiers->toArray(),
+                    'end_at' => $event->end_moment
+                        ? EventModifierService::parseMoment($event->end_moment)->timestamp
+                        : null,
+                    'ends_at_display' => $event->end_moment
+                        ? EventModifierService::formatForDisplay($event->end_moment)
+                        : null,
+                    'modifiers' => $modifiers->isEmpty() ? (object) [] : $modifiers->toArray(),
                 ];
             })
-            ->filter()  
-            ->values(); 
+            ->values();
 
         return response()->json([
             'status' => 'success',
             'timestamp' => $now->toIso8601String(),
-            'events' => $events
+            'events' => $events,
         ]);
     }
 }

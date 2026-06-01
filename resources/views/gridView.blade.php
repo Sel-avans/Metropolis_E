@@ -146,19 +146,20 @@
             <div id="breakdown-qol-score">
             </div>
 
-          <div class="p-4 bg-slate-900 text-white">
-            <h3 class="text-lg font-bold text-emerald-400 mb-3">Active Events</h3>
-            
-            <div id="active-events-empty" class="text-gray-400 text-sm">
-                No active events right now.
-            </div>
+          <div class="p-4 bg-slate-900 text-white rounded-lg border border-gray-700">
+                <h3 class="text-lg font-bold text-emerald-400 mb-3">Active Events</h3>
 
-            <ul id="active-events-list" class="mt-2"></ul>
-        </div>
+                <div id="active-events-empty" class="text-gray-400 text-sm italic {{ ($activeEvents ?? collect())->isNotEmpty() ? 'hidden' : '' }}">
+                    No active events right now.
+                </div>
+
+                <ul id="active-events-list" class="space-y-3"></ul>
+            </div>
 
         </div>
 
     </div>
+
 
     <div id="qol-popup" class="absolute z-50 bg-slate-800/95 text-slate-50 border border-slate-600 rounded-lg p-3 shadow-lg min-w-[200px] pointer-events-none opacity-0 scale-95 transition-all duration-150 hidden">
         <div class="font-bold border-b border-slate-600 pb-1.5 mb-2 text-[10px] uppercase tracking-wider text-slate-300">

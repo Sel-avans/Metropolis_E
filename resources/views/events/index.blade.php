@@ -81,8 +81,15 @@
                                     <td class="px-5 py-5 border-b border-gray-200 bg-white text-sm">
                                         @if($event->type === 'one-off')
                                             <p class="text-gray-900 whitespace-no-wrap">
-                                                From: {{ \Carbon\Carbon::parse($event->start_moment)->format('d-m-Y H:i') }} <br>
-                                                To: {{ \Carbon\Carbon::parse($event->end_moment)->format('d-m-Y H:i') }}
+                                                From: {{ \App\Services\EventModifierService::formatForDisplay($event->start_moment) }}<br>
+                                                To: {{ \App\Services\EventModifierService::formatForDisplay($event->end_moment) }}
+                                                <span class="text-xs text-gray-500">(Nederlandse tijd)</span>
+                                            </p>
+                                            @php
+                                                $isActive = \App\Services\EventModifierService::isActive($event);
+                                            @endphp
+                                            <p class="text-xs mt-1 {{ $isActive ? 'text-green-600 font-semibold' : 'text-gray-500' }}">
+                                                {{ $isActive ? 'Nu actief' : 'Niet actief' }}
                                             </p>
                                         @else
                                             <p class="text-gray-900 whitespace-no-wrap">

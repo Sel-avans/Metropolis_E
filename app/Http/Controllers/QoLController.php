@@ -5,14 +5,16 @@ namespace App\Http\Controllers;
 use App\Models\GridCell;
 use App\Models\Condition;
 use App\Models\AdjacencyRule;
+use App\Services\EventModifierService;
 
 class QoLController extends Controller
 {
     public function details()
     {
         $cells = GridCell::with('function.effects')->get();
+        $occupiedCells = $cells->filter(fn ($cell) => $cell->function_id && $cell->function);
 
-        if ($cells->whereNotNull('function_id')->isEmpty()) {
+        if ($occupiedCells->isEmpty()) {
             return response()->json([
                 'categories' => [
                     'Safety'      => ['total' => 0, 'items' => []],
@@ -21,18 +23,19 @@ class QoLController extends Controller
                     'Amenities'   => ['total' => 0, 'items' => []],
                     'Mobility'    => ['total' => 0, 'items' => []],
                 ],
-                'total_score' => 0
+                'total_score' => 0,
             ]);
         }
-    
+
         $conditions = Condition::with(['functionA', 'functionB'])->get();
+        $eventModifiers = EventModifierService::getModifiersByCategory();
 
         $categories = [
             'safety'      => [],
             'recreation'  => [],
             'environment' => [],
             'amenities'   => [],
-            'mobility'    => []
+            'mobility'    => [],
         ];
 
         $totals = [
@@ -40,109 +43,58 @@ class QoLController extends Controller
             'recreation'  => 0,
             'environment' => 0,
             'amenities'   => 0,
-            'mobility'    => 0
+            'mobility'    => 0,
         ];
 
-        foreach ($cells as $cell) {
-            if (!$cell->function_id || !$cell->function) continue;
+        $functionBaseByCategory = array_fill_keys(array_keys($totals), 0);
+        $discard = [];
 
-            foreach ($cell->function->effects as $effect) {
-                $catKey = strtolower($effect->category);
-                if (isset($totals[$catKey])) {
-                    $categories[$catKey][] = [
-                        'function' => $cell->function->name,
-                        'value'    => $effect->value
-                    ];
-                    $totals[$catKey] += $effect->value;
+        foreach ($occupiedCells as $cell) {
+            $cellTotals = $this->computeCellTotals($cell, $cells, $conditions, $discard);
+
+            foreach ($cellTotals as $catKey => $value) {
+                $totals[$catKey] += $value;
+            }
+
+            foreach ($eventModifiers as $catKey => $value) {
+                if ($value != 0 && isset($totals[$catKey])) {
+                    $totals[$catKey] += $value;
                 }
             }
         }
 
-        foreach ($cells as $cell) {
-            if (!$cell->function) continue;
-
-            $funcA = $cell->function;
-            $neighbors = $this->getNeighbors($cell, $cells);
-
-            foreach ($neighbors as $neighbor) {
-                if (!$neighbor->function) continue;
-
-                $funcB = $neighbor->function;
-
-                $isFirst =
-                    ($cell->row < $neighbor->row) ||
-                    ($cell->row == $neighbor->row && $cell->col < $neighbor->col);
-
-                if (!$isFirst) {
-                    continue;
-                }
-
-                $catA = strtolower($funcA->category);
-                $catB = strtolower($funcB->category);
-
-                $conditionExists = $conditions->first(function ($c) use ($funcA, $funcB) {
-                    return $c->function_a == min($funcA->id, $funcB->id)
-                        && $c->function_b == max($funcA->id, $funcB->id);
-                });
-
-                if (!$conditionExists && $catA === $catB) {
-                    if (isset($totals[$catA])) {
-                        $categories[$catA][] = [
-                            'function' => "{$funcA->name} next to {$funcB->name} (same category)",
-                            'value'    => 2
-                        ];
-                        $totals[$catA] += 2;
-                    }
-                }
-
-                $condition = $conditions
-                    ->filter(fn($c) =>
-                        ($c->function_a == $funcA->id && $c->function_b == $funcB->id) ||
-                        ($c->function_a == $funcB->id && $c->function_b == $funcA->id)
-                    )
-                    ->whereIn('type', ['bonus', 'penalty'])
-                    ->sortByDesc('value')
-                    ->first();
-
-                if ($condition) {
-                    $chosenCat = $funcA->id < $funcB->id ? $catA : $catB;
-                    $value = $condition->value ?? 0;
-
-                    if (isset($totals[$chosenCat])) {
-                        $categories[$chosenCat][] = [
-                            'function' => "{$funcA->name} next to {$funcB->name} ({$condition->type})",
-                            'value'    => $value
-                        ];
-                        $totals[$chosenCat] += $value;
-                    }
-                }
-
-                $isSensitiveA = $funcA->sensitivity === 'sensitive';
-                $isSensitiveB = $funcB->sensitivity === 'sensitive';
-
-                $isPollutingA = $funcA->pollution === 'polluting';
-                $isPollutingB = $funcB->pollution === 'polluting';
-
-                if ($isSensitiveA && $isPollutingB) {
-                    if (isset($totals[$catA])) {
-                        $categories[$catA][] = [
-                            'function' => "{$funcA->name} next to {$funcB->name} (penalty)",
-                            'value'    => -2
-                        ];
-                        $totals[$catA] -= 2;
-                    }
-                }
-
-                if ($isSensitiveB && $isPollutingA) {
-                    if (isset($totals[$catB])) {
-                        $categories[$catB][] = [
-                            'function' => "{$funcB->name} next to {$funcA->name} (penalty)",
-                            'value'    => -2
-                        ];
-                        $totals[$catB] -= 2;
-                    }
+        foreach ($occupiedCells as $cell) {
+            foreach ($cell->function->effects as $effect) {
+                $catKey = strtolower($effect->category);
+                if (isset($functionBaseByCategory[$catKey])) {
+                    $functionBaseByCategory[$catKey] += $effect->value;
                 }
             }
+        }
+
+        foreach ($functionBaseByCategory as $catKey => $sum) {
+            if ($sum === 0) {
+                continue;
+            }
+
+            $categories[$catKey][] = [
+                'function' => 'Functies',
+                'value'    => $sum,
+            ];
+        }
+
+        foreach (EventModifierService::getModifierBreakdown() as $modifier) {
+            $catKey = $modifier['category'];
+            $value = $modifier['value'] * $occupiedCells->count();
+
+            if ($value == 0 || !isset($categories[$catKey])) {
+                continue;
+            }
+
+            $categories[$catKey][] = [
+                'function' => "{$modifier['event_name']} (event)",
+                'value'    => $value,
+            ];
         }
 
         return response()->json([
@@ -153,7 +105,7 @@ class QoLController extends Controller
                 'Amenities'   => ['total' => $totals['amenities'],   'items' => $categories['amenities']],
                 'Mobility'    => ['total' => $totals['mobility'],    'items' => $categories['mobility']],
             ],
-            'total_score' => array_sum($totals)
+            'total_score' => array_sum($totals),
         ]);
     }
 
@@ -168,96 +120,157 @@ class QoLController extends Controller
             return response()->json(['categories' => [], 'total_score' => 0]);
         }
 
-        $funcA = $targetCell->function;
-        $neighbors = $this->getNeighbors($targetCell, $cells);
+        $discard = [];
+        $totals = $this->computeCellTotals($targetCell, $cells, $conditions, $discard);
 
+        $eventModifiers = EventModifierService::getModifiersByCategory();
+        $perCellTotal = array_sum($totals) + array_sum($eventModifiers);
+
+        return response()->json([
+            'categories' => [
+                'Safety'      => ['total' => $totals['safety']],
+                'Recreation'  => ['total' => $totals['recreation']],
+                'Environment' => ['total' => $totals['environment']],
+                'Amenities'   => ['total' => $totals['amenities']],
+                'Mobility'    => ['total' => $totals['mobility']],
+            ],
+            'event_modifiers' => $eventModifiers,
+            'total_score' => $perCellTotal,
+        ]);
+    }
+
+    /**
+     * @param  \Illuminate\Support\Collection<int, GridCell>  $cells
+     * @param  array<string, array<int, array{function: string, value: int|float}|string>>  $items
+     * @return array<string, int|float>
+     */
+    private function computeCellTotals($cell, $cells, $conditions, array &$items): array
+    {
         $totals = [
             'safety'      => 0,
             'recreation'  => 0,
             'environment' => 0,
             'amenities'   => 0,
-            'mobility'    => 0
+            'mobility'    => 0,
         ];
-        
-        $breakdown = [];
+
+        if (!$cell->function) {
+            return $totals;
+        }
+
+        $funcA = $cell->function;
 
         foreach ($funcA->effects as $effect) {
             $catKey = strtolower($effect->category);
             if (isset($totals[$catKey])) {
                 $totals[$catKey] += $effect->value;
-                $breakdown[$catKey][] = "Basiswaarde: {$effect->value}";
             }
         }
 
-        foreach ($neighbors as $neighbor) {
-            if (!$neighbor->function) continue;
-
-            $funcB = $neighbor->function;
-            $catA = strtolower($funcA->category);
-            $catB = strtolower($funcB->category);
-
-            if ($catA === $catB) {
-                if (isset($totals[$catA])) {
-                    $totals[$catA] += 2;
-                    $breakdown[$catA][] = "{$funcB->name} (Zelfde categorie: +2)";
-                }
+        foreach ($this->getNeighbors($cell, $cells) as $neighbor) {
+            if (!$neighbor->function) {
+                continue;
             }
 
-            $condition = $conditions->filter(fn($c) =>
+            $isFirst =
+                ($cell->row < $neighbor->row) ||
+                ($cell->row == $neighbor->row && $cell->col < $neighbor->col);
+
+            if (!$isFirst) {
+                continue;
+            }
+
+            $this->applyAdjacencyBetween(
+                $funcA,
+                $neighbor->function,
+                $conditions,
+                $totals,
+                $items,
+                true
+            );
+        }
+
+        return $totals;
+    }
+
+    /**
+     * @param  array<string, int|float>  $totals
+     * @param  array<string, array<int, array{function: string, value: int|float}|string>>  $items
+     */
+    private function applyAdjacencyBetween(
+        $funcA,
+        $funcB,
+        $conditions,
+        array &$totals,
+        array &$items,
+        bool $hoverStrings = false
+    ): void {
+        $catA = strtolower($funcA->category);
+        $catB = strtolower($funcB->category);
+
+        $conditionExists = $conditions->first(function ($c) use ($funcA, $funcB) {
+            return $c->function_a == min($funcA->id, $funcB->id)
+                && $c->function_b == max($funcA->id, $funcB->id);
+        });
+
+        if (!$conditionExists && $catA === $catB && isset($totals[$catA])) {
+            $totals[$catA] += 2;
+            $items[$catA][] = $hoverStrings
+                ? "{$funcB->name} (Zelfde categorie: +2)"
+                : [
+                    'function' => "{$funcA->name} next to {$funcB->name} (same category)",
+                    'value' => 2,
+                ];
+        }
+
+        $condition = $conditions
+            ->filter(fn ($c) =>
                 ($c->function_a == $funcA->id && $c->function_b == $funcB->id) ||
                 ($c->function_a == $funcB->id && $c->function_b == $funcA->id)
-            )->whereIn('type', ['bonus', 'penalty'])->sortByDesc('value')->first();
+            )
+            ->whereIn('type', ['bonus', 'penalty'])
+            ->sortByDesc('value')
+            ->first();
 
-            if ($condition) {
-                $chosenCat = $funcA->id < $funcB->id ? $catA : $catB;
-                $value = $condition->value ?? 0;
-                if (isset($totals[$chosenCat])) {
-                    $totals[$chosenCat] += $value;
-                    $breakdown[$chosenCat][] = "{$funcB->name} ({$condition->type})";
-                }
-            }
+        if ($condition) {
+            $chosenCat = $funcA->id < $funcB->id ? $catA : $catB;
+            $value = $condition->value ?? 0;
 
-            $isSensitiveA = $funcA->sensitivity === 'sensitive';
-            $isSensitiveB = $funcB->sensitivity === 'sensitive';
-            $isPollutingA = $funcA->pollution === 'polluting';
-            $isPollutingB = $funcB->pollution === 'polluting';
-
-            if ($isSensitiveA && $isPollutingB) {
-                if (isset($totals[$catA])) {
-                    $totals[$catA] -= 2;
-                    $breakdown[$catA][] = "Hinder van {$funcB->name}";
-                }
-            }
-            if ($isSensitiveB && $isPollutingA) {
-                if (isset($totals[$catB])) {
-                    $totals[$catB] -= 2;
-                    $breakdown[$catB][] = "Hinder bij {$funcB->name}";
-                }
+            if (isset($totals[$chosenCat])) {
+                $totals[$chosenCat] += $value;
+                $items[$chosenCat][] = $hoverStrings
+                    ? "{$funcB->name} ({$condition->type})"
+                    : [
+                        'function' => "{$funcA->name} next to {$funcB->name} ({$condition->type})",
+                        'value' => $value,
+                    ];
             }
         }
 
-        $categoryMapping = [
-            'safety'      => 'Safety',
-            'recreation'  => 'Recreation',
-            'environment' => 'Environment',
-            'amenities'   => 'Amenities',
-            'mobility'    => 'Mobility',
-        ];
+        $isSensitiveA = $funcA->sensitivity === 'sensitive';
+        $isSensitiveB = $funcB->sensitivity === 'sensitive';
+        $isPollutingA = $funcA->pollution === 'polluting';
+        $isPollutingB = $funcB->pollution === 'polluting';
 
-        $formattedCategories = [];
-        foreach ($totals as $key => $total) {
-            if ($total !== 0 || !empty($breakdown[$key])) {
-                $formattedCategories[$categoryMapping[$key]] = [
-                    'total' => $total,
-                    'items' => $breakdown[$key] ?? []
+        if ($isSensitiveA && $isPollutingB && isset($totals[$catA])) {
+            $totals[$catA] -= 2;
+            $items[$catA][] = $hoverStrings
+                ? "Hinder van {$funcB->name}"
+                : [
+                    'function' => "{$funcA->name} next to {$funcB->name} (penalty)",
+                    'value' => -2,
                 ];
-            }
         }
 
-        return response()->json([
-            'categories'  => $formattedCategories,
-            'total_score' => array_sum($totals)
-        ]);
+        if ($isSensitiveB && $isPollutingA && isset($totals[$catB])) {
+            $totals[$catB] -= 2;
+            $items[$catB][] = $hoverStrings
+                ? "Hinder bij {$funcB->name}"
+                : [
+                    'function' => "{$funcB->name} next to {$funcA->name} (penalty)",
+                    'value' => -2,
+                ];
+        }
     }
 
     private function getNeighbors($cell, $allCells)
