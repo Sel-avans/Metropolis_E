@@ -90,60 +90,61 @@ class SimulationEventController extends Controller
     }
 
    public function active()
-{
-    $now = Carbon::now('Europe/Amsterdam');
+    {
+        $now = Carbon::now('Europe/Amsterdam');
 
-    $events = SimulationEvent::with('effects')
-        ->get()
-        ->map(function ($event) use ($now) {
-            
-            // Dwing Laravel om de meest recente effects uit de database te trekken (voorkomt cache-smetjes)
-            $event->load('effects'); 
+        $events = SimulationEvent::with('effects')
+            ->get()
+            ->map(function ($event) use ($now) {
+                
+                // Dwing Laravel om de meest recente effects uit de database te trekken (voorkomt cache-smetjes)
+                $event->load('effects'); 
 
-            $isActive = false;
-            $timing = '';
+                $isActive = false;
+                $timing = '';
 
-            // Check voor one-off events
-            if ($event->type === 'one-off' && $event->start_moment && $event->end_moment) {
-                $start = Carbon::parse($event->start_moment, 'Europe/Amsterdam');
-                $end = Carbon::parse($event->end_moment, 'Europe/Amsterdam');
+                // Check voor one-off events
+                if ($event->type === 'one-off' && $event->start_moment && $event->end_moment) {
+                    $start = Carbon::parse($event->start_moment, 'Europe/Amsterdam');
+                    $end = Carbon::parse($event->end_moment, 'Europe/Amsterdam');
 
-                if ($now->between($start, $end)) {
-                    $isActive = true;
-                    $mins = round($now->diffInMinutes($end));
-                    $timing = 'Ends in ' . $mins . ' min';
+                    if ($now->between($start, $end)) {
+                        $isActive = true;
+                        $mins = round($now->diffInMinutes($end));
+                        $timing = 'Ends in ' . $mins . ' min';
+                    }
                 }
-            }
 
-            // Check voor recurring events
-            if ($event->type === 'recurring') {
-                $isActive = true; 
-                $timing = 'Pattern: ' . ($event->recurring_schedule ?? 'unknown');
-            }
+                // Check voor recurring events
+                if ($event->type === 'recurring') {
+                    $isActive = true; 
+                    $timing = 'Pattern: ' . ($event->recurring_schedule ?? 'unknown');
+                }
 
-            if (!$isActive) {
-                return null;
-            }
+                if (!$isActive) {
+                    return null;
+                }
 
-            // Haal de categorieën en waarden op
-            $modifiers = $event->effects->pluck('value', 'category');
+                // Haal de categorieën en waarden op
+                $modifiers = $event->effects->pluck('value', 'category');
 
-            return [
-                'id' => $event->id,
-                'name' => $event->name,
-                'type' => $event->type,
-                'timing' => $timing,
-                // Forceert altijd een JSON-object {}, ook als deze leeg is
-                'modifiers' => $modifiers->isEmpty() ? (object)[] : $modifiers->toArray(),
-            ];
-        })
-        ->filter()  
-        ->values(); 
+                return [
+                    'id' => $event->id,
+                    'name' => $event->name,
+                    'type' => $event->type,
+                    'timing' => $timing,
+                    'end_at' => $event->end_moment ? Carbon::parse($event->end_moment, 'Europe/Amsterdam')->timestamp : null,
+                    // Forceert altijd een JSON-object {}, ook als deze leeg is
+                    'modifiers' => $modifiers->isEmpty() ? (object)[] : $modifiers->toArray(),
+                ];
+            })
+            ->filter()  
+            ->values(); 
 
-    return response()->json([
-        'status' => 'success',
-        'timestamp' => $now->toIso8601String(),
-        'events' => $events
-    ]);
-}
+        return response()->json([
+            'status' => 'success',
+            'timestamp' => $now->toIso8601String(),
+            'events' => $events
+        ]);
+    }
 }

@@ -22,7 +22,8 @@ document.addEventListener("DOMContentLoaded", () => {
     const popup = document.getElementById('qol-popup');
     const neighborsList = document.getElementById('popup-neighbors-list');
 
-    // === NIEUW: Functie om actieve events op te halen en te tonen ===
+    let eventTimerInterval = null;
+
     async function updateActiveEvents() {
         const listEl = document.getElementById('active-events-list');
         const emptyEl = document.getElementById('active-events-empty');
@@ -31,30 +32,107 @@ document.addEventListener("DOMContentLoaded", () => {
 
         try {
             const response = await fetch('/events/active');
+            if (!response.ok) return;
+
             const data = await response.json();
+            if (!data || !data.events) return;
 
-            // data.events is dankzij de ->values() in de controller nu een schone array
-            if (data.events && data.events.length > 0) {
+            if (data.events.length > 0) {
                 emptyEl.classList.add('hidden');
-                listEl.innerHTML = ''; // Maak de lijst leeg
+                listEl.innerHTML = ''; 
 
-                data.events.forEach(event => {
+                const activeTimers = [];
+
+                data.events.forEach((event, index) => {
                     const li = document.createElement('li');
-                    li.className = "p-2 bg-purple-100 dark:bg-purple-950/40 border border-purple-300 dark:border-purple-800 rounded shadow-sm";
+                    li.className = "p-3 bg-purple-100 dark:bg-purple-950/40 border border-purple-300 dark:border-purple-800 rounded shadow-sm mb-2";
+                    
+                    const timerId = `event-timer-${index}`;
+
                     li.innerHTML = `
-                        <div class="font-semibold text-purple-900 dark:text-purple-300">${event.name}</div>
-                        <div class="text-xs text-gray-600 dark:text-gray-400">${event.timing}</div>
+                        <div class="font-semibold text-purple-900 dark:text-purple-300">${event.name || 'Naamloos event'}</div>
+                        <div id="${timerId}" class="text-xs text-gray-600 dark:text-gray-400 font-mono mt-1">
+                            Laden...
+                        </div>
                     `;
                     listEl.appendChild(li);
+
+                    // Als end_at aanwezig is, gaan we de timer instellen
+                    if (event.end_at) {
+                        let endTimeMs = 0;
+                        if (typeof event.end_at === 'number' || (!isNaN(event.end_at) && !isNaN(parseFloat(event.end_at)))) {
+                            endTimeMs = Number(event.end_at) * 1000;
+                        } else {
+                            const formattedString = event.end_at.replace(' ', 'T');
+                            endTimeMs = new Date(formattedString).getTime();
+                        }
+
+                        if (!isNaN(endTimeMs) && endTimeMs > 0) {
+                            activeTimers.push({
+                                elementId: timerId,
+                                endTimeMs: endTimeMs
+                            });
+                        }
+                    } else {
+                        document.getElementById(timerId).textContent = "Geen eindtijd bekend";
+                    }
                 });
+
+                if (activeTimers.length > 0) {
+                    if (eventTimerInterval) clearInterval(eventTimerInterval);
+
+                    const tick = () => {
+                        const nowMs = new Date().getTime();
+                        let activeCount = 0;
+
+                        activeTimers.forEach(timer => {
+                            const timerEl = document.getElementById(timer.elementId);
+                            if (!timerEl) return;
+
+                            const distance = timer.endTimeMs - nowMs;
+
+                            if (distance <= 0) {
+                                timerEl.textContent = "Finished";
+                                timerEl.className = "text-xs text-red-500 font-bold mt-1";
+                            } else {
+                                activeCount++;
+                                const totalSeconds = Math.floor(distance / 1000);
+                                const minutes = Math.floor(totalSeconds / 60);
+                                const seconds = totalSeconds % 60;
+
+                                const mm = String(minutes).padStart(2, '0');
+                                const ss = String(seconds).padStart(2, '0');
+
+                                timerEl.textContent = `Remaining: ${mm}:${ss}`;
+                            }
+                        });
+
+                        if (activeCount === 0) {
+                            clearInterval(eventTimerInterval);
+                        }
+                    };
+
+                    tick(); 
+                    eventTimerInterval = setInterval(tick, 1000); 
+                }
+
             } else {
                 emptyEl.classList.remove('hidden');
                 listEl.innerHTML = '';
+                if (eventTimerInterval) clearInterval(eventTimerInterval);
             }
         } catch (err) {
-            console.error("Fout bij ophalen actieve events:", err);
+            console.error("Fout bij updaten events:", err);
         }
     }
+
+    // === DE REFRESH-LOZE MOTOR ===
+    // 1. Haal direct bij het laden van de pagina de events op
+    updateActiveEvents();
+
+    // 2. Check ELKE 5 seconden op de achtergrond of er een nieuw event is aangemaakt.
+    // Hierdoor verschijnt je event LIVE op het scherm zonder dat je de pagina refresht!
+    setInterval(updateActiveEvents, 5000);
 
     document.addEventListener("click", async (e) => {
         if (!e.target.classList.contains("delete-btn")) return;
