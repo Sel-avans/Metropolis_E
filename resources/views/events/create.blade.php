@@ -50,7 +50,6 @@
                     </div>
 
                     <div id="one_off_fields" class="mb-4 bg-gray-50 p-4 rounded border">
-                        <p class="text-sm text-gray-600 mb-3">Tijden in <strong>Nederlandse tijd</strong>.</p>
                         <div class="mb-2">
                             <label for="start_moment" class="block text-gray-700 font-bold mb-2">Start Moment</label>
                             <input type="datetime-local" id="start_moment" name="start_moment" 

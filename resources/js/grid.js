@@ -24,6 +24,7 @@ document.addEventListener("DOMContentLoaded", () => {
 
     let eventTimerInterval = null;
     let lastActiveEventSignature = '';
+    const expiredEventTimerIds = new Set();
 
     function formatModifiers(modifiers) {
         if (!modifiers || typeof modifiers !== 'object') {
@@ -79,6 +80,7 @@ document.addEventListener("DOMContentLoaded", () => {
             if (data.events.length > 0) {
                 emptyEl.classList.add('hidden');
                 listEl.innerHTML = '';
+                expiredEventTimerIds.clear();
 
                 const activeTimers = [];
 
@@ -132,7 +134,6 @@ document.addEventListener("DOMContentLoaded", () => {
                     const tick = () => {
                         const nowMs = Date.now();
                         let stillRunning = false;
-                        let anyExpired = false;
 
                         activeTimers.forEach(timer => {
                             const timerEl = document.getElementById(timer.elementId);
@@ -141,9 +142,10 @@ document.addEventListener("DOMContentLoaded", () => {
                             const distance = timer.endTimeMs - nowMs;
 
                             if (distance <= 0) {
-                                timerEl.textContent = "Afgelopen";
-                                timerEl.className = "text-[11px] text-red-500 font-bold mt-1";
-                                anyExpired = true;
+                                if (!expiredEventTimerIds.has(timer.elementId)) {
+                                    expiredEventTimerIds.add(timer.elementId);
+                                    updateActiveEvents({ forceQolRefresh: true });
+                                }
                             } else {
                                 stillRunning = true;
                                 const totalSeconds = Math.floor(distance / 1000);
@@ -153,10 +155,9 @@ document.addEventListener("DOMContentLoaded", () => {
                             }
                         });
 
-                        if (anyExpired && !stillRunning) {
+                        if (!stillRunning) {
                             clearInterval(eventTimerInterval);
                             eventTimerInterval = null;
-                            updateActiveEvents();
                         }
                     };
 

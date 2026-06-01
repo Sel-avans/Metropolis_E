@@ -83,9 +83,9 @@
                                         
                                         @if($event->type === 'one-off')
                                             <div class="text-sm text-gray-900 whitespace-no-wrap">
-                                                <span class="font-semibold">Start:</span> {{ $event->start_moment ? \Carbon\Carbon::parse($event->start_moment)->format('d-m-Y H:i') : 'N/A' }}
+                                                <span class="font-semibold">Start:</span> {{ $event->start_moment ? \App\Services\EventModifierService::formatForDisplay($event->start_moment) : 'N/A' }}
                                                 <br>
-                                                <span class="font-semibold">End:</span> {{ $event->end_moment ? \Carbon\Carbon::parse($event->end_moment)->format('d-m-Y H:i') : 'N/A' }}
+                                                <span class="font-semibold">End:</span> {{ $event->end_moment ? \App\Services\EventModifierService::formatForDisplay($event->end_moment) : 'N/A' }}
                                             </div>
                                         @else
                                             <div class="text-sm text-gray-900 whitespace-no-wrap">

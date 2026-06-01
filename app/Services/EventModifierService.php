@@ -5,6 +5,7 @@ namespace App\Services;
 use App\Models\SimulationEvent;
 use Carbon\Carbon;
 use Illuminate\Support\Collection;
+use Illuminate\Support\Facades\Schema;
 
 class EventModifierService
 {
@@ -87,6 +88,56 @@ class EventModifierService
         }
 
         return $data;
+    }
+
+    /**
+     * @param  array<string, mixed>  $data
+     * @return array<string, mixed>
+     */
+    public static function attributesForPersistence(array $data): array
+    {
+        $data = self::normalizeEventMoments($data);
+
+        $base = [
+            'name' => $data['name'] ?? null,
+            'description' => $data['description'] ?? null,
+            'type' => $data['type'] ?? null,
+        ];
+
+        if (($data['type'] ?? '') === 'one-off') {
+            return array_merge($base, [
+                'start_moment' => $data['start_moment'] ?? null,
+                'end_moment' => $data['end_moment'] ?? null,
+            ], self::clearedRecurringAttributes());
+        }
+
+        return array_merge($base, [
+            'start_moment' => null,
+            'end_moment' => null,
+            'recurring_schedule' => $data['recurring_schedule'] ?? null,
+            'recurring_start_date' => $data['recurring_start_date'] ?? null,
+            'recurring_end_date' => $data['recurring_end_date'] ?? null,
+            'recurring_start_time' => $data['recurring_start_time'] ?? null,
+            'recurring_end_time' => $data['recurring_end_time'] ?? null,
+        ]);
+    }
+
+    /**
+     * @return array<string, null>
+     */
+    private static function clearedRecurringAttributes(): array
+    {
+        if (! Schema::hasColumn('simulation_events', 'recurring_start_date')) {
+            return [];
+        }
+
+        return [
+            'recurring_schedule' => null,
+            'recurring_start_date' => null,
+            'recurring_end_date' => null,
+            'recurring_start_time' => null,
+            'recurring_end_time' => null,
+        ];
     }
 
     public static function isActive(SimulationEvent $event, ?Carbon $now = null): bool

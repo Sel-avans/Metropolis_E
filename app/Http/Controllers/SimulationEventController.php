@@ -52,7 +52,7 @@ class SimulationEventController extends Controller
             'recurring_end_time'   => 'required_if:type,recurring|nullable',
         ]);
 
-        SimulationEvent::create(EventModifierService::normalizeEventMoments($validated));
+        SimulationEvent::create(EventModifierService::attributesForPersistence($validated));
 
         return redirect()->route('events.index')->with('success', 'Event created successfully.');
     }
@@ -83,7 +83,7 @@ class SimulationEventController extends Controller
             'recurring_end_time'   => 'required_if:type,recurring|nullable',
         ]);
 
-        $event->update(EventModifierService::normalizeEventMoments($validated));
+        $event->update(EventModifierService::attributesForPersistence($validated));
 
         return redirect()->route('events.index')->with('success', 'Event updated successfully.');
     }
@@ -102,12 +102,9 @@ class SimulationEventController extends Controller
     {
         $now = EventModifierService::now();
 
-    $events = SimulationEvent::with('effects')
-        ->get()
-        ->map(function ($event) use ($now) {
-            
-            // Dwing Laravel om de meest recente effects uit de database te trekken (voorkomt cache-smetjes)
-             $event->load('effects'); 
+        $events = EventModifierService::getActiveEvents()
+            ->map(function (SimulationEvent $event) use ($now) {
+                $timing = null;
 
                 if ($event->type === 'one-off' && $event->end_moment) {
                     $end = EventModifierService::parseMoment($event->end_moment);
