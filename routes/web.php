@@ -45,8 +45,7 @@ Route::middleware('auth')->group(function () {
 
 Route::resource('conditions', ConditionsController::class)->except(['show']);
 
-
-Route::post('/simulation/change-speed', [SimulationEventController::class, 'changeSpeed']); 
+//
+Route::post('/api/simulation/speed', [SimulationEventController::class, 'changeSpeed']); 
 
 require __DIR__.'/auth.php';
-
