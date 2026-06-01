@@ -8,6 +8,7 @@ use App\Http\Controllers\FunctionController;
 use App\Http\Controllers\EffectsController;
 use App\Http\Controllers\FunctionManagementController;
 use App\Http\Controllers\ConditionsController;
+use App\Http\Controllers\SimulationEventController; 
 
 Route::get('/functions', [FunctionManagementController::class, 'index'])->name('functions.index');
 Route::get('/functions/create', [FunctionManagementController::class, 'create'])->name('functions.create');
@@ -44,4 +45,8 @@ Route::middleware('auth')->group(function () {
 
 Route::resource('conditions', ConditionsController::class)->except(['show']);
 
+
+Route::post('/simulation/change-speed', [SimulationEventController::class, 'changeSpeed']); 
+
 require __DIR__.'/auth.php';
+
