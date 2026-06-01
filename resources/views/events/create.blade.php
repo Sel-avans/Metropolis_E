@@ -134,6 +134,27 @@
 
                     </div>
 
+                    <div class="mt-6 p-4 bg-gray-50 border border-gray-200 rounded-lg">
+                        <h3 class="text-lg font-medium text-gray-900 mb-4">Event Effect (Modifier)</h3>
+                        
+                        <div class="grid grid-cols-1 md:grid-cols-2 gap-4">
+                            <div>
+                                <label for="city_function_id" class="block text-sm font-medium text-gray-700">Target City Function</label>
+                                <select name="city_function_id" id="city_function_id" class="mt-1 block w-full border-gray-300 rounded-md shadow-sm focus:ring-blue-500 focus:border-blue-500">
+                                    <option value="">-- Select a function --</option>
+                                    @foreach($cityFunctions as $function)
+                                        <option value="{{ $function->id }}">{{ $function->name }}</option>
+                                    @endforeach
+                                </select>
+                            </div>
+
+                            <div>
+                                <label for="modifier" class="block text-sm font-medium text-gray-700">Modifier Value (e.g., +5 or -2)</label>
+                                <input type="number" name="modifier" id="modifier" class="mt-1 block w-full border-gray-300 rounded-md shadow-sm focus:ring-blue-500 focus:border-blue-500">
+                            </div>
+                        </div>
+                    </div>
+
                     <div class="flex items-center justify-between mt-8 pt-4 border-t border-gray-200">
                         <a href="{{ route('events.index') }}" class="bg-gray-500 hover:bg-gray-600 text-white font-bold py-2 px-4 rounded focus:outline-none focus:shadow-outline transition-colors">
                              Back

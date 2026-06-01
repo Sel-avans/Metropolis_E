@@ -5,7 +5,7 @@ namespace App\Http\Controllers;
 use App\Models\SimulationEvent;
 use Illuminate\Http\Request;
 use Carbon\Carbon; 
-
+use App\Models\CityFunction;
 class SimulationEventController extends Controller
 {
     /**
@@ -30,7 +30,9 @@ class SimulationEventController extends Controller
      */
     public function create()
     {
-        return view('events.create');
+        $cityFunctions = CityFunction::all();
+
+        return view('events.create', compact('cityFunctions'));
     }
 
     /**
@@ -38,6 +40,9 @@ class SimulationEventController extends Controller
      */
     public function store(Request $request)
     {
+        dd($request->all());
+
+        
         $validated = $request->validate([
             'name' => 'required|string|max:255',
             'description' => 'nullable|string',
