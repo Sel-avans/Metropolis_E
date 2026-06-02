@@ -5,7 +5,7 @@ namespace Tests\Browser;
 use Laravel\Dusk\Browser;
 use Tests\DuskTestCase;
 
-class PlaceFunctionE2ETest extends DuskTestCase
+class GridPlaceFunctionE2ETest extends DuskTestCase
 {
     /**
      * End-to-end: login, navigate to grid, place function, assert QoL updates.
