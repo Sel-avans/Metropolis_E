@@ -89,15 +89,15 @@ document.addEventListener("DOMContentLoaded", () => {
                     const timerId = `event-timer-${index}`;
                     const modifiersHtml = formatModifiers(event.modifiers);
                     const endsAtHtml = event.ends_at_display
-                        ? `<div class="text-[11px] text-gray-500 mt-0.5">Eindigt om ${event.ends_at_display} (NL)</div>`
+                        ? `<div class="text-[11px] text-gray-500 mt-0.5">Ends at ${event.ends_at_display}</div>`
                         : '';
 
                     li.innerHTML = `
-                        <div class="font-semibold text-slate-200">${event.name || 'Naamloos event'}</div>
+                        <div class="font-semibold text-slate-200">${event.name || 'Nameless Event'}</div>
                         ${modifiersHtml}
                         ${endsAtHtml}
                         <div id="${timerId}" class="text-[11px] text-emerald-400 font-mono mt-1 font-bold">
-                            Laden...
+                            Loading...
                         </div>
                     `;
                     listEl.appendChild(li);
@@ -122,7 +122,7 @@ document.addEventListener("DOMContentLoaded", () => {
                         }
                     } else {
                         const timerEl = document.getElementById(timerId);
-                        if (timerEl) timerEl.textContent = "Geen eindtijd bekend";
+                        if (timerEl) timerEl.textContent = "No end time known";
                     }
                 });
 
@@ -141,7 +141,7 @@ document.addEventListener("DOMContentLoaded", () => {
                             const distance = timer.endTimeMs - nowMs;
 
                             if (distance <= 0) {
-                                timerEl.textContent = "Afgelopen";
+                                timerEl.textContent = "Expired";
                                 timerEl.className = "text-[11px] text-red-500 font-bold mt-1";
                                 anyExpired = true;
                             } else {
@@ -149,7 +149,7 @@ document.addEventListener("DOMContentLoaded", () => {
                                 const totalSeconds = Math.floor(distance / 1000);
                                 const minutes = Math.floor(totalSeconds / 60);
                                 const seconds = totalSeconds % 60;
-                                timerEl.textContent = `Tijd over: ${String(minutes).padStart(2, '0')}:${String(seconds).padStart(2, '0')}`;
+                                timerEl.textContent = `Time left: ${String(minutes).padStart(2, '0')}:${String(seconds).padStart(2, '0')}`;
                             }
                         });
 
