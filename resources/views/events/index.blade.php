@@ -55,6 +55,9 @@
                                     Type
                                 </th>
                                 <th class="px-5 py-3 border-b-2 border-gray-200 bg-gray-100 text-left text-xs font-semibold text-gray-600 uppercase tracking-wider">
+                                    Effects
+                                </th>
+                                <th class="px-5 py-3 border-b-2 border-gray-200 bg-gray-100 text-left text-xs font-semibold text-gray-600 uppercase tracking-wider">
                                     Timing
                                 </th>
                                 @can('CanManageEvents', App\Policies\PagePolicy::class)
@@ -80,12 +83,28 @@
                                         </span>
                                     </td>
                                     <td class="px-5 py-5 border-b border-gray-200 bg-white text-sm">
+                                        @if($event->categoryEffects->isEmpty())
+                                            <span class="text-gray-400 italic text-xs">No effects</span>
+                                        @else
+                                            <ul class="space-y-1">
+                                                @foreach($event->categoryEffects as $effect)
+                                                    <li>
+                                                        <span class="inline-flex items-center px-2 py-0.5 rounded text-xs font-semibold
+                                                            {{ $effect->value > 0 ? 'bg-green-100 text-green-800' : 'bg-red-100 text-red-800' }}">
+                                                            {{ ucfirst($effect->category) }}: {{ $effect->value > 0 ? '+' : '' }}{{ $effect->value }}
+                                                        </span>
+                                                    </li>
+                                                @endforeach
+                                            </ul>
+                                        @endif
+                                    </td>
+                                    <td class="px-5 py-5 border-b border-gray-200 bg-white text-sm">
                                         
                                         @if($event->type === 'one-off')
                                             <div class="text-sm text-gray-900 whitespace-no-wrap">
-                                                <span class="font-semibold">Start:</span> {{ $event->start_moment ? \Carbon\Carbon::parse($event->start_moment)->format('d-m-Y H:i') : 'N/A' }}
+                                                <span class="font-semibold">Start:</span> {{ $event->start_moment ? \App\Services\EventModifierService::formatForDisplay($event->start_moment) : 'N/A' }}
                                                 <br>
-                                                <span class="font-semibold">End:</span> {{ $event->end_moment ? \Carbon\Carbon::parse($event->end_moment)->format('d-m-Y H:i') : 'N/A' }}
+                                                <span class="font-semibold">End:</span> {{ $event->end_moment ? \App\Services\EventModifierService::formatForDisplay($event->end_moment) : 'N/A' }}
                                             </div>
                                         @else
                                             <div class="text-sm text-gray-900 whitespace-no-wrap">
@@ -118,8 +137,11 @@
                                     @endcan
                                 </tr>
                             @empty
+                                @php
+                                    $columnCount = auth()->user()->can('CanManageEvents', App\Policies\PagePolicy::class) ? 5 : 4;
+                                @endphp
                                 <tr>
-                                    <td colspan="4" class="px-5 py-5 border-b border-gray-200 bg-white text-sm text-center">
+                                    <td colspan="{{ $columnCount }}" class="px-5 py-5 border-b border-gray-200 bg-white text-sm text-center">
                                         No events created yet.
                                     </td>
                                 </tr>

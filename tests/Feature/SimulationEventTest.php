@@ -2,32 +2,51 @@
 
 namespace Tests\Feature;
 
+use App\Enums\UserRole;
+use App\Models\CityFunction;
+use App\Models\Effect;
+use App\Models\SimulationEvent;
+use App\Models\User;
+use App\Services\EventModifierService;
+use Carbon\Carbon;
 use Illuminate\Foundation\Testing\RefreshDatabase;
 use Tests\TestCase;
-use App\Models\User;
-use App\Models\SimulationEvent;
-use App\Enums\UserRole;
 
 class SimulationEventTest extends TestCase
 {
-    // Ensures the database is wiped clean after every single test
     use RefreshDatabase;
+
+    protected function setUp(): void
+    {
+        parent::setUp();
+        $this->withMiddleware();
+    }
+
+    /**
+     * @return array<string, mixed>
+     */
+    private function eventEffectPayload(): array
+    {
+        $function = CityFunction::factory()->create(['category' => 'recreation']);
+
+        return [
+            'category_modifiers' => ['recreation' => 3],
+            'city_functions' => [$function->id],
+        ];
+    }
 
     /**
      * Test if a City Planner can view the list, but CANNOT create events (403 Forbidden).
      */
     public function test_city_planner_can_view_but_cannot_manage_events(): void
     {
-        // Create a temporary City Planner user
         $planner = User::factory()->create([
-            'role' => UserRole::City_planner, // Ensure this matches your specific Enum!
+            'role' => UserRole::City_planner,
         ]);
 
-        // Viewing the index should be allowed (CanViewGridPage route)
         $responseView = $this->actingAs($planner)->get('/events');
         $responseView->assertStatus(200);
 
-        // Accessing the create form should be blocked (CanManageEvents route)
         $responseCreate = $this->actingAs($planner)->get('/events/create');
         $responseCreate->assertStatus(403);
     }
@@ -37,24 +56,20 @@ class SimulationEventTest extends TestCase
      */
     public function test_policy_maker_can_create_one_off_event(): void
     {
-        // Create a temporary Policy Maker user
         $policyMaker = User::factory()->create([
             'role' => UserRole::Municipal_Policy_Maker,
         ]);
 
-        // Submit the form data for a one-off event
-        $response = $this->actingAs($policyMaker)->post('/events', [
+        $response = $this->actingAs($policyMaker)->post('/events', array_merge([
             'name' => 'Zomerfestival',
             'description' => 'Een groot evenement in het centrum.',
             'type' => 'one-off',
             'start_moment' => now()->addDay()->format('Y-m-d H:i:s'),
             'end_moment' => now()->addDays(3)->format('Y-m-d H:i:s'),
-        ]);
+        ], $this->eventEffectPayload()));
 
-        // Assert that the user is redirected back to the events index upon success
         $response->assertRedirect('/events');
 
-        // Verify that the exact record was successfully saved in the database
         $this->assertDatabaseHas('simulation_events', [
             'name' => 'Zomerfestival',
             'type' => 'one-off',
@@ -66,21 +81,22 @@ class SimulationEventTest extends TestCase
      */
     public function test_administrator_can_create_recurring_event(): void
     {
-        // Create a temporary Administrator user
         $admin = User::factory()->create([
             'role' => UserRole::Administrator,
         ]);
 
-        // Submit the form data for a recurring event
-        $response = $this->actingAs($admin)->post('/events', [
+        $response = $this->actingAs($admin)->post('/events', array_merge([
             'name' => 'Wekelijkse Markt',
             'type' => 'recurring',
             'recurring_schedule' => 'weekly',
-            // start_moment and end_moment are intentionally left blank here!
-        ]);
+            'recurring_start_date' => now()->format('Y-m-d'),
+            'recurring_end_date' => now()->addMonth()->format('Y-m-d'),
+            'recurring_start_time' => '09:00',
+            'recurring_end_time' => '17:00',
+        ], $this->eventEffectPayload()));
 
         $response->assertRedirect('/events');
-        
+
         $this->assertDatabaseHas('simulation_events', [
             'name' => 'Wekelijkse Markt',
             'recurring_schedule' => 'weekly',
@@ -96,18 +112,49 @@ class SimulationEventTest extends TestCase
             'role' => UserRole::Administrator,
         ]);
 
-        // Intentionally submit invalid data (a one-off event without required dates)
-        $response = $this->actingAs($admin)->post('/events', [
+        $response = $this->actingAs($admin)->post('/events', array_merge([
             'name' => 'Fout Evenement',
             'type' => 'one-off',
-        ]);
+        ], $this->eventEffectPayload()));
 
-        // Assert that Laravel catches the error for the missing start_moment
         $response->assertSessionHasErrors(['start_moment']);
-        
-        // Assert that the invalid event was NOT saved to the database
+
         $this->assertDatabaseMissing('simulation_events', [
             'name' => 'Fout Evenement',
         ]);
+    }
+
+    public function test_active_endpoint_returns_currently_active_events(): void
+    {
+        Carbon::setTestNow(Carbon::parse('2026-06-02 22:30:00', 'UTC'));
+
+        $user = User::factory()->create(['role' => UserRole::Administrator]);
+        $function = CityFunction::factory()->create(['category' => 'recreation']);
+
+        $moments = EventModifierService::normalizeEventMoments([
+            'type' => 'one-off',
+            'start_moment' => Carbon::parse('2026-06-03 00:21:00', 'UTC'),
+            'end_moment' => Carbon::parse('2026-06-03 01:21:00', 'UTC'),
+        ]);
+
+        $event = SimulationEvent::create([
+            'name' => 'test',
+            'type' => 'one-off',
+            'start_moment' => $moments['start_moment'],
+            'end_moment' => $moments['end_moment'],
+        ]);
+
+        Effect::create([
+            'function_id' => null,
+            'simulation_event_id' => $event->id,
+            'category' => 'recreation',
+            'value' => 4,
+        ]);
+
+        $response = $this->actingAs($user)->getJson('/events/active');
+
+        $response->assertOk();
+        $response->assertJsonPath('events.0.name', 'test');
+        $response->assertJsonPath('events.0.modifiers.recreation', 4);
     }
 }

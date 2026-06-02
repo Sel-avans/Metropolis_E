@@ -62,7 +62,10 @@ document.addEventListener("DOMContentLoaded", () => {
         if (!listEl || !emptyEl) return;
 
         try {
-            const response = await fetch('/events/active');
+            const response = await fetch('/events/active', {
+                credentials: 'same-origin',
+                headers: { 'Accept': 'application/json' },
+            });
             if (!response.ok) return;
 
             const data = await response.json();

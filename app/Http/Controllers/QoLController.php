@@ -28,7 +28,6 @@ class QoLController extends Controller
         }
 
         $conditions = Condition::with(['functionA', 'functionB'])->get();
-        $eventModifiers = EventModifierService::getModifiersByCategory();
 
         $categories = [
             'safety'      => [],
@@ -56,7 +55,7 @@ class QoLController extends Controller
                 $totals[$catKey] += $value;
             }
 
-            foreach ($eventModifiers as $catKey => $value) {
+            foreach (EventModifierService::getModifiersByCategoryForFunction((int) $cell->function_id) as $catKey => $value) {
                 if ($value != 0 && isset($totals[$catKey])) {
                     $totals[$catKey] += $value;
                 }
@@ -83,9 +82,22 @@ class QoLController extends Controller
             ];
         }
 
-        foreach (EventModifierService::getModifierBreakdown() as $modifier) {
+        $eventBreakdownTotals = [];
+
+        foreach ($occupiedCells as $cell) {
+            foreach (EventModifierService::getModifierBreakdownForFunction((int) $cell->function_id) as $modifier) {
+                $key = $modifier['event_name'] . '|' . $modifier['category'];
+                $eventBreakdownTotals[$key] = [
+                    'event_name' => $modifier['event_name'],
+                    'category' => $modifier['category'],
+                    'value' => ($eventBreakdownTotals[$key]['value'] ?? 0) + $modifier['value'],
+                ];
+            }
+        }
+
+        foreach ($eventBreakdownTotals as $modifier) {
             $catKey = $modifier['category'];
-            $value = $modifier['value'] * $occupiedCells->count();
+            $value = $modifier['value'];
 
             if ($value == 0 || !isset($categories[$catKey])) {
                 continue;
@@ -123,7 +135,7 @@ class QoLController extends Controller
         $discard = [];
         $totals = $this->computeCellTotals($targetCell, $cells, $conditions, $discard);
 
-        $eventModifiers = EventModifierService::getModifiersByCategory();
+        $eventModifiers = EventModifierService::getModifiersByCategoryForFunction((int) $targetCell->function_id);
         $perCellTotal = array_sum($totals) + array_sum($eventModifiers);
 
         return response()->json([

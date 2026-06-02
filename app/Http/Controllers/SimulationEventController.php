@@ -2,47 +2,38 @@
 
 namespace App\Http\Controllers;
 
+use App\Models\CityFunction;
+use App\Models\Effect;
+use App\Models\EventEffect;
 use App\Models\SimulationEvent;
 use App\Services\EventModifierService;
 use Illuminate\Http\Request;
-use Carbon\Carbon; 
-use App\Models\CityFunction;
+
 class SimulationEventController extends Controller
 {
-    /**
-     * Display a listing of the events.
-     */
     public function index()
     {
-        $events = SimulationEvent::all();
+        $events = SimulationEvent::with(['categoryEffects', 'effects.cityFunction'])
+            ->orderByDesc('id')
+            ->get();
+
         return view('events.index', compact('events'));
     }
 
-    /**
-     * Display the specified event.
-     */
     public function show(SimulationEvent $event)
-        {
-            $event->load('effects.cityFunction');
-            return view('events.show', compact('event'));
-        }
-    /**
-     * Show the form for creating a new event.
-     */
-    public function create()
     {
-        $cityFunctions = CityFunction::all();
+        $event->load('effects.cityFunction', 'categoryEffects');
 
-        return view('events.create', compact('cityFunctions'));
+        return view('events.show', compact('event'));
     }
 
-    /**
-     * Store a newly created event in storage.
-     */
+    public function create()
+    {
+        return view('events.create', $this->eventFormData());
+    }
+
     public function store(Request $request)
     {
-
-        
         $validated = $request->validate([
             'name' => 'required|string|max:255',
             'description' => 'nullable|string',
@@ -53,34 +44,41 @@ class SimulationEventController extends Controller
             'recurring_start_date' => 'required_if:type,recurring|nullable|date',
             'recurring_end_date' => 'nullable|date|after_or_equal:recurring_start_date',
             'recurring_start_time' => 'required_if:type,recurring|nullable',
-            'recurring_end_time'   => 'required_if:type,recurring|nullable',
-            'effects' => 'nullable|array',
-            'effects.*' => 'nullable|integer|min:-5|max:5',
+            'recurring_end_time' => 'required_if:type,recurring|nullable',
+            'category_modifiers' => 'required|array|min:1',
+            'category_modifiers.*' => 'required|integer|min:-5|max:5|not_in:0',
+            'city_functions' => 'required|array|min:1',
+            'city_functions.*' => 'integer|exists:city_functions,id',
         ]);
 
-        SimulationEvent::create(EventModifierService::normalizeEventMoments($validated));
+        $event = SimulationEvent::create(
+            EventModifierService::normalizeEventMoments($validated)
+        );
+
+        $this->syncEventEffects(
+            $event,
+            $validated['category_modifiers'],
+            $validated['city_functions']
+        );
 
         return redirect()->route('events.index')->with('success', 'Event created successfully.');
-
-        
     }
 
-    /**
-     * Show the form for editing the specified event.
-     */
     public function edit(SimulationEvent $event)
     {
-        // Load all available city functions
-        $cityFunctions = CityFunction::all();
-        
-        // Eager load the existing effects so we can display them in the form
-        $event->load('effects');
-        return view('events.edit', compact('event', 'cityFunctions'));
+        $event->load('effects', 'categoryEffects');
+
+        return view('events.edit', array_merge($this->eventFormData(), [
+            'event' => $event,
+            'selectedCategoryModifiers' => $event->categoryEffects
+                ->mapWithKeys(fn (Effect $effect) => [strtolower($effect->category) => (int) $effect->value])
+                ->all(),
+            'selectedCityFunctionIds' => $event->effects
+                ->pluck('city_function_id')
+                ->all(),
+        ]));
     }
 
-    /**
-     * Update the specified event in storage.
-     */
     public function update(Request $request, SimulationEvent $event)
     {
         $validated = $request->validate([
@@ -91,38 +89,26 @@ class SimulationEventController extends Controller
             'end_moment' => 'required_if:type,one-off|nullable|date|after_or_equal:start_moment',
             'recurring_schedule' => 'required_if:type,recurring|nullable|string',
             'recurring_start_date' => 'required_if:type,recurring|nullable|date',
-            'recurring_end_date'   => 'required_if:type,recurring|nullable|date|after_or_equal:recurring_start_date',
+            'recurring_end_date' => 'required_if:type,recurring|nullable|date|after_or_equal:recurring_start_date',
             'recurring_start_time' => 'required_if:type,recurring|nullable',
-            'recurring_end_time'   => 'required_if:type,recurring|nullable',
-            'effects' => 'nullable|array',
-            'effects.*' => 'nullable|integer|min:-5|max:5', // Validate that effects is an array if provided
+            'recurring_end_time' => 'required_if:type,recurring|nullable',
+            'category_modifiers' => 'required|array|min:1',
+            'category_modifiers.*' => 'required|integer|min:-5|max:5|not_in:0',
+            'city_functions' => 'required|array|min:1',
+            'city_functions.*' => 'integer|exists:city_functions,id',
         ]);
 
         $event->update(EventModifierService::normalizeEventMoments($validated));
 
-        // Handle the event effects
-        if ($request->has('effects')) {
-
-            $event->effects()->delete();
-
-            // Loop through the submitted effects and save the new ones
-            foreach ($request->effects as $functionId => $modifier) {
-                // Only save if the user actually typed a number
-                if (is_numeric($modifier)) {
-                    $event->effects()->create([
-                        'city_function_id' => $functionId,
-                        'modifier' => $modifier
-                    ]);
-                }
-            }
-        }
+        $this->syncEventEffects(
+            $event,
+            $validated['category_modifiers'],
+            $validated['city_functions']
+        );
 
         return redirect()->route('events.index')->with('success', 'Event updated successfully.');
     }
 
-    /**
-     * Remove the specified event from storage.
-     */
     public function destroy(SimulationEvent $event)
     {
         $event->delete();
@@ -134,12 +120,9 @@ class SimulationEventController extends Controller
     {
         $now = EventModifierService::now();
 
-    $events = SimulationEvent::with('effects')
-        ->get()
-        ->map(function ($event) use ($now) {
-            
-            // Dwing Laravel om de meest recente effects uit de database te trekken (voorkomt cache-smetjes)
-             $event->load('effects'); 
+        $events = EventModifierService::getActiveEvents()
+            ->map(function (SimulationEvent $event) use ($now) {
+                $timing = null;
 
                 if ($event->type === 'one-off' && $event->end_moment) {
                     $end = EventModifierService::parseMoment($event->end_moment);
@@ -151,7 +134,7 @@ class SimulationEventController extends Controller
                     $timing = 'Pattern: ' . ($event->recurring_schedule ?? 'unknown');
                 }
 
-                $modifiers = $event->effects->mapWithKeys(function ($effect) {
+                $modifiers = $event->categoryEffects->mapWithKeys(function (Effect $effect) {
                     return [strtolower($effect->category) => (float) $effect->value];
                 });
 
@@ -176,5 +159,79 @@ class SimulationEventController extends Controller
             'timestamp' => $now->toIso8601String(),
             'events' => $events,
         ]);
+    }
+
+    /**
+     * @return array<string, mixed>
+     */
+    private function eventFormData(): array
+    {
+        return [
+            'effectCategories' => $this->distinctEffectCategories(),
+            'cityFunctions' => CityFunction::orderBy('name')->get(),
+            'selectedCategoryModifiers' => [],
+            'selectedCityFunctionIds' => [],
+        ];
+    }
+
+    /**
+     * @return list<string>
+     */
+    private function distinctEffectCategories(): array
+    {
+        $fromEffects = Effect::query()
+            ->whereNull('simulation_event_id')
+            ->whereNotNull('category')
+            ->distinct()
+            ->orderBy('category')
+            ->pluck('category');
+
+        $fromFunctions = CityFunction::query()
+            ->whereNotNull('category')
+            ->distinct()
+            ->orderBy('category')
+            ->pluck('category');
+
+        return $fromEffects
+            ->merge($fromFunctions)
+            ->map(fn ($category) => strtolower((string) $category))
+            ->unique()
+            ->sort()
+            ->values()
+            ->all();
+    }
+
+    /**
+     * @param  array<string, int|string>  $categoryModifiers
+     * @param  array<int|string>  $cityFunctionIds
+     */
+    private function syncEventEffects(
+        SimulationEvent $event,
+        array $categoryModifiers,
+        array $cityFunctionIds
+    ): void {
+        $event->categoryEffects()->delete();
+        $event->effects()->delete();
+
+        foreach ($categoryModifiers as $category => $value) {
+            if (!is_numeric($value) || (int) $value === 0) {
+                continue;
+            }
+
+            Effect::create([
+                'function_id' => null,
+                'simulation_event_id' => $event->id,
+                'category' => strtolower((string) $category),
+                'value' => (int) $value,
+            ]);
+        }
+
+        foreach (array_unique(array_map('intval', $cityFunctionIds)) as $functionId) {
+            EventEffect::create([
+                'simulation_event_id' => $event->id,
+                'city_function_id' => $functionId,
+                'modifier' => 0,
+            ]);
+        }
     }
 }

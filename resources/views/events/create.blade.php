@@ -49,8 +49,9 @@
                         </select>
                     </div>
 
+                    @include('events.partials.event-effects-form')
+
                     <div id="one_off_fields" class="mb-4 bg-gray-50 p-4 rounded border">
-                        <p class="text-sm text-gray-600 mb-3">Tijden in <strong>Nederlandse tijd</strong>.</p>
                         <div class="mb-2">
                             <label for="start_moment" class="block text-gray-700 font-bold mb-2">Start Moment</label>
                             <input type="datetime-local" id="start_moment" name="start_moment" 
@@ -135,46 +136,6 @@
 
                     </div>
 
-                    <div class="mt-6 p-4 bg-gray-50 border border-gray-200 rounded-lg">
-                        <h3 class="text-lg font-medium text-gray-900 mb-4">Event Effects (Modifiers)</h3>
-                        <p class="text-sm text-gray-500 mb-4">Adjust the impact using the - and + buttons (min -5, max +5).</p>
-                        
-                        <div class="grid grid-cols-1 md:grid-cols-3 gap-4">
-                            @foreach($cityFunctions as $function)
-                                @php
-                                    // Default value is 0
-                                    $currentVal = old('effects.'.$function->id, 0);
-                                @endphp
-                                
-                                <div class="bg-white p-3 rounded border border-gray-200 shadow-sm flex flex-col items-center">
-                                    <label class="block text-sm font-semibold text-gray-700 mb-2 text-center w-full">
-                                        {{ $function->name }}
-                                    </label>
-                                    
-                                    <div class="flex items-center justify-center space-x-3 mt-1">
-                                        <button type="button" 
-                                                onclick="adjustEffect({{ $function->id }}, -1)" 
-                                                class="bg-red-500 hover:bg-red-600 text-white font-bold w-8 h-8 rounded flex items-center justify-center focus:outline-none focus:ring-2 focus:ring-red-400">
-                                            -
-                                        </button>
-                                        
-                                        <input type="text" readonly 
-                                               name="effects[{{ $function->id }}]" 
-                                               id="effect_{{ $function->id }}" 
-                                               value="{{ $currentVal }}"
-                                               class="w-16 text-center border border-gray-300 rounded-md shadow-sm bg-gray-100 font-bold text-gray-800 focus:ring-0 cursor-default">
-                                        
-                                        <button type="button" 
-                                                onclick="adjustEffect({{ $function->id }}, 1)" 
-                                                class="bg-green-500 hover:bg-green-600 text-white font-bold w-8 h-8 rounded flex items-center justify-center focus:outline-none focus:ring-2 focus:ring-green-400">
-                                            +
-                                        </button>
-                                    </div>
-                                </div>
-                            @endforeach
-                        </div>
-                    </div>
-
                     <div class="flex items-center justify-between mt-8 pt-4 border-t border-gray-200">
                         <a href="{{ route('events.index') }}" class="bg-gray-500 hover:bg-gray-600 text-white font-bold py-2 px-4 rounded focus:outline-none focus:shadow-outline transition-colors">
                              Back
@@ -240,21 +201,5 @@
         
         // Initialize form view state on page load
         document.addEventListener('DOMContentLoaded', toggleEventFields);
-
-        // Adjust the effect value and enforce the limits (-5 to +5)
-        function adjustEffect(functionId, changeAmount) {
-            const inputField = document.getElementById('effect_' + functionId);
-            
-            // Parse the current value as an integer
-            let currentValue = parseInt(inputField.value) || 0;
-            
-            // Calculate the new value
-            let newValue = currentValue + changeAmount;
-            
-            // Enforce constraints as per documentation (-5 to 5 limit)
-            if (newValue >= -5 && newValue <= 5) {
-                inputField.value = newValue;
-            }
-        }
     </script>
 </x-app-layout>

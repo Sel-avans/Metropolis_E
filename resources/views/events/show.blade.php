@@ -31,9 +31,9 @@
                             <div>
                                 <p class="text-sm font-semibold text-gray-500 uppercase tracking-wider">Start & End</p>
                                 <p class="mt-1 text-gray-900">
-                                    {{ \Carbon\Carbon::parse($event->start_moment)->format('M d, Y H:i') }} <br>
+                                    {{ \App\Services\EventModifierService::formatForDisplay($event->start_moment) }} <br>
                                     <span class="text-gray-500 text-sm">to</span> <br>
-                                    {{ \Carbon\Carbon::parse($event->end_moment)->format('M d, Y H:i') }}
+                                    {{ \App\Services\EventModifierService::formatForDisplay($event->end_moment) }}
                                 </p>
                             </div>
                         @else
@@ -49,28 +49,52 @@
                     </div>
                 </div>
 
-                <div class="bg-white px-6 py-6 sm:px-6">
-                    <h3 class="text-lg leading-6 font-medium text-gray-900 mb-4">Event Effects (Modifiers)</h3>
-                    
-                    <div class="border border-gray-200 rounded-md">
-                        @if($event->effects->isEmpty())
-                            <p class="p-4 text-sm text-gray-500 italic bg-gray-50 rounded-md">No modifiers assigned to this event.</p>
-                        @else
-                            <ul class="divide-y divide-gray-200">
-                                @foreach($event->effects as $effect)
-                                    <li class="py-4 flex justify-between items-center px-4 sm:px-6 hover:bg-gray-50 transition-colors">
-                                        <span class="text-base font-medium text-gray-900">
-                                            {{ $effect->cityFunction->name ?? 'Unknown Function' }}
-                                        </span>
-                                        
-                                        <span class="px-3 py-1 inline-flex text-sm leading-5 font-bold rounded-full shadow-sm
-                                            {{ $effect->modifier > 0 ? 'bg-green-100 text-green-800 border border-green-200' : 'bg-red-100 text-red-800 border border-red-200' }}">
-                                            {{ $effect->modifier > 0 ? '+' : '' }}{{ $effect->modifier }}
-                                        </span>
-                                    </li>
-                                @endforeach
-                            </ul>
-                        @endif
+                <div class="bg-white px-6 py-6 sm:px-6 space-y-6">
+                    <div>
+                        <h3 class="text-lg leading-6 font-medium text-gray-900 mb-4">Category Modifiers</h3>
+                        <div class="border border-gray-200 rounded-md">
+                            @if($event->categoryEffects->isEmpty())
+                                <p class="p-4 text-sm text-gray-500 italic bg-gray-50 rounded-md">No category modifiers assigned.</p>
+                            @else
+                                <ul class="divide-y divide-gray-200">
+                                    @foreach($event->categoryEffects as $effect)
+                                        <li class="py-4 flex justify-between items-center px-4 sm:px-6 hover:bg-gray-50 transition-colors">
+                                            <span class="text-base font-medium text-gray-900 capitalize">{{ $effect->category }}</span>
+                                            <span class="px-3 py-1 inline-flex text-sm leading-5 font-bold rounded-full shadow-sm
+                                                {{ $effect->value > 0 ? 'bg-green-100 text-green-800 border border-green-200' : 'bg-red-100 text-red-800 border border-red-200' }}">
+                                                {{ $effect->value > 0 ? '+' : '' }}{{ $effect->value }}
+                                            </span>
+                                        </li>
+                                    @endforeach
+                                </ul>
+                            @endif
+                        </div>
+                    </div>
+
+                    <div>
+                        <h3 class="text-lg leading-6 font-medium text-gray-900 mb-4">Affected City Functions</h3>
+                        <div class="border border-gray-200 rounded-md">
+                            @if($event->effects->isEmpty())
+                                <p class="p-4 text-sm text-gray-500 italic bg-gray-50 rounded-md">No city functions assigned.</p>
+                            @else
+                                <ul class="divide-y divide-gray-200">
+                                    @foreach($event->effects as $effect)
+                                        <li class="py-4 px-4 sm:px-6 hover:bg-gray-50 transition-colors">
+                                            <div class="flex items-center gap-3">
+                                                @if($effect->cityFunction?->image)
+                                                    <img src="{{ asset($effect->cityFunction->image) }}"
+                                                         alt="{{ $effect->cityFunction->name }}"
+                                                         class="w-12 h-12 object-contain flex-shrink-0">
+                                                @endif
+                                                <span class="text-base font-medium text-gray-900">
+                                                    {{ $effect->cityFunction->name ?? 'Unknown Function' }}
+                                                </span>
+                                            </div>
+                                        </li>
+                                    @endforeach
+                                </ul>
+                            @endif
+                        </div>
                     </div>
                 </div>
 

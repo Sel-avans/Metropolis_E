@@ -57,15 +57,37 @@ class EventModifierService
     }
 
     /** Parse datetime-local form input (Dutch time) and store in app/DB timezone (UTC). */
-    public static function fromDatetimeLocalInput(?string $value): ?string
+    public static function fromDatetimeLocalInput(mixed $value): ?string
+    {
+        $local = self::asDatetimeLocalString($value);
+        if ($local === null || $local === '') {
+            return null;
+        }
+
+        return Carbon::parse($local, self::DISPLAY_TIMEZONE)
+            ->timezone(self::storageTimezone())
+            ->format('Y-m-d H:i:s');
+    }
+
+    /** @return non-empty-string|null */
+    public static function asDatetimeLocalString(mixed $value): ?string
     {
         if ($value === null || $value === '') {
             return null;
         }
 
-        return Carbon::parse($value, self::DISPLAY_TIMEZONE)
-            ->timezone(self::storageTimezone())
-            ->format('Y-m-d H:i:s');
+        if ($value instanceof \DateTimeInterface) {
+            // Laravel's date rule parses in app timezone (UTC), preserving wall-clock digits.
+            return $value->format('Y-m-d\TH:i');
+        }
+
+        $str = (string) $value;
+
+        if (str_contains($str, 'T')) {
+            return substr($str, 0, 16);
+        }
+
+        return str_replace(' ', 'T', substr($str, 0, 16));
     }
 
     /**
@@ -78,12 +100,12 @@ class EventModifierService
             return $data;
         }
 
-        if (array_key_exists('start_moment', $data)) {
-            $data['start_moment'] = self::fromDatetimeLocalInput($data['start_moment']);
-        }
+        foreach (['start_moment', 'end_moment'] as $field) {
+            if (!array_key_exists($field, $data) || $data[$field] === null || $data[$field] === '') {
+                continue;
+            }
 
-        if (array_key_exists('end_moment', $data)) {
-            $data['end_moment'] = self::fromDatetimeLocalInput($data['end_moment']);
+            $data[$field] = self::fromDatetimeLocalInput($data[$field]);
         }
 
         return $data;
@@ -111,7 +133,7 @@ class EventModifierService
     {
         $now = self::now();
 
-        return SimulationEvent::with('effects')
+        return SimulationEvent::with(['categoryEffects', 'effects'])
             ->get()
             ->filter(fn (SimulationEvent $event) => self::isActive($event, $now))
             ->values();
@@ -125,7 +147,7 @@ class EventModifierService
         $modifiers = array_fill_keys(self::CATEGORY_KEYS, 0.0);
 
         foreach (self::getActiveEvents() as $event) {
-            foreach ($event->effects as $effect) {
+            foreach ($event->categoryEffects as $effect) {
                 $catKey = strtolower($effect->category);
                 if (isset($modifiers[$catKey])) {
                     $modifiers[$catKey] += (float) $effect->value;
@@ -137,14 +159,75 @@ class EventModifierService
     }
 
     /**
-     * @return array<int, array{name: string, category: string, value: float}>
+     * Event category modifiers that apply to a specific city function on the grid.
+     *
+     * @return array<string, float>
+     */
+    public static function getModifiersByCategoryForFunction(int $functionId): array
+    {
+        $modifiers = array_fill_keys(self::CATEGORY_KEYS, 0.0);
+
+        foreach (self::getActiveEvents() as $event) {
+            if (!self::eventAppliesToFunction($event, $functionId)) {
+                continue;
+            }
+
+            foreach ($event->categoryEffects as $effect) {
+                $catKey = strtolower($effect->category);
+                if (isset($modifiers[$catKey])) {
+                    $modifiers[$catKey] += (float) $effect->value;
+                }
+            }
+        }
+
+        return $modifiers;
+    }
+
+    public static function eventAppliesToFunction(SimulationEvent $event, int $functionId): bool
+    {
+        return $event->effects->contains(
+            fn ($eventEffect) => (int) $eventEffect->city_function_id === $functionId
+        );
+    }
+
+    /**
+     * @return array<int, array{event_name: string, category: string, value: float}>
+     */
+    public static function getModifierBreakdownForFunction(int $functionId): array
+    {
+        $breakdown = [];
+
+        foreach (self::getActiveEvents() as $event) {
+            if (!self::eventAppliesToFunction($event, $functionId)) {
+                continue;
+            }
+
+            foreach ($event->categoryEffects as $effect) {
+                $catKey = strtolower($effect->category);
+                if (!in_array($catKey, self::CATEGORY_KEYS, true)) {
+                    continue;
+                }
+
+                $breakdown[] = [
+                    'event_name' => $event->name,
+                    'category' => $catKey,
+                    'value' => (float) $effect->value,
+                ];
+            }
+        }
+
+        return $breakdown;
+    }
+
+    /**
+     * @return array<int, array{event_name: string, category: string, value: float}>
      */
     public static function getModifierBreakdown(): array
     {
         $breakdown = [];
 
         foreach (self::getActiveEvents() as $event) {
-            foreach ($event->effects as $effect) {
+            foreach ($event->categoryEffects as $effect) {
                 $catKey = strtolower($effect->category);
                 if (!in_array($catKey, self::CATEGORY_KEYS, true)) {
                     continue;
