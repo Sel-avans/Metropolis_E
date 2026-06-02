@@ -102,43 +102,14 @@ class SimulationEventController extends Controller
     {
         $now = EventModifierService::now();
 
-        $events = EventModifierService::getActiveEvents()
-            ->map(function (SimulationEvent $event) use ($now) {
-                $timing = null;
-
-                if ($event->type === 'one-off' && $event->end_moment) {
-                    $end = EventModifierService::parseMoment($event->end_moment);
-                    $mins = max(0, (int) round($now->diffInMinutes($end, false)));
-                    $timing = 'Ends in ' . $mins . ' min';
-                }
-
-                if ($event->type === 'recurring') {
-                    $timing = 'Pattern: ' . ($event->recurring_schedule ?? 'unknown');
-                }
-
-                $modifiers = $event->effects->mapWithKeys(function ($effect) {
-                    return [strtolower($effect->category) => (float) $effect->value];
-                });
-
-                return [
-                    'id' => $event->id,
-                    'name' => $event->name,
-                    'type' => $event->type,
-                    'timing' => $timing,
-                    'end_at' => $event->end_moment
-                        ? EventModifierService::parseMoment($event->end_moment)->timestamp
-                        : null,
-                    'ends_at_display' => $event->end_moment
-                        ? EventModifierService::formatForDisplay($event->end_moment)
-                        : null,
-                    'modifiers' => $modifiers->isEmpty() ? (object) [] : $modifiers->toArray(),
-                ];
-            })
+        $events = EventModifierService::getTrackedEvents($now)
+            ->map(fn (SimulationEvent $event) => EventModifierService::formatEventForClient($event, $now))
             ->values();
 
         return response()->json([
             'status' => 'success',
             'timestamp' => $now->toIso8601String(),
+            'server_now_ms' => $now->getTimestamp() * 1000,
             'events' => $events,
         ]);
     }

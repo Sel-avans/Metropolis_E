@@ -148,24 +148,144 @@ class EventModifierService
             $start = self::parseMoment($event->start_moment);
             $end = self::parseMoment($event->end_moment);
 
-            return $now->greaterThanOrEqualTo($start) && $now->lessThanOrEqualTo($end);
+            return $now->greaterThanOrEqualTo($start) && $now->lessThan($end);
         }
 
         if ($event->type === 'recurring') {
+            return self::isRecurringActive($event, $now);
+        }
+
+        return false;
+    }
+
+    public static function isTracked(SimulationEvent $event, ?Carbon $now = null): bool
+    {
+        $now = $now ?? self::now();
+
+        if ($event->type === 'one-off') {
+            if (!$event->end_moment) {
+                return false;
+            }
+
+            return self::parseMoment($event->end_moment)->gt($now);
+        }
+
+        if ($event->type === 'recurring') {
+            if ($event->recurring_end_date) {
+                $end = Carbon::parse($event->recurring_end_date, self::storageTimezone())->endOfDay();
+
+                return $now->lessThanOrEqualTo($end);
+            }
+
             return true;
         }
 
         return false;
     }
 
+    public static function getTrackedEvents(?Carbon $now = null): Collection
+    {
+        $now = $now ?? self::now();
+
+        return SimulationEvent::with('effects')
+            ->get()
+            ->filter(fn (SimulationEvent $event) => self::isTracked($event, $now))
+            ->values();
+    }
+
     public static function getActiveEvents(): Collection
     {
         $now = self::now();
 
-        return SimulationEvent::with('effects')
-            ->get()
+        return self::getTrackedEvents($now)
             ->filter(fn (SimulationEvent $event) => self::isActive($event, $now))
             ->values();
+    }
+
+    /**
+     * @return array<string, float|int|string|bool|null|array<string, float>>
+     */
+    public static function formatEventForClient(SimulationEvent $event, Carbon $now): array
+    {
+        $isActive = self::isActive($event, $now);
+        $modifiers = [];
+
+        if ($isActive) {
+            foreach ($event->effects as $effect) {
+                $catKey = strtolower($effect->category);
+                $modifiers[$catKey] = ($modifiers[$catKey] ?? 0) + (float) $effect->value;
+            }
+        }
+
+        $timing = null;
+
+        if ($event->type === 'one-off' && $event->end_moment) {
+            $end = self::parseMoment($event->end_moment);
+
+            if ($isActive) {
+                $mins = max(0, (int) round($now->diffInMinutes($end, false)));
+                $timing = 'Ends in ' . $mins . ' min';
+            } elseif ($event->start_moment) {
+                $start = self::parseMoment($event->start_moment);
+                $mins = max(0, (int) round($start->diffInMinutes($now, false)));
+                $timing = 'Starts in ' . $mins . ' min';
+            }
+        }
+
+        if ($event->type === 'recurring') {
+            $timing = 'Pattern: ' . ($event->recurring_schedule ?? 'unknown');
+        }
+
+        return [
+            'id' => $event->id,
+            'name' => $event->name,
+            'type' => $event->type,
+            'is_active' => $isActive,
+            'timing' => $timing,
+            'start_at' => $event->start_moment
+                ? self::parseMoment($event->start_moment)->timestamp
+                : null,
+            'end_at' => $event->end_moment
+                ? self::parseMoment($event->end_moment)->timestamp
+                : null,
+            'starts_at_display' => $event->start_moment
+                ? self::formatForDisplay($event->start_moment)
+                : null,
+            'ends_at_display' => $event->end_moment
+                ? self::formatForDisplay($event->end_moment)
+                : null,
+            'modifiers' => $modifiers === [] ? (object) [] : $modifiers,
+        ];
+    }
+
+    private static function isRecurringActive(SimulationEvent $event, Carbon $now): bool
+    {
+        if (!self::isTracked($event, $now)) {
+            return false;
+        }
+
+        if ($event->recurring_start_date) {
+            $start = Carbon::parse($event->recurring_start_date, self::storageTimezone())->startOfDay();
+
+            if ($now->lessThan($start)) {
+                return false;
+            }
+        }
+
+        if (!$event->recurring_start_time || !$event->recurring_end_time) {
+            return true;
+        }
+
+        $local = $now->copy()->timezone(self::DISPLAY_TIMEZONE);
+        $today = $local->format('Y-m-d');
+        $windowStart = Carbon::parse("{$today} {$event->recurring_start_time}", self::DISPLAY_TIMEZONE);
+        $windowEnd = Carbon::parse("{$today} {$event->recurring_end_time}", self::DISPLAY_TIMEZONE);
+
+        if ($windowEnd->lessThanOrEqualTo($windowStart)) {
+            $windowEnd->addDay();
+        }
+
+        return $local->greaterThanOrEqualTo($windowStart) && $local->lessThan($windowEnd);
     }
 
     /**

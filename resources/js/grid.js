@@ -12,6 +12,10 @@ document.addEventListener("DOMContentLoaded", () => {
     let sourceCell = null;
     let dropOccurred = false;
     let old_score;
+    let lastKnownTotalScore = 0;
+    let pinnedDelta = null;
+    let deltaClearTimeout = null;
+    const DELTA_DISPLAY_MS = 8000;
 
     // Slaat de laatste actie op zodat undo weet wat teruggezet moet worden
     let lastAction = null;
@@ -24,7 +28,10 @@ document.addEventListener("DOMContentLoaded", () => {
 
     let eventTimerInterval = null;
     let lastActiveEventSignature = '';
-    const expiredEventTimerIds = new Set();
+    let serverClockOffsetMs = 0;
+    let eventBoundaryTimeouts = [];
+    const EVENT_POLL_MS = 1000;
+    const MAX_SCHEDULE_MS = 24 * 60 * 60 * 1000;
 
     function formatModifiers(modifiers) {
         if (!modifiers || typeof modifiers !== 'object') {
@@ -50,10 +57,47 @@ document.addEventListener("DOMContentLoaded", () => {
         return JSON.stringify(
             (events || []).map(event => ({
                 id: event.id,
+                is_active: Boolean(event.is_active),
+                start_at: event.start_at ?? null,
                 end_at: event.end_at ?? null,
                 modifiers: event.modifiers ?? {},
             }))
         );
+    }
+
+    function simulationNowMs() {
+        return Date.now() + serverClockOffsetMs;
+    }
+
+    function clearEventBoundarySchedules() {
+        eventBoundaryTimeouts.forEach((timeoutId) => clearTimeout(timeoutId));
+        eventBoundaryTimeouts = [];
+    }
+
+    function scheduleEventBoundary(delayMs) {
+        if (delayMs < 0 || delayMs > MAX_SCHEDULE_MS) {
+            return;
+        }
+
+        const timeoutId = setTimeout(() => {
+            updateActiveEvents({ forceQolRefresh: true });
+        }, delayMs);
+
+        eventBoundaryTimeouts.push(timeoutId);
+    }
+
+    function scheduleEventBoundaries(events) {
+        clearEventBoundarySchedules();
+
+        (events || []).forEach((event) => {
+            if (event.start_at) {
+                scheduleEventBoundary((Number(event.start_at) * 1000) - simulationNowMs());
+            }
+
+            if (event.end_at) {
+                scheduleEventBoundary((Number(event.end_at) * 1000) - simulationNowMs());
+            }
+        });
     }
 
     async function updateActiveEvents({ forceQolRefresh = false } = {}) {
@@ -69,6 +113,12 @@ document.addEventListener("DOMContentLoaded", () => {
             const data = await response.json();
             if (!data || !data.events) return;
 
+            if (typeof data.server_now_ms === 'number') {
+                serverClockOffsetMs = data.server_now_ms - Date.now();
+            }
+
+            scheduleEventBoundaries(data.events);
+
             const signature = buildEventSignature(data.events);
             if (signature !== lastActiveEventSignature) {
                 lastActiveEventSignature = signature;
@@ -77,44 +127,52 @@ document.addEventListener("DOMContentLoaded", () => {
                 updateQoL();
             }
 
-            if (data.events.length > 0) {
+            const visibleEvents = data.events.filter((event) => event.is_active || event.start_at);
+
+            if (visibleEvents.length > 0) {
                 emptyEl.classList.add('hidden');
                 listEl.innerHTML = '';
-                expiredEventTimerIds.clear();
 
-                const activeTimers = [];
+                const countdownTimers = [];
 
-                data.events.forEach((event, index) => {
+                visibleEvents.forEach((event, index) => {
                     const li = document.createElement('li');
-                    li.className = "p-3 bg-slate-800 border-l-4 border-amber-500 rounded shadow-sm mb-2 text-sm";
+                    const borderClass = event.is_active
+                        ? 'border-amber-500'
+                        : 'border-slate-500';
+                    li.className = `p-3 bg-slate-800 border-l-4 ${borderClass} rounded shadow-sm mb-2 text-sm`;
 
                     const timerId = `event-timer-${index}`;
-                    const modifiersHtml = formatModifiers(event.modifiers);
-                    const endsAtHtml = event.ends_at_display
-                        ? `<div class="text-[11px] text-gray-500 mt-0.5">Eindigt om ${event.ends_at_display} (NL)</div>`
-                        : '';
+                    const modifiersHtml = event.is_active ? formatModifiers(event.modifiers) : '';
+                    const scheduleHtml = event.is_active
+                        ? (event.ends_at_display
+                            ? `<div class="text-[11px] text-gray-500 mt-0.5">Ends at ${event.ends_at_display}</div>`
+                            : '')
+                        : (event.starts_at_display
+                            ? `<div class="text-[11px] text-gray-500 mt-0.5">Starts at ${event.starts_at_display}</div>`
+                            : '');
 
                     li.innerHTML = `
-                        <div class="font-semibold text-slate-200">${event.name || 'Naamloos event'}</div>
+                        <div class="font-semibold text-slate-200">${event.name || 'Unnamed event'}</div>
                         ${modifiersHtml}
-                        ${endsAtHtml}
+                        ${scheduleHtml}
                         <div id="${timerId}" class="text-[11px] text-emerald-400 font-mono mt-1 font-bold">
-                            Laden...
+                            Loading...
                         </div>
                     `;
                     listEl.appendChild(li);
 
-                    if (event.end_at) {
-                        let endTimeMs = 0;
-                        if (typeof event.end_at === 'number' || (!isNaN(event.end_at) && !isNaN(parseFloat(event.end_at)))) {
-                            endTimeMs = Number(event.end_at) * 1000;
-                        } else {
-                            const formattedString = String(event.end_at).replace(' ', 'T');
-                            endTimeMs = new Date(formattedString).getTime();
-                        }
+                    const targetTimestamp = event.is_active ? event.end_at : event.start_at;
 
-                        if (!isNaN(endTimeMs) && endTimeMs > 0) {
-                            activeTimers.push({ elementId: timerId, endTimeMs });
+                    if (targetTimestamp) {
+                        const targetTimeMs = Number(targetTimestamp) * 1000;
+
+                        if (!Number.isNaN(targetTimeMs) && targetTimeMs > 0) {
+                            countdownTimers.push({
+                                elementId: timerId,
+                                targetTimeMs,
+                                isActive: Boolean(event.is_active),
+                            });
                         }
                     } else if (event.type === 'recurring') {
                         const timerEl = document.getElementById(timerId);
@@ -124,36 +182,42 @@ document.addEventListener("DOMContentLoaded", () => {
                         }
                     } else {
                         const timerEl = document.getElementById(timerId);
-                        if (timerEl) timerEl.textContent = "Geen eindtijd bekend";
+                        if (timerEl) timerEl.textContent = "No time available";
                     }
                 });
 
                 if (eventTimerInterval) clearInterval(eventTimerInterval);
 
-                if (activeTimers.length > 0) {
+                if (countdownTimers.length > 0) {
                     const tick = () => {
-                        const nowMs = Date.now();
+                        const nowMs = simulationNowMs();
                         let stillRunning = false;
+                        let boundaryCrossed = false;
 
-                        activeTimers.forEach(timer => {
+                        countdownTimers.forEach((timer) => {
                             const timerEl = document.getElementById(timer.elementId);
                             if (!timerEl) return;
 
-                            const distance = timer.endTimeMs - nowMs;
+                            const distance = timer.targetTimeMs - nowMs;
 
                             if (distance <= 0) {
-                                if (!expiredEventTimerIds.has(timer.elementId)) {
-                                    expiredEventTimerIds.add(timer.elementId);
-                                    updateActiveEvents({ forceQolRefresh: true });
-                                }
+                                boundaryCrossed = true;
+                                timerEl.textContent = timer.isActive ? 'Ended' : 'Starting...';
+                                timerEl.className = "text-[11px] text-red-500 font-bold mt-1";
                             } else {
                                 stillRunning = true;
                                 const totalSeconds = Math.floor(distance / 1000);
                                 const minutes = Math.floor(totalSeconds / 60);
                                 const seconds = totalSeconds % 60;
-                                timerEl.textContent = `Tijd over: ${String(minutes).padStart(2, '0')}:${String(seconds).padStart(2, '0')}`;
+                                const label = timer.isActive ? 'Time left' : 'Starts in';
+                                timerEl.textContent = `${label}: ${String(minutes).padStart(2, '0')}:${String(seconds).padStart(2, '0')}`;
+                                timerEl.className = "text-[11px] text-emerald-400 font-mono mt-1 font-bold";
                             }
                         });
+
+                        if (boundaryCrossed) {
+                            updateActiveEvents({ forceQolRefresh: true });
+                        }
 
                         if (!stillRunning) {
                             clearInterval(eventTimerInterval);
@@ -162,11 +226,12 @@ document.addEventListener("DOMContentLoaded", () => {
                     };
 
                     tick();
-                    eventTimerInterval = setInterval(tick, 1000);
+                    eventTimerInterval = setInterval(tick, EVENT_POLL_MS);
                 }
             } else {
                 emptyEl.classList.remove('hidden');
                 listEl.innerHTML = '';
+                clearEventBoundarySchedules();
                 if (eventTimerInterval) {
                     clearInterval(eventTimerInterval);
                     eventTimerInterval = null;
@@ -178,7 +243,7 @@ document.addEventListener("DOMContentLoaded", () => {
     }
 
     updateActiveEvents({ forceQolRefresh: true });
-    setInterval(updateActiveEvents, 5000);
+    setInterval(updateActiveEvents, EVENT_POLL_MS);
 
     document.addEventListener("click", async (e) => {
         if (!e.target.classList.contains("delete-btn")) return;
@@ -233,19 +298,100 @@ document.addEventListener("DOMContentLoaded", () => {
         }
     }
 
+    function formatDeltaHtml(delta) {
+        const deltaClass = delta < 0 ? 'text-red-600' : 'text-green-600';
+        const sign = delta >= 0 ? '+' : '';
+
+        return `
+            <span class="text-xl float-right ${deltaClass} qol-delta-badge">
+                ${sign}${delta}
+            </span>
+        `;
+    }
+
+    function clearPinnedDelta() {
+        pinnedDelta = null;
+        if (deltaClearTimeout) {
+            clearTimeout(deltaClearTimeout);
+            deltaClearTimeout = null;
+        }
+
+        const oldScoreEl = document.getElementById('old-qol-score');
+        if (oldScoreEl) {
+            oldScoreEl.innerHTML = '';
+        }
+    }
+
+    function pinScoreDelta(delta) {
+        pinnedDelta = delta;
+
+        if (deltaClearTimeout) {
+            clearTimeout(deltaClearTimeout);
+        }
+
+        const oldScoreEl = document.getElementById('old-qol-score');
+        if (oldScoreEl) {
+            oldScoreEl.innerHTML = formatDeltaHtml(pinnedDelta);
+        }
+
+        deltaClearTimeout = setTimeout(() => {
+            old_score = lastKnownTotalScore;
+            clearPinnedDelta();
+        }, DELTA_DISPLAY_MS);
+    }
+
+    function updateDeltaDisplay(newTotal) {
+        const oldScoreEl = document.getElementById('old-qol-score');
+        if (!oldScoreEl) return;
+
+        if (old_score === undefined) {
+            old_score = newTotal;
+            oldScoreEl.innerHTML = '';
+            return;
+        }
+
+        if (pinnedDelta !== null) {
+            const previousTotal = lastKnownTotalScore;
+
+            if (newTotal !== previousTotal) {
+                const transitionDelta = newTotal - previousTotal;
+
+                if (transitionDelta !== 0) {
+                    pinScoreDelta(transitionDelta);
+                    return;
+                }
+            }
+
+            oldScoreEl.innerHTML = formatDeltaHtml(pinnedDelta);
+            return;
+        }
+
+        const delta = newTotal - old_score;
+
+        if (delta !== 0) {
+            pinScoreDelta(delta);
+            return;
+        }
+
+        old_score = newTotal;
+        oldScoreEl.innerHTML = '';
+    }
+
     async function updateQoL() {
         try {
             const scoreEl = document.getElementById('qol-score-value');
             const breakdownEl = document.getElementById('breakdown-qol-score');
-            const oldScoreEl = document.getElementById('old-qol-score');
 
             const response = await fetch('/qol/details');
             const data = await response.json();
+            const newTotal = data.total_score;
 
             if (scoreEl) {
-                scoreEl.textContent = data.total_score;
-                oldScoreEl.innerHTML = compareScores(data);
+                scoreEl.textContent = newTotal;
+                updateDeltaDisplay(newTotal);
             }
+
+            lastKnownTotalScore = newTotal;
 
             if (breakdownEl) {
                 breakdownEl.innerHTML = renderQoLBreakdown(data);
@@ -254,23 +400,6 @@ document.addEventListener("DOMContentLoaded", () => {
         } catch (err) {
             console.error("Fout bij ophalen QoL:", err);
         }
-    }
-
-    function compareScores(data) {
-        let html = '';
-
-        if (old_score === undefined) {
-            html += ''; 
-        } else {
-            const delta_score = data.total_score - old_score;
-            html += `
-                <span class="text-xl float-right ${delta_score < 0 ? 'text-red-600' : 'text-green-600'}">
-                    ${delta_score >= 0 ? '+' : ''}${delta_score}
-                </span>
-            `;
-        }
-        if (data.total_score !== 0) old_score = data.total_score;
-        return html;
     }
 
     function renderQoLBreakdown(data) {
