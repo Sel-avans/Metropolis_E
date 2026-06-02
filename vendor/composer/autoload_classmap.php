@@ -6,6 +6,7 @@ $vendorDir = dirname(__DIR__);
 $baseDir = dirname($vendorDir);
 
 return array(
+    'App\\Enums\\UserRole' => $baseDir . '/app/Enums/UserRole.php',
     'App\\Http\\Controllers\\Auth\\AuthenticatedSessionController' => $baseDir . '/app/Http/Controllers/Auth/AuthenticatedSessionController.php',
     'App\\Http\\Controllers\\Auth\\ConfirmablePasswordController' => $baseDir . '/app/Http/Controllers/Auth/ConfirmablePasswordController.php',
     'App\\Http\\Controllers\\Auth\\EmailVerificationNotificationController' => $baseDir . '/app/Http/Controllers/Auth/EmailVerificationNotificationController.php',
@@ -23,7 +24,9 @@ return array(
     'App\\Http\\Controllers\\GridController' => $baseDir . '/app/Http/Controllers/GridController.php',
     'App\\Http\\Controllers\\ProfileController' => $baseDir . '/app/Http/Controllers/ProfileController.php',
     'App\\Http\\Controllers\\QoLController' => $baseDir . '/app/Http/Controllers/QoLController.php',
+    'App\\Http\\Controllers\\SimulationEventController' => $baseDir . '/app/Http/Controllers/SimulationEventController.php',
     'App\\Http\\Controllers\\UndoController' => $baseDir . '/app/Http/Controllers/UndoController.php',
+    'App\\Http\\Middleware\\RoleMiddleware' => $baseDir . '/app/Http/Middleware/RoleMiddleware.php',
     'App\\Http\\Requests\\Auth\\LoginRequest' => $baseDir . '/app/Http/Requests/Auth/LoginRequest.php',
     'App\\Http\\Requests\\ProfileUpdateRequest' => $baseDir . '/app/Http/Requests/ProfileUpdateRequest.php',
     'App\\Mail\\NewFunctionNotification' => $baseDir . '/app/Mail/NewFunctionNotification.php',
@@ -41,6 +44,7 @@ return array(
     'App\\Models\\TileType' => $baseDir . '/app/Models/TileType.php',
     'App\\Models\\UndoAction' => $baseDir . '/app/Models/UndoAction.php',
     'App\\Models\\User' => $baseDir . '/app/Models/User.php',
+    'App\\Policies\\PagePolicy' => $baseDir . '/app/Policies/PagePolicy.php',
     'App\\Providers\\AppServiceProvider' => $baseDir . '/app/Providers/AppServiceProvider.php',
     'App\\View\\Components\\AppLayout' => $baseDir . '/app/View/Components/AppLayout.php',
     'App\\View\\Components\\GuestLayout' => $baseDir . '/app/View/Components/GuestLayout.php',
@@ -177,6 +181,7 @@ return array(
     'Database\\Seeders\\DatabaseSeeder' => $baseDir . '/database/seeders/DatabaseSeeder.php',
     'Database\\Seeders\\DestinationSeeder' => $baseDir . '/database/seeders/DestinationSeeder.php',
     'Database\\Seeders\\EffectsSeeder' => $baseDir . '/database/seeders/EffectsSeeder.php',
+    'Database\\Seeders\\UserSeeder' => $baseDir . '/database/seeders/UserSeeder.php',
     'DeepCopy\\DeepCopy' => $vendorDir . '/myclabs/deep-copy/src/DeepCopy/DeepCopy.php',
     'DeepCopy\\Exception\\CloneException' => $vendorDir . '/myclabs/deep-copy/src/DeepCopy/Exception/CloneException.php',
     'DeepCopy\\Exception\\PropertyException' => $vendorDir . '/myclabs/deep-copy/src/DeepCopy/Exception/PropertyException.php',

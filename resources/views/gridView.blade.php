@@ -135,7 +135,7 @@
             class="px-4 py-2 bg-white dark:bg-gray-700 hover:bg-sky-600 hover:text-white text-gray-700 dark:text-gray-200 shadow-sm border border-gray-300 dark:border-gray-600 font-medium rounded transition">
             &#x23E9;
         </button>
-        <button type="button" id="redoBtn" title="Repeat"
+        <button type="button" id="replayBtn" title="Repeat"
             class="px-4 py-2 bg-white dark:bg-gray-700 hover:bg-sky-600 hover:text-white text-gray-700 dark:text-gray-200 shadow-sm border border-gray-300 dark:border-gray-600 font-medium rounded transition">
             &#x21BB;
         </button>

@@ -551,6 +551,7 @@ class ComposerStaticInit448b506834890d3a66187c46e76fc183
     );
 
     public static $classMap = array (
+        'App\\Enums\\UserRole' => __DIR__ . '/../..' . '/app/Enums/UserRole.php',
         'App\\Http\\Controllers\\Auth\\AuthenticatedSessionController' => __DIR__ . '/../..' . '/app/Http/Controllers/Auth/AuthenticatedSessionController.php',
         'App\\Http\\Controllers\\Auth\\ConfirmablePasswordController' => __DIR__ . '/../..' . '/app/Http/Controllers/Auth/ConfirmablePasswordController.php',
         'App\\Http\\Controllers\\Auth\\EmailVerificationNotificationController' => __DIR__ . '/../..' . '/app/Http/Controllers/Auth/EmailVerificationNotificationController.php',
@@ -568,7 +569,9 @@ class ComposerStaticInit448b506834890d3a66187c46e76fc183
         'App\\Http\\Controllers\\GridController' => __DIR__ . '/../..' . '/app/Http/Controllers/GridController.php',
         'App\\Http\\Controllers\\ProfileController' => __DIR__ . '/../..' . '/app/Http/Controllers/ProfileController.php',
         'App\\Http\\Controllers\\QoLController' => __DIR__ . '/../..' . '/app/Http/Controllers/QoLController.php',
+        'App\\Http\\Controllers\\SimulationEventController' => __DIR__ . '/../..' . '/app/Http/Controllers/SimulationEventController.php',
         'App\\Http\\Controllers\\UndoController' => __DIR__ . '/../..' . '/app/Http/Controllers/UndoController.php',
+        'App\\Http\\Middleware\\RoleMiddleware' => __DIR__ . '/../..' . '/app/Http/Middleware/RoleMiddleware.php',
         'App\\Http\\Requests\\Auth\\LoginRequest' => __DIR__ . '/../..' . '/app/Http/Requests/Auth/LoginRequest.php',
         'App\\Http\\Requests\\ProfileUpdateRequest' => __DIR__ . '/../..' . '/app/Http/Requests/ProfileUpdateRequest.php',
         'App\\Mail\\NewFunctionNotification' => __DIR__ . '/../..' . '/app/Mail/NewFunctionNotification.php',
@@ -586,6 +589,7 @@ class ComposerStaticInit448b506834890d3a66187c46e76fc183
         'App\\Models\\TileType' => __DIR__ . '/../..' . '/app/Models/TileType.php',
         'App\\Models\\UndoAction' => __DIR__ . '/../..' . '/app/Models/UndoAction.php',
         'App\\Models\\User' => __DIR__ . '/../..' . '/app/Models/User.php',
+        'App\\Policies\\PagePolicy' => __DIR__ . '/../..' . '/app/Policies/PagePolicy.php',
         'App\\Providers\\AppServiceProvider' => __DIR__ . '/../..' . '/app/Providers/AppServiceProvider.php',
         'App\\View\\Components\\AppLayout' => __DIR__ . '/../..' . '/app/View/Components/AppLayout.php',
         'App\\View\\Components\\GuestLayout' => __DIR__ . '/../..' . '/app/View/Components/GuestLayout.php',
@@ -722,6 +726,7 @@ class ComposerStaticInit448b506834890d3a66187c46e76fc183
         'Database\\Seeders\\DatabaseSeeder' => __DIR__ . '/../..' . '/database/seeders/DatabaseSeeder.php',
         'Database\\Seeders\\DestinationSeeder' => __DIR__ . '/../..' . '/database/seeders/DestinationSeeder.php',
         'Database\\Seeders\\EffectsSeeder' => __DIR__ . '/../..' . '/database/seeders/EffectsSeeder.php',
+        'Database\\Seeders\\UserSeeder' => __DIR__ . '/../..' . '/database/seeders/UserSeeder.php',
         'DeepCopy\\DeepCopy' => __DIR__ . '/..' . '/myclabs/deep-copy/src/DeepCopy/DeepCopy.php',
         'DeepCopy\\Exception\\CloneException' => __DIR__ . '/..' . '/myclabs/deep-copy/src/DeepCopy/Exception/CloneException.php',
         'DeepCopy\\Exception\\PropertyException' => __DIR__ . '/..' . '/myclabs/deep-copy/src/DeepCopy/Exception/PropertyException.php',
