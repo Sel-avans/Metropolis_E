@@ -1,5 +1,5 @@
 <?php
-
+// Test voor: login opportunity, SIM.1, SIM.2, SIM.5
 namespace Tests\Browser;
 
 use Laravel\Dusk\Browser;
