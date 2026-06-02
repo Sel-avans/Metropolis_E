@@ -3,8 +3,9 @@
 namespace App\Http\Controllers;
 
 use App\Models\SimulationEvent;
+use App\Services\SimSpeedService; // Zorg dat deze service bestaat in App\Services
 use Illuminate\Http\Request;
-use Carbon\Carbon; // toegevoegd voor tijd berekeningen
+use Carbon\Carbon;
 
 class SimulationEventController extends Controller
 {
@@ -13,15 +14,8 @@ class SimulationEventController extends Controller
      */
     public function index()
     {
-        // Fetch all events from the database
         $events = SimulationEvent::all();
-
         return view('events.index', compact('events'));
-    }
-
-    public function show(SimulationEvent $event)
-    {
-        return view('events.show', compact('event'));
     }
 
     /**
@@ -37,7 +31,6 @@ class SimulationEventController extends Controller
      */
     public function store(Request $request)
     {
-        // Dynamically validate fields based on the chosen event type (one-off or recurring)
         $validated = $request->validate([
             'name' => 'required|string|max:255',
             'description' => 'nullable|string',
@@ -47,7 +40,6 @@ class SimulationEventController extends Controller
             'recurring_schedule' => 'required_if:type,recurring|nullable|string',
         ]);
 
-        // Create the event in the database
         SimulationEvent::create($validated);
 
         return redirect()->route('events.index')->with('success', 'Event created successfully.');
@@ -66,7 +58,6 @@ class SimulationEventController extends Controller
      */
     public function update(Request $request, SimulationEvent $event)
     {
-        // Apply the same dynamic validation rules for updating
         $validated = $request->validate([
             'name' => 'required|string|max:255',
             'description' => 'nullable|string',
@@ -76,7 +67,6 @@ class SimulationEventController extends Controller
             'recurring_schedule' => 'required_if:type,recurring|nullable|string',
         ]);
 
-        // Update the database record
         $event->update($validated);
 
         return redirect()->route('events.index')->with('success', 'Event updated successfully.');
@@ -87,52 +77,46 @@ class SimulationEventController extends Controller
      */
     public function destroy(SimulationEvent $event)
     {
-        // Delete the event
         $event->delete();
 
         return redirect()->route('events.index')->with('success', 'Event deleted successfully.');
     }
 
-    // kleine toevoeging: geeft actieve events terug voor de UI
+    /**
+     * API: Geeft actieve events terug voor de UI.
+     */
     public function active()
     {
         $now = Carbon::now();
 
         $events = SimulationEvent::all()
             ->map(function ($event) use ($now) {
-
                 $isActive = false;
                 $timing = '';
 
-                // simpele check voor one-off events
                 if ($event->type === 'one-off' && $event->start_moment && $event->end_moment) {
                     $start = Carbon::parse($event->start_moment);
                     $end = Carbon::parse($event->end_moment);
 
                     if ($now->between($start, $end)) {
                         $isActive = true;
-
                         $mins = $now->diffInMinutes($end);
                         $timing = 'Ends in ' . $mins . ' min';
                     }
                 }
 
-                // simpele check voor recurring events
                 if ($event->type === 'recurring') {
                     $isActive = true;
                     $timing = 'Next: ' . ($event->recurring_schedule ?? 'unknown');
                 }
 
-                if (! $isActive) {
-                    return null;
-                }
+                if (! $isActive) return null;
 
                 return [
                     'id' => $event->id,
                     'name' => $event->name,
                     'type' => $event->type,
                     'timing' => $timing,
-                    // placeholder tot andere subtask klaar is
                     'affected_functions' => 'Functions modified (from other subtask)',
                 ];
             })
@@ -140,5 +124,38 @@ class SimulationEventController extends Controller
             ->values();
 
         return response()->json(['events' => $events]);
+    }
+
+    /**
+     * API: Update de simulatiesnelheid en herbereken actieve events.
+     */
+    public function changeSpeed(Request $request)
+    {
+        $request->validate([
+            'speed' => 'required|numeric|min:0.1',
+        ]);
+
+        $newSpeed = (float) $request->input('speed');
+        $oldSpeed = (float) session('current_simulation_speed', 1.0);
+
+        $manager = new SimSpeedService();
+        $events = SimulationEvent::all();
+
+        // Update elk event via de service
+        foreach ($events as $event) {
+            try {
+                $updateData = $manager->updateSpeedChange($event, $oldSpeed, $newSpeed);
+                $event->update($updateData);
+            } catch (\Exception $e) {
+                \Log::error("Fout bij update event ID {$event->id}: " . $e->getMessage());
+            }
+        }
+
+        session(['current_simulation_speed' => $newSpeed]);
+
+        return response()->json([
+            'success' => true,
+            'new_speed' => $newSpeed
+        ]);
     }
 }

@@ -1,6 +1,6 @@
 import { getNeighborsWithQoL } from './neighbours.js';
+
 import './simulation.js';
-import './regulation.js';
 
 document.addEventListener("DOMContentLoaded", () => {
     const cells = document.querySelectorAll(".grid-cell");
@@ -445,22 +445,6 @@ document.addEventListener("DOMContentLoaded", () => {
         } catch (err) {
             console.error('active events error', err);
         }
-    }
-
-
-    initSimulationControls();
-
-    function simulationLoop() {
-        if (getIsPlaying()) {
-
-            let time = getCurrentTime();
-            if (time < 100) { // MAX_TIME check
-                setCurrentTime(time + 1);
-                syncTimelineUI();
-            } else {
-            }
-        }
-        requestAnimationFrame(simulationLoop);
     }
 
     // Start de loop

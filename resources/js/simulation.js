@@ -1,3 +1,8 @@
+import { getIsPlaying, 
+    getCurrentTime, 
+    setCurrentTime,
+    syncTimelineUI, 
+    initSimulationControls } from './regulation.js';
 
 //Global State for standard speed
 export const simulationState = {
@@ -37,5 +42,19 @@ export const setSimulationSpeed = async (speed) => {
     }
 };
 
+initSimulationControls();
+
+    function simulationLoop() {
+        if (getIsPlaying()) {
+
+            let time = getCurrentTime();
+            if (time < 100) { // MAX_TIME check
+                setCurrentTime(time + 1);
+                syncTimelineUI();
+            } else {
+            }
+        }
+        requestAnimationFrame(simulationLoop);
+    }
 // Code to make function global for inline clicks
 window.setSimulationSpeed = setSimulationSpeed;
