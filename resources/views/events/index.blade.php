@@ -103,8 +103,10 @@
                                     
                                     @can('CanManageEvents', App\Policies\PagePolicy::class)
                                         <td class="px-5 py-5 border-b border-gray-200 bg-white text-sm">
-                                            <div class="flex items-center space-x-4">
-                                                <a href="{{ route('events.edit', $event) }}" class="text-indigo-600 hover:text-indigo-900">Edit</a>
+                                        <div class="flex items-center space-x-4">
+                                        <a href="{{ route('events.show', $event) }}" class="text-blue-600 hover:text-blue-900 font-semibold">Details</a>
+    
+                                        <a href="{{ route('events.edit', $event) }}" class="text-indigo-600 hover:text-indigo-900">Edit</a>
                                                 
                                                 <form action="{{ route('events.destroy', $event) }}" method="POST" onsubmit="return confirm('Are you sure you want to delete this event?');">
                                                     @csrf

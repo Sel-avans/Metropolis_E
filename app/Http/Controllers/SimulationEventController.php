@@ -6,7 +6,7 @@ use App\Models\SimulationEvent;
 use App\Services\EventModifierService;
 use Illuminate\Http\Request;
 use Carbon\Carbon; 
-
+use App\Models\CityFunction;
 class SimulationEventController extends Controller
 {
     /**
@@ -23,7 +23,7 @@ class SimulationEventController extends Controller
      */
     public function show(SimulationEvent $event)
         {
-            $event->load('effects');
+            $event->load('effects.cityFunction');
             return view('events.show', compact('event'));
         }
     /**
@@ -31,7 +31,9 @@ class SimulationEventController extends Controller
      */
     public function create()
     {
-        return view('events.create');
+        $cityFunctions = CityFunction::all();
+
+        return view('events.create', compact('cityFunctions'));
     }
 
     /**
@@ -39,6 +41,8 @@ class SimulationEventController extends Controller
      */
     public function store(Request $request)
     {
+
+        
         $validated = $request->validate([
             'name' => 'required|string|max:255',
             'description' => 'nullable|string',
@@ -50,11 +54,15 @@ class SimulationEventController extends Controller
             'recurring_end_date' => 'nullable|date|after_or_equal:recurring_start_date',
             'recurring_start_time' => 'required_if:type,recurring|nullable',
             'recurring_end_time'   => 'required_if:type,recurring|nullable',
+            'effects' => 'nullable|array',
+            'effects.*' => 'nullable|integer|min:-5|max:5',
         ]);
 
         SimulationEvent::create(EventModifierService::normalizeEventMoments($validated));
 
         return redirect()->route('events.index')->with('success', 'Event created successfully.');
+
+        
     }
 
     /**
@@ -62,7 +70,12 @@ class SimulationEventController extends Controller
      */
     public function edit(SimulationEvent $event)
     {
-        return view('events.edit', compact('event'));
+        // Load all available city functions
+        $cityFunctions = CityFunction::all();
+        
+        // Eager load the existing effects so we can display them in the form
+        $event->load('effects');
+        return view('events.edit', compact('event', 'cityFunctions'));
     }
 
     /**
@@ -81,9 +94,28 @@ class SimulationEventController extends Controller
             'recurring_end_date'   => 'required_if:type,recurring|nullable|date|after_or_equal:recurring_start_date',
             'recurring_start_time' => 'required_if:type,recurring|nullable',
             'recurring_end_time'   => 'required_if:type,recurring|nullable',
+            'effects' => 'nullable|array',
+            'effects.*' => 'nullable|integer|min:-5|max:5', // Validate that effects is an array if provided
         ]);
 
         $event->update(EventModifierService::normalizeEventMoments($validated));
+
+        // Handle the event effects
+        if ($request->has('effects')) {
+
+            $event->effects()->delete();
+
+            // Loop through the submitted effects and save the new ones
+            foreach ($request->effects as $functionId => $modifier) {
+                // Only save if the user actually typed a number
+                if (is_numeric($modifier)) {
+                    $event->effects()->create([
+                        'city_function_id' => $functionId,
+                        'modifier' => $modifier
+                    ]);
+                }
+            }
+        }
 
         return redirect()->route('events.index')->with('success', 'Event updated successfully.');
     }

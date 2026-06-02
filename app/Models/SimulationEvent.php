@@ -23,6 +23,8 @@ class SimulationEvent extends Model
 
     public function effects()
         {
-            return $this->hasMany(Effect::class, 'simulation_event_id');
+            return $this->hasMany(EventEffect::class, 'simulation_event_id');
         }
+
+    
 }
