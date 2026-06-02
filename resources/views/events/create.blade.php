@@ -135,23 +135,22 @@
                     </div>
 
                     <div class="mt-6 p-4 bg-gray-50 border border-gray-200 rounded-lg">
-                        <h3 class="text-lg font-medium text-gray-900 mb-4">Event Effect (Modifier)</h3>
+                        <h3 class="text-lg font-medium text-gray-900 mb-4">Event Effects (Modifiers)</h3>
+                        <p class="text-sm text-gray-500 mb-4">Leave blank if the event has no effect on a specific function.</p>
                         
-                        <div class="grid grid-cols-1 md:grid-cols-2 gap-4">
-                            <div>
-                                <label for="city_function_id" class="block text-sm font-medium text-gray-700">Target City Function</label>
-                                <select name="city_function_id" id="city_function_id" class="mt-1 block w-full border-gray-300 rounded-md shadow-sm focus:ring-blue-500 focus:border-blue-500">
-                                    <option value="">-- Select a function --</option>
-                                    @foreach($cityFunctions as $function)
-                                        <option value="{{ $function->id }}">{{ $function->name }}</option>
-                                    @endforeach
-                                </select>
-                            </div>
-
-                            <div>
-                                <label for="modifier" class="block text-sm font-medium text-gray-700">Modifier Value (e.g., +5 or -2)</label>
-                                <input type="number" name="modifier" id="modifier" class="mt-1 block w-full border-gray-300 rounded-md shadow-sm focus:ring-blue-500 focus:border-blue-500">
-                            </div>
+                        <div class="grid grid-cols-1 md:grid-cols-3 gap-4">
+                            @foreach($cityFunctions as $function)
+                                <div class="bg-white p-3 rounded border border-gray-200 shadow-sm">
+                                    <label for="effect_{{ $function->id }}" class="block text-sm font-semibold text-gray-700 mb-1">
+                                        {{ $function->name }}
+                                    </label>
+                                    <input type="number" 
+                                           name="effects[{{ $function->id }}]" 
+                                           id="effect_{{ $function->id }}" 
+                                           placeholder="e.g. 5 or -2"
+                                           class="mt-1 block w-full border-gray-300 rounded-md shadow-sm focus:ring-blue-500 focus:border-blue-500">
+                                </div>
+                            @endforeach
                         </div>
                     </div>
 
