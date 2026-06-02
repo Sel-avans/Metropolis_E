@@ -31,7 +31,7 @@ class SimulationEventController extends Controller
         
         return response()->json([
             'success' => true,
-            'message' => "Simulatiesnelheid aangepast naar {$newSpeed}x. Events live herberekend!",
+            'message' => "Simulationspeed changed to {$newSpeed}x. Events caculated live here!",
             'new_speed' => $newSpeed
         ]);
     }
