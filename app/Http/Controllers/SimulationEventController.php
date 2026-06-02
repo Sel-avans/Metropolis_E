@@ -54,6 +54,7 @@ class SimulationEventController extends Controller
             'recurring_start_time' => 'required_if:type,recurring|nullable',
             'recurring_end_time'   => 'required_if:type,recurring|nullable',
             'effects' => 'nullable|array',
+            'effects.*' => 'nullable|integer|min:-5|max:5',
         ]);
 
         $event = SimulationEvent::create($validated);
@@ -62,7 +63,7 @@ class SimulationEventController extends Controller
         if ($request->has('effects')) {
             foreach ($request->effects as $functionId => $modifier) {
                 // Only save if the user actually typed a number (skip empty fields)
-                if (!is_null($modifier) && $modifier !== '') {
+                if (is_numeric($modifier)) {
                     $event->effects()->create([
                         'city_function_id' => $functionId,
                         'modifier' => $modifier
@@ -105,7 +106,8 @@ class SimulationEventController extends Controller
             'recurring_end_date'   => 'required_if:type,recurring|nullable|date|after_or_equal:recurring_start_date',
             'recurring_start_time' => 'required_if:type,recurring|nullable',
             'recurring_end_time'   => 'required_if:type,recurring|nullable',
-            'effects' => 'nullable|array', // Validate that effects is an array if provided
+            'effects' => 'nullable|array',
+            'effects.*' => 'nullable|integer|min:-5|max:5', // Validate that effects is an array if provided
         ]);
 
         // Update the main event details
@@ -113,13 +115,13 @@ class SimulationEventController extends Controller
 
         // Handle the event effects
         if ($request->has('effects')) {
-            // Delete the old effects first to avoid duplicates or leaving unwanted effects behind
+
             $event->effects()->delete();
 
             // Loop through the submitted effects and save the new ones
             foreach ($request->effects as $functionId => $modifier) {
                 // Only save if the user actually typed a number
-                if (!is_null($modifier) && $modifier !== '') {
+                if (is_numeric($modifier)) {
                     $event->effects()->create([
                         'city_function_id' => $functionId,
                         'modifier' => $modifier

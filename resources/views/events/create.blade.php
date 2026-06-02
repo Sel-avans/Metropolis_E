@@ -136,19 +136,39 @@
 
                     <div class="mt-6 p-4 bg-gray-50 border border-gray-200 rounded-lg">
                         <h3 class="text-lg font-medium text-gray-900 mb-4">Event Effects (Modifiers)</h3>
-                        <p class="text-sm text-gray-500 mb-4">Leave blank if the event has no effect on a specific function.</p>
+                        <p class="text-sm text-gray-500 mb-4">Adjust the impact using the - and + buttons (min -5, max +5).</p>
                         
                         <div class="grid grid-cols-1 md:grid-cols-3 gap-4">
                             @foreach($cityFunctions as $function)
-                                <div class="bg-white p-3 rounded border border-gray-200 shadow-sm">
-                                    <label for="effect_{{ $function->id }}" class="block text-sm font-semibold text-gray-700 mb-1">
+                                @php
+                                    // Default value is 0
+                                    $currentVal = old('effects.'.$function->id, 0);
+                                @endphp
+                                
+                                <div class="bg-white p-3 rounded border border-gray-200 shadow-sm flex flex-col items-center">
+                                    <label class="block text-sm font-semibold text-gray-700 mb-2 text-center w-full">
                                         {{ $function->name }}
                                     </label>
-                                    <input type="number" 
-                                           name="effects[{{ $function->id }}]" 
-                                           id="effect_{{ $function->id }}" 
-                                           placeholder="e.g. 5 or -2"
-                                           class="mt-1 block w-full border-gray-300 rounded-md shadow-sm focus:ring-blue-500 focus:border-blue-500">
+                                    
+                                    <div class="flex items-center justify-center space-x-3 mt-1">
+                                        <button type="button" 
+                                                onclick="adjustEffect({{ $function->id }}, -1)" 
+                                                class="bg-red-500 hover:bg-red-600 text-white font-bold w-8 h-8 rounded flex items-center justify-center focus:outline-none focus:ring-2 focus:ring-red-400">
+                                            -
+                                        </button>
+                                        
+                                        <input type="text" readonly 
+                                               name="effects[{{ $function->id }}]" 
+                                               id="effect_{{ $function->id }}" 
+                                               value="{{ $currentVal }}"
+                                               class="w-16 text-center border border-gray-300 rounded-md shadow-sm bg-gray-100 font-bold text-gray-800 focus:ring-0 cursor-default">
+                                        
+                                        <button type="button" 
+                                                onclick="adjustEffect({{ $function->id }}, 1)" 
+                                                class="bg-green-500 hover:bg-green-600 text-white font-bold w-8 h-8 rounded flex items-center justify-center focus:outline-none focus:ring-2 focus:ring-green-400">
+                                            +
+                                        </button>
+                                    </div>
                                 </div>
                             @endforeach
                         </div>
@@ -219,5 +239,21 @@
         
         // Initialize form view state on page load
         document.addEventListener('DOMContentLoaded', toggleEventFields);
+
+        // Adjust the effect value and enforce the limits (-5 to +5)
+        function adjustEffect(functionId, changeAmount) {
+            const inputField = document.getElementById('effect_' + functionId);
+            
+            // Parse the current value as an integer
+            let currentValue = parseInt(inputField.value) || 0;
+            
+            // Calculate the new value
+            let newValue = currentValue + changeAmount;
+            
+            // Enforce constraints as per documentation (-5 to 5 limit)
+            if (newValue >= -5 && newValue <= 5) {
+                inputField.value = newValue;
+            }
+        }
     </script>
 </x-app-layout>
