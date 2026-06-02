@@ -1,4 +1,5 @@
 <?php
+// Tests voor Login Opportunity
 
 namespace Tests\Feature;
 

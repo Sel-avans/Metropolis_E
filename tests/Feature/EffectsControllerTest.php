@@ -1,4 +1,5 @@
 <?php
+// Test voor EFF.1
 
 namespace Tests\Feature;
 
@@ -11,7 +12,6 @@ class EffectsControllerTest extends TestCase
 {
     use RefreshDatabase;
     
-    // Test voor EFF.1
     public function test_effects_can_be_updated()
     {
         // Maak een city function aan

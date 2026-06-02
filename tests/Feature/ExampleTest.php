@@ -1,4 +1,5 @@
 <?php
+// Default test, can be ignored.
 
 namespace Tests\Feature;
 

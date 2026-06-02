@@ -1,4 +1,5 @@
 <?php
+//Tests voor BES.2
 
 namespace Tests\Feature;
 
@@ -16,7 +17,6 @@ class FunctionsControllerTest extends TestCase
         return User::factory()->create();
     }
 
-    //Tests voor BES.2
     public function test_admin_can_create_function()
     {
         $admin = $this->adminUser();
