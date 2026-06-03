@@ -58,7 +58,7 @@
                         <div class="mb-2">
                             <label for="start_moment" class="block text-gray-700 font-bold mb-2">Start Moment</label>
                             <input type="datetime-local" id="start_moment" name="start_moment" 
-                                   value="{{ old('start_moment', \App\Services\EventModifierService::toDatetimeLocalValue($event->start_moment)) }}" 
+                                   value="{{ old('start_moment', $event->start_moment ? \App\Services\EventModifierService::toDatetimeLocalValue($event->start_moment) : '') }}" 
                                    class="shadow appearance-none border rounded w-full py-2 px-3 text-gray-700 leading-tight focus:outline-none focus:shadow-outline @error('start_moment') border-red-500 border-2 @enderror">
                             @error('start_moment')
                                 <p class="text-red-500 text-xs italic mt-2">{{ $message }}</p>
@@ -68,7 +68,7 @@
                         <div>
                             <label for="end_moment" class="block text-gray-700 font-bold mb-2">End Moment</label>
                             <input type="datetime-local" id="end_moment" name="end_moment" 
-                                   value="{{ old('end_moment', \App\Services\EventModifierService::toDatetimeLocalValue($event->end_moment)) }}" 
+                                   value="{{ old('end_moment', $event->end_moment ? \App\Services\EventModifierService::toDatetimeLocalValue($event->end_moment) : '') }}" 
                                    class="shadow appearance-none border rounded w-full py-2 px-3 text-gray-700 leading-tight focus:outline-none focus:shadow-outline @error('end_moment') border-red-500 border-2 @enderror">
                             @error('end_moment')
                                 <p class="text-red-500 text-xs italic mt-2">{{ $message }}</p>

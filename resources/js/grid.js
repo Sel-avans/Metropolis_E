@@ -25,6 +25,10 @@ document.addEventListener("DOMContentLoaded", () => {
 
     let eventTimerInterval = null;
     let lastActiveEventSignature = '';
+    let serverClockOffsetMs = 0;
+    let eventBoundaryTimeouts = [];
+    const EVENT_POLL_MS = 1000;
+    const MAX_SCHEDULE_MS = 24 * 60 * 60 * 1000;
 
     function formatModifiers(modifiers) {
         if (!modifiers || typeof modifiers !== 'object') {
@@ -36,6 +40,7 @@ document.addEventListener("DOMContentLoaded", () => {
                 const num = Number(value);
                 const sign = num >= 0 ? '+' : '';
                 const label = category.charAt(0).toUpperCase() + category.slice(1);
+                console.log({label, num, sign});
                 return `<li class="text-amber-400">- ${label}: ${sign}${num}</li>`;
             });
 
@@ -56,6 +61,41 @@ document.addEventListener("DOMContentLoaded", () => {
         );
     }
 
+    function simulationNowMs() {
+        return Date.now() + serverClockOffsetMs;
+    }
+
+    function clearEventBoundarySchedules() {
+        eventBoundaryTimeouts.forEach((timeoutId) => clearTimeout(timeoutId));
+        eventBoundaryTimeouts = [];
+    }
+
+    function scheduleEventBoundary(delayMs) {
+        if (delayMs < 0 || delayMs > MAX_SCHEDULE_MS) {
+            return;
+        }
+
+        const timeoutId = setTimeout(() => {
+            updateActiveEvents({ forceQolRefresh: true });
+        }, delayMs);
+
+        eventBoundaryTimeouts.push(timeoutId);
+    }
+
+    function scheduleEventBoundaries(events) {
+        clearEventBoundarySchedules();
+
+        (events || []).forEach((event) => {
+            if (event.start_at) {
+                scheduleEventBoundary((Number(event.start_at) * 1000) - simulationNowMs());
+            }
+
+            if (event.end_at) {
+                scheduleEventBoundary((Number(event.end_at) * 1000) - simulationNowMs());
+            }
+        });
+    }
+
     async function updateActiveEvents({ forceQolRefresh = false } = {}) {
         const listEl = document.getElementById('active-events-list');
         const emptyEl = document.getElementById('active-events-empty');
@@ -63,14 +103,18 @@ document.addEventListener("DOMContentLoaded", () => {
         if (!listEl || !emptyEl) return;
 
         try {
-            const response = await fetch('/events/active', {
-                credentials: 'same-origin',
-                headers: { 'Accept': 'application/json' },
-            });
+            const response = await fetch('/events/active');
             if (!response.ok) return;
 
             const data = await response.json();
             if (!data || !data.events) return;
+            console.log(data);
+
+            if (typeof data.server_now_ms === 'number') {
+                serverClockOffsetMs = data.server_now_ms - Date.now();
+            }
+
+            scheduleEventBoundaries(data.events);
 
             const signature = buildEventSignature(data.events);
             if (signature !== lastActiveEventSignature) {
@@ -80,43 +124,52 @@ document.addEventListener("DOMContentLoaded", () => {
                 updateQoL();
             }
 
-            if (data.events.length > 0) {
+            const visibleEvents = data.events.filter((event) => event.is_active || event.start_at);
+
+                        if (visibleEvents.length > 0) {
                 emptyEl.classList.add('hidden');
                 listEl.innerHTML = '';
 
-                const activeTimers = [];
+                const countdownTimers = [];
 
-                data.events.forEach((event, index) => {
+                visibleEvents.forEach((event, index) => {
                     const li = document.createElement('li');
-                    li.className = "p-3 bg-slate-800 border-l-4 border-amber-500 rounded shadow-sm mb-2 text-sm";
+                    const borderClass = event.is_active
+                        ? 'border-amber-500'
+                        : 'border-slate-500';
+                    li.className = `p-3 bg-slate-800 border-l-4 ${borderClass} rounded shadow-sm mb-2 text-sm`;
 
                     const timerId = `event-timer-${index}`;
-                    const modifiersHtml = formatModifiers(event.modifiers);
-                    const endsAtHtml = event.ends_at_display
-                        ? `<div class="text-[11px] text-gray-500 mt-0.5">Ends at ${event.ends_at_display}</div>`
-                        : '';
+                    const modifiersHtml = event.is_active ? formatModifiers(event.modifiers) : '';
+                    const scheduleHtml = event.is_active
+                        ? (event.ends_at_display
+                            ? `<div class="text-[11px] text-gray-500 mt-0.5">Ends at ${event.ends_at_display}</div>`
+                            : '')
+                        : (event.starts_at_display
+                            ? `<div class="text-[11px] text-gray-500 mt-0.5">Starts at ${event.starts_at_display}</div>`
+                            : '');
 
                     li.innerHTML = `
-                        <div class="font-semibold text-slate-200">${event.name || 'Nameless Event'}</div>
+                        <div class="font-semibold text-slate-200">${event.name || 'Unnamed event'}</div>
                         ${modifiersHtml}
-                        ${endsAtHtml}
+                        ${scheduleHtml}
                         <div id="${timerId}" class="text-[11px] text-emerald-400 font-mono mt-1 font-bold">
                             Loading...
                         </div>
                     `;
                     listEl.appendChild(li);
 
-                    if (event.end_at) {
-                        let endTimeMs = 0;
-                        if (typeof event.end_at === 'number' || (!isNaN(event.end_at) && !isNaN(parseFloat(event.end_at)))) {
-                            endTimeMs = Number(event.end_at) * 1000;
-                        } else {
-                            const formattedString = String(event.end_at).replace(' ', 'T');
-                            endTimeMs = new Date(formattedString).getTime();
-                        }
+                    const targetTimestamp = event.is_active ? event.end_at : event.start_at;
 
-                        if (!isNaN(endTimeMs) && endTimeMs > 0) {
-                            activeTimers.push({ elementId: timerId, endTimeMs });
+                    if (targetTimestamp) {
+                        const targetTimeMs = Number(targetTimestamp) * 1000;
+
+                        if (!Number.isNaN(targetTimeMs) && targetTimeMs > 0) {
+                            countdownTimers.push({
+                                elementId: timerId,
+                                targetTimeMs,
+                                isActive: Boolean(event.is_active),
+                            });
                         }
                     } else if (event.type === 'recurring') {
                         const timerEl = document.getElementById(timerId);
@@ -126,50 +179,56 @@ document.addEventListener("DOMContentLoaded", () => {
                         }
                     } else {
                         const timerEl = document.getElementById(timerId);
-                        if (timerEl) timerEl.textContent = "No end time known";
+                        if (timerEl) timerEl.textContent = "No time available";
                     }
                 });
 
                 if (eventTimerInterval) clearInterval(eventTimerInterval);
 
-                if (activeTimers.length > 0) {
+                if (countdownTimers.length > 0) {
                     const tick = () => {
-                        const nowMs = Date.now();
+                        const nowMs = simulationNowMs();
                         let stillRunning = false;
-                        let anyExpired = false;
+                        let boundaryCrossed = false;
 
-                        activeTimers.forEach(timer => {
+                        countdownTimers.forEach((timer) => {
                             const timerEl = document.getElementById(timer.elementId);
                             if (!timerEl) return;
 
-                            const distance = timer.endTimeMs - nowMs;
+                            const distance = timer.targetTimeMs - nowMs;
 
                             if (distance <= 0) {
-                                timerEl.textContent = "Expired";
+                                boundaryCrossed = true;
+                                timerEl.textContent = timer.isActive ? 'Ended' : 'Starting...';
                                 timerEl.className = "text-[11px] text-red-500 font-bold mt-1";
-                                anyExpired = true;
                             } else {
                                 stillRunning = true;
                                 const totalSeconds = Math.floor(distance / 1000);
                                 const minutes = Math.floor(totalSeconds / 60);
                                 const seconds = totalSeconds % 60;
-                                timerEl.textContent = `Time left: ${String(minutes).padStart(2, '0')}:${String(seconds).padStart(2, '0')}`;
+                                const label = timer.isActive ? 'Time left' : 'Starts in';
+                                timerEl.textContent = `${label}: ${String(minutes).padStart(2, '0')}:${String(seconds).padStart(2, '0')}`;
+                                timerEl.className = "text-[11px] text-emerald-400 font-mono mt-1 font-bold";
                             }
                         });
 
-                        if (anyExpired && !stillRunning) {
+                        if (boundaryCrossed) {
+                            updateActiveEvents({ forceQolRefresh: true });
+                        }
+
+                        if (!stillRunning) {
                             clearInterval(eventTimerInterval);
                             eventTimerInterval = null;
-                            updateActiveEvents();
                         }
                     };
 
                     tick();
-                    eventTimerInterval = setInterval(tick, 1000);
+                    eventTimerInterval = setInterval(tick, EVENT_POLL_MS);
                 }
             } else {
                 emptyEl.classList.remove('hidden');
                 listEl.innerHTML = '';
+                clearEventBoundarySchedules();
                 if (eventTimerInterval) {
                     clearInterval(eventTimerInterval);
                     eventTimerInterval = null;
