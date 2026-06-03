@@ -31,7 +31,7 @@ export const initSimulationControls = () => {
     playPauseBtn.addEventListener('click', () => {
         isPlaying = !isPlaying;
         playPauseBtn.innerHTML = isPlaying ? '&#x23F8;' : '&#x25B6;';
-        console.log(`Simulatie status gewijzigd naar: ${isPlaying ? 'PLAYING' : 'PAUSED'}`);
+        console.log(`Simulation status changed to: ${isPlaying ? 'PLAYING' : 'PAUSED'}`);
     });
 
     // Replay (Replay from t=0)
@@ -40,14 +40,14 @@ export const initSimulationControls = () => {
         timeline.value = 0;
         isPlaying = true;
         playPauseBtn.innerHTML = '&#x23F8;';
-        updateEventsUI([]); // Clear events op reset
+        updateEventsUI([]);
         console.log("Replaying simulation from start");
     });
 
     // Timeline Scrubbing
     timeline.addEventListener('input', (e) => {
         currentTime = parseInt(e.target.value);
-        console.log(`Timeline gescrubd naar: ${currentTime}`);
+        console.log(`Timeline scrubbed to: ${currentTime}`);
     });
 
     // Forward
@@ -55,6 +55,7 @@ export const initSimulationControls = () => {
         if (currentTime < MAX_TIME) {
             currentTime++;
             timeline.value = currentTime;
+            console.log("Forwarding simulation");
         }
     });
 
@@ -63,6 +64,7 @@ export const initSimulationControls = () => {
         if (currentTime > 0) {
             currentTime--;
             timeline.value = currentTime;
+            console.log("Reversing simulation");
         }
     });
 };
