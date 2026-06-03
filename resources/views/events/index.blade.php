@@ -71,11 +71,11 @@
                             @forelse ($events as $event)
                                 <tr>
                                     <td class="px-5 py-5 border-b border-gray-200 bg-white text-sm">
-                                        <a href="{{ route('events.show', $event) }}" class="text-blue-600 hover:text-blue-900 font-bold hover:underline transition-colors">
-                                            {{ $event->name }}
-                                        </a>
-                                        <p class="text-gray-500 whitespace-no-wrap text-xs">{{ $event->description }}</p>
-                                    </td>
+                                    <span class="text-sm text-gray-900 whitespace-no-wrap">
+                                        {{ ucfirst($event->name) }}
+                                    </span>
+                                    <p class="text-gray-500 whitespace-no-wrap text-xs">{{ $event->description }}</p>
+                                </td>
                                     <td class="px-5 py-5 border-b border-gray-200 bg-white text-sm">
                                         <span class="relative inline-block px-3 py-1 font-semibold text-blue-900 leading-tight">
                                             <span aria-hidden class="absolute inset-0 bg-blue-200 opacity-50 rounded-full"></span>
