@@ -1,5 +1,7 @@
 import { getNeighborsWithQoL } from './neighbours.js';
 
+import './simulation.js';
+
 document.addEventListener("DOMContentLoaded", () => {
 
     function activateCell(cell) {
@@ -659,4 +661,16 @@ document.addEventListener("DOMContentLoaded", () => {
             });
         });
     }
+
+    // Start de loop
+    simulationLoop();
+
+    // eenmalig laden
+    loadActiveEvents();
+  
+
+    // elke 10 sec verversen
+    setInterval(loadActiveEvents, 10000);
+
+    updateQoL();
 });

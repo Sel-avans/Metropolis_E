@@ -7,6 +7,10 @@ use Illuminate\Database\Eloquent\Relations\HasMany;
 
 class SimulationEvent extends Model
 {
+   
+    protected $table = 'simulation_events';
+
+   
     protected $fillable = [
         'name',
         'description',
@@ -18,6 +22,8 @@ class SimulationEvent extends Model
         'recurring_end_date',
         'recurring_start_time',
         'recurring_end_time',
+        'remaining_base_duration', 
+        'last_updated_at', 
     ];
 
     /** Assigned city functions (destinations) for this event. */

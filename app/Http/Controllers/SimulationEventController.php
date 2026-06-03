@@ -234,4 +234,37 @@ class SimulationEventController extends Controller
             ]);
         }
     }
+
+    /**
+     * API: Update de simulatiesnelheid en herbereken actieve events.
+     */
+    public function changeSpeed(Request $request)
+    {
+        $request->validate([
+            'speed' => 'required|numeric|min:0.1',
+        ]);
+
+        $newSpeed = (float) $request->input('speed');
+        $oldSpeed = (float) session('current_simulation_speed', 1.0);
+
+        $manager = new SimSpeedService();
+        $events = SimulationEvent::all();
+
+        // Update elk event via de service
+        foreach ($events as $event) {
+            try {
+                $updateData = $manager->updateSpeedChange($event, $oldSpeed, $newSpeed);
+                $event->update($updateData);
+            } catch (\Exception $e) {
+                \Log::error("Fout bij update event ID {$event->id}: " . $e->getMessage());
+            }
+        }
+
+        session(['current_simulation_speed' => $newSpeed]);
+
+        return response()->json([
+            'success' => true,
+            'new_speed' => $newSpeed
+        ]);
+    }
 }
