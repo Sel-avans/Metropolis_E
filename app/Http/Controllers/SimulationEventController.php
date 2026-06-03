@@ -8,6 +8,7 @@ use App\Models\EventEffect;
 use App\Models\SimulationEvent;
 use App\Services\EventModifierService;
 use Illuminate\Http\Request;
+use App\Services\SimSpeedService;
 
 class SimulationEventController extends Controller
 {

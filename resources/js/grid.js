@@ -1,6 +1,5 @@
 import { getNeighborsWithQoL } from './neighbours.js';
-
-import './simulation.js';
+import { simulationLoop } from './simulation.js';
 
 document.addEventListener("DOMContentLoaded", () => {
 

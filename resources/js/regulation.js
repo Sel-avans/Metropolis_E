@@ -89,9 +89,14 @@ export const updateEventsUI = (activeEvents) => {
     });
 };
 
+
 export const syncTimelineUI = () => {
     const timeline = document.getElementById('simulation-timeline');
     if (timeline) {
-        timeline.value = currentTime;
+        const time = getCurrentTime(); // Zorg dat deze functie de laatst bijgewerkte tijd teruggeeft
+        timeline.value = time;
+        
+        // DEBUG: Kijk of de waarde in de console verandert
+        console.log("Huidige tijd:", time); 
     }
 };

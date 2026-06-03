@@ -52,17 +52,34 @@ export const setSimulationSpeed = async (speed) => {
 
 initSimulationControls();
 
-function simulationLoop() {
-    if (getIsPlaying()) {
 
-        let time = getCurrentTime();
-        if (time < 100) { // MAX_TIME check
-            setCurrentTime(time + 1);
-            syncTimelineUI();
-        } else {
+let lastTimestamp = 0;
+
+export function simulationLoop(timestamp) {
+    if (getIsPlaying()) {
+        if (!lastTimestamp) lastTimestamp = timestamp;
+        
+        // Bereken verstreken tijd in seconden sinds de vorige frame
+        const deltaTime = (timestamp - lastTimestamp) / 1000;
+        
+        let currentTime = getCurrentTime();
+        if (currentTime < 100) {
+            // INCREMENT = Snelheid * verstreken tijd
+            // Bij 1x snelheid: voegt 1 unit per seconde toe
+            // Bij 5x snelheid: voegt 5 units per seconde toe
+            const increment = simulationState.speed * deltaTime;
+            
+            setCurrentTime(Math.min(currentTime + increment, 100));
+            syncTimelineUI(); // Update de balk
         }
+        
+        lastTimestamp = timestamp;
+    } else {
+        lastTimestamp = 0; // Reset na pauzeren
     }
+    
     requestAnimationFrame(simulationLoop);
 }
+
 // Code to make function global for inline clicks
 window.setSimulationSpeed = setSimulationSpeed;
