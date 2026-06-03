@@ -188,9 +188,13 @@
         <div class="border-l border-gray-400 dark:border-gray-700 w-2/12 p-3 ml-auto flex flex-col gap-4">
             <div id="breakdown-qol-score"></div>
             <div id="active-events-panel">
-                <h3 class="text-lg font-semibold mb-2 dark:text-teal-500">Events</h3>
-                <div id="active-events-empty" class="text-sm text-gray-500">No events.</div>
-                <ul id="active-events-list" class="space-y-2 text-sm dark:text-white"></ul>
+                <h3 class="text-lg font-bold text-emerald-400 mb-3">Active Events</h3>
+
+                <div id="active-events-empty" class="text-gray-400 text-sm italic {{ ($activeEvents ?? collect())->isNotEmpty() ? 'hidden' : '' }}">
+                    No active events right now.
+                </div>
+
+                <ul id="active-events-list" class="space-y-3"></ul>
             </div>
         </div>
     </div>
