@@ -1,6 +1,7 @@
 import { getNeighborsWithQoL } from './neighbours.js';
 import './simulation.js';
 
+
 document.addEventListener("DOMContentLoaded", () => {
 
     function activateCell(cell) {
