@@ -1,8 +1,10 @@
-import { getIsPlaying, 
-    getCurrentTime, 
+import {
+    getIsPlaying,
+    getCurrentTime,
     setCurrentTime,
-    syncTimelineUI, 
-    initSimulationControls } from './regulation.js';
+    syncTimelineUI,
+    initSimulationControls
+} from './regulation.js';
 
 //Global State for standard speed
 export const simulationState = {
@@ -20,9 +22,15 @@ export const setSimulationSpeed = async (speed) => {
     document.querySelectorAll('.speed-btn').forEach(btn => {
         const isSelected = parseInt(btn.getAttribute('data-speed')) === speed;
         btn.classList.toggle('bg-teal-600', isSelected);
-        btn.classList.toggle('text-white', isSelected);
         btn.classList.toggle('bg-gray-200', !isSelected);
         btn.classList.toggle('dark:bg-gray-700', !isSelected);
+
+
+        btn.classList.toggle('text-black', isSelected);
+        btn.classList.toggle('text-white', false);
+
+        btn.classList.toggle('text-gray-700', !isSelected);
+        btn.classList.toggle('dark:text-gray-200', !isSelected);
     });
 
     try {
@@ -44,17 +52,17 @@ export const setSimulationSpeed = async (speed) => {
 
 initSimulationControls();
 
-    function simulationLoop() {
-        if (getIsPlaying()) {
+function simulationLoop() {
+    if (getIsPlaying()) {
 
-            let time = getCurrentTime();
-            if (time < 100) { // MAX_TIME check
-                setCurrentTime(time + 1);
-                syncTimelineUI();
-            } else {
-            }
+        let time = getCurrentTime();
+        if (time < 100) { // MAX_TIME check
+            setCurrentTime(time + 1);
+            syncTimelineUI();
+        } else {
         }
-        requestAnimationFrame(simulationLoop);
     }
+    requestAnimationFrame(simulationLoop);
+}
 // Code to make function global for inline clicks
 window.setSimulationSpeed = setSimulationSpeed;
