@@ -79,10 +79,10 @@
             </button>
 
             {{-- Section City Grid --}}
-            <div class="w-auto p-6">
+            <div class="w-auto p-6 justify-center">
                 <h1 class="text-2xl text-center font-bold mb-4 dark:text-teal-300">City Grid</h1>
 
-                <div class="city-grid grid grid-flow-col grid-rows-3 gap-3 w-min">
+                <div class="city-grid grid grid-flow-col grid-rows-3 gap-3 w-min mx-auto">
                     @for($col = 1; $col <= 4; $col++)
                         @for($row = 1; $row <= 3; $row++)
                             @php
