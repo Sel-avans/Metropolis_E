@@ -93,13 +93,22 @@
                                 draggable="{{ $cell ? 'true' : 'false' }}" role="button"
                                 aria-label="{{ $cell && $cell->function ? 'Cell ' . $row . ',' . $col . ' with ' . $cell->function->name : 'Empty cell ' . $row . ',' . $col }}">
 
-                                @if($cell && $cell->function)
-                                    <img src="{{ asset($cell->function->image) }}" alt="{{ $cell->function->name }}"
-                                        class="grid-function-icon object-contain w-20 h-20"
-                                        data-function-id="{{ $cell->function->id }}">
-                                    <button type="button"
-                                        class="delete-btn absolute top-1 right-1 bg-red-600 text-white w-5 h-5 text-xs rounded-full flex items-center justify-center hover:bg-red-700"
-                                        aria-label="Remove">✖</button>
+                                @if(!empty($cell) && !empty($cell->function))
+                                    <img 
+                                        src="{{ asset($cell->function->image) }}"
+                                        alt="{{ $cell->function->name }}"
+                                        class="grid-function-icon object-contain"
+                                        data-function-id="{{ $cell->function->id }}"
+                                    >
+
+                                    <button 
+                                            type="button"
+                                            class="delete-btn absolute top-[2px] right-[2px] bg-red-600/80 text-white w-5 h-5 text-[14px] rounded cursor-pointer flex items-center justify-center"
+                                            aria-label="Remove {{ $cell->function->name }} from grid cell"
+                                            title="Remove {{ $cell->function->name }} from grid cell">
+                                            <span class="sr-only">Remove {{ $cell->function->name }} from grid cell</span>✖
+                                    </button>
+
                                 @endif
                             </div>
                         @endfor
