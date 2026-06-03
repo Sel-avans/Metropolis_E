@@ -263,7 +263,7 @@ document.addEventListener("DOMContentLoaded", () => {
         let html = '';
 
         if (old_score === undefined) {
-            html += ''; 
+            html += '';
         } else {
             const delta_score = data.total_score - old_score;
             html += `
@@ -433,7 +433,7 @@ document.addEventListener("DOMContentLoaded", () => {
                 const wantsToReplace = window.confirm("Are you sure you want to replace this feature?");
                 if (!wantsToReplace) {
                     if (sourceCell) sourceCell.classList.remove("drag-source");
-                    return; 
+                    return;
                 }
             }
 
@@ -467,7 +467,7 @@ document.addEventListener("DOMContentLoaded", () => {
             const deleteText = `Remove ${draggedItem.name} from grid cell`;
             deleteBtn.setAttribute("aria-label", deleteText);
             deleteBtn.setAttribute("title", deleteText);
-            
+
             const srText = document.createElement("span");
             srText.className = "sr-only";
             srText.textContent = deleteText;
@@ -526,15 +526,15 @@ document.addEventListener("DOMContentLoaded", () => {
         cell.addEventListener('mouseenter', (event) => {
             const row = parseInt(cell.dataset.row);
             const col = parseInt(cell.dataset.col);
-            clearTimeout(hoverTimer); 
-            hoverTimer = setTimeout(() => { 
-                handleTileHover(row, col, event); 
+            clearTimeout(hoverTimer);
+            hoverTimer = setTimeout(() => {
+                handleTileHover(row, col, event);
             }, HOVER_DELAY_MS);
         });
 
-        cell.addEventListener('mouseleave', () => { 
-            clearTimeout(hoverTimer); 
-            hidePopup(); 
+        cell.addEventListener('mouseleave', () => {
+            clearTimeout(hoverTimer);
+            hidePopup();
         });
     }); // <-- Dit sloot in jouw code de cells-loop niet af! Nu wel.
 
@@ -605,17 +605,17 @@ document.addEventListener("DOMContentLoaded", () => {
                     'Content-Type': 'application/json'
                 }
             })
-            .then(res => res.json())
-            .then(data => {
-                if (!data.success) return;
+                .then(res => res.json())
+                .then(data => {
+                    if (!data.success) return;
 
-                const targetCell = document.querySelector(
-                    `[data-row="${data.cell.row}"][data-col="${data.cell.col}"]`
-                );
+                    const targetCell = document.querySelector(
+                        `[data-row="${data.cell.row}"][data-col="${data.cell.col}"]`
+                    );
 
-                if (targetCell) {
-                    if (data.cell.function_id) {
-                        targetCell.innerHTML = `
+                    if (targetCell) {
+                        if (data.cell.function_id) {
+                            targetCell.innerHTML = `
                             <img src="${data.cell.image}" 
                                  class="grid-function-icon object-contain"
                                  data-function-id="${data.cell.function_id}">
@@ -624,49 +624,61 @@ document.addEventListener("DOMContentLoaded", () => {
                                 ✖
                             </button>
                         `;
-                        targetCell.setAttribute("draggable", "true");
-                    } else {
-                        targetCell.innerHTML = "";
-                        targetCell.removeAttribute("draggable");
+                            targetCell.setAttribute("draggable", "true");
+                        } else {
+                            targetCell.innerHTML = "";
+                            targetCell.removeAttribute("draggable");
+                        }
+                        activateCell(targetCell);
                     }
-                    activateCell(targetCell);
-                }
 
-                if (data.cleared) {
-                    const clearedCell = document.querySelector(
-                        `[data-row="${data.cleared.row}"][data-col="${data.cleared.col}"]`
-                    );
+                    if (data.cleared) {
+                        const clearedCell = document.querySelector(
+                            `[data-row="${data.cleared.row}"][data-col="${data.cleared.col}"]`
+                        );
 
-                    if (clearedCell) {
-                        clearedCell.innerHTML = "";
-                        clearedCell.removeAttribute("draggable");
-                        clearedCell.classList.remove("selected");
+                        if (clearedCell) {
+                            clearedCell.innerHTML = "";
+                            clearedCell.removeAttribute("draggable");
+                            clearedCell.classList.remove("selected");
+                        }
                     }
-                }
 
-                document.querySelectorAll('.grid-cell').forEach(c => {
-                    const cRow = Number(c.dataset.row);
-                    const cCol = Number(c.dataset.col);
+                    document.querySelectorAll('.grid-cell').forEach(c => {
+                        const cRow = Number(c.dataset.row);
+                        const cCol = Number(c.dataset.col);
 
-                    if (cRow === Number(data.cell.row) && cCol === Number(data.cell.col)) return;
+                        if (cRow === Number(data.cell.row) && cCol === Number(data.cell.col)) return;
 
-                    if (data.cleared && cRow === Number(data.cleared.row) && cCol === Number(data.cleared.col)) {
-                        c.innerHTML = "";
-                        c.removeAttribute("draggable");
-                    }
+                        if (data.cleared && cRow === Number(data.cleared.row) && cCol === Number(data.cleared.col)) {
+                            c.innerHTML = "";
+                            c.removeAttribute("draggable");
+                        }
+                    });
+
+                    setTimeout(() => updateQoL(), 50);
                 });
-
-                setTimeout(() => updateQoL(), 50);
-            });
         });
     }
 
+    //Code voor krijgen van maximale lengte van de animatie aan de hand van de active events.
+    let maxSimulationTime = 100;
+
+    function calculateMaxDuration(events) {
+        if (!events || events.length === 0) return 100;
+
+        const now = Date.now() / 1000;
+        const durations = events.map(e => (e.end_at ? (e.end_at - now) : 0));
+        const longest = Math.max(...durations, 100); // Minimaal 100 seconden
+
+        return longest;
+    }
     // Start de loop
     simulationLoop();
 
     // eenmalig laden
     loadActiveEvents();
-  
+
 
     // elke 10 sec verversen
     setInterval(loadActiveEvents, 10000);

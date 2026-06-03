@@ -56,6 +56,7 @@ export const initSimulationControls = () => {
             currentTime++;
             timeline.value = currentTime;
             console.log("Forwarding simulation");
+            console.log("Huidige tijd:", time); 
         }
     });
 
@@ -93,10 +94,9 @@ export const updateEventsUI = (activeEvents) => {
 export const syncTimelineUI = () => {
     const timeline = document.getElementById('simulation-timeline');
     if (timeline) {
-        const time = getCurrentTime(); // Zorg dat deze functie de laatst bijgewerkte tijd teruggeeft
+        const time = getCurrentTime();
         timeline.value = time;
         
-        // DEBUG: Kijk of de waarde in de console verandert
         console.log("Huidige tijd:", time); 
     }
 };

@@ -59,27 +59,20 @@ export function simulationLoop(timestamp) {
     if (getIsPlaying()) {
         if (!lastTimestamp) lastTimestamp = timestamp;
         
-        // Bereken verstreken tijd in seconden sinds de vorige frame
         const deltaTime = (timestamp - lastTimestamp) / 1000;
         
+        // Gebruik de dynamische limiet
         let currentTime = getCurrentTime();
-        if (currentTime < 100) {
-            // INCREMENT = Snelheid * verstreken tijd
-            // Bij 1x snelheid: voegt 1 unit per seconde toe
-            // Bij 5x snelheid: voegt 5 units per seconde toe
-            const increment = simulationState.speed * deltaTime;
-            
-            setCurrentTime(Math.min(currentTime + increment, 100));
-            syncTimelineUI(); // Update de balk
+        if (currentTime < maxSimulationTime) {
+            const increment = simulationUnitsPerSecond * simulationState.speed * deltaTime;
+            setCurrentTime(Math.min(currentTime + increment, maxSimulationTime));
+            syncTimelineUI();
         }
         
         lastTimestamp = timestamp;
-    } else {
-        lastTimestamp = 0; // Reset na pauzeren
     }
-    
     requestAnimationFrame(simulationLoop);
-}
+};
 
 // Code to make function global for inline clicks
 window.setSimulationSpeed = setSimulationSpeed;
