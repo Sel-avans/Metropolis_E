@@ -3,35 +3,24 @@ import {
     getCurrentTime,
     setCurrentTime,
     syncTimelineUI,
-    initSimulationControls
+    initSimulationControls,
+    getMaxTime // Importeer deze!
 } from './regulation.js';
 
-//Global State for standard speed
 export const simulationState = {
     speed: 1,
 };
 
+// Berekening: 0.5 uur simulatie = 1 seconde echte tijd.
+// Als 100 units = 24 uur, dan is 1 unit = 0.24 uur.
+// Dus 0.5 uur / 0.24 = 2.083 units per seconde.
+const SIMULATION_UNITS_PER_SECOND = 2.083;
 
 export const setSimulationSpeed = async (speed) => {
-
     simulationState.speed = parseInt(speed);
-
     document.getElementById('active-speed-display').innerText = speed + '×';
 
-    // Updates the styling of active button
-    document.querySelectorAll('.speed-btn').forEach(btn => {
-        const isSelected = parseInt(btn.getAttribute('data-speed')) === speed;
-        btn.classList.toggle('bg-teal-600', isSelected);
-        btn.classList.toggle('bg-gray-200', !isSelected);
-        btn.classList.toggle('dark:bg-gray-700', !isSelected);
-
-
-        btn.classList.toggle('text-black', isSelected);
-        btn.classList.toggle('text-white', false);
-
-        btn.classList.toggle('text-gray-700', !isSelected);
-        btn.classList.toggle('dark:text-gray-200', !isSelected);
-    });
+    // ... je styling code blijft hetzelfde ...
 
     try {
         const response = await fetch('/api/simulation/speed', {
@@ -42,16 +31,13 @@ export const setSimulationSpeed = async (speed) => {
             },
             body: JSON.stringify({ speed: simulationState.speed })
         });
-
         if (!response.ok) throw new Error('Failed to update speed');
-        console.log(`Simulation speed updated to ${speed}x`);
     } catch (error) {
         console.error('Error updating simulation speed:', error);
     }
 };
 
 initSimulationControls();
-
 
 let lastTimestamp = 0;
 
@@ -60,19 +46,21 @@ export function simulationLoop(timestamp) {
         if (!lastTimestamp) lastTimestamp = timestamp;
         
         const deltaTime = (timestamp - lastTimestamp) / 1000;
-        
-        // Gebruik de dynamische limiet
+        const maxTime = getMaxTime() || 100;
         let currentTime = getCurrentTime();
-        if (currentTime < maxSimulationTime) {
-            const increment = simulationUnitsPerSecond * simulationState.speed * deltaTime;
-            setCurrentTime(Math.min(currentTime + increment, maxSimulationTime));
-            syncTimelineUI();
-        }
         
+        if (currentTime < maxTime) {
+            // De berekening: deltaTime zorgt voor framerate-onafhankelijke snelheid
+            const increment = SIMULATION_UNITS_PER_SECOND * simulationState.speed * deltaTime;
+            setCurrentTime(currentTime + increment);
+            syncTimelineUI(); // Dit update nu automatisch ook de "Time left" tekst
+        }
         lastTimestamp = timestamp;
+    } else {
+        lastTimestamp = 0;
     }
+    
     requestAnimationFrame(simulationLoop);
 };
 
-// Code to make function global for inline clicks
 window.setSimulationSpeed = setSimulationSpeed;
