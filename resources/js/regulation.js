@@ -56,7 +56,6 @@ export const initSimulationControls = () => {
             currentTime++;
             timeline.value = currentTime;
             console.log("Forwarding simulation");
-            console.log("Huidige tijd:", time); 
         }
     });
 

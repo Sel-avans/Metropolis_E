@@ -669,7 +669,7 @@ document.addEventListener("DOMContentLoaded", () => {
 
         const now = Date.now() / 1000;
         const durations = events.map(e => (e.end_at ? (e.end_at - now) : 0));
-        const longest = Math.max(...durations, 100); // Minimaal 100 seconden
+        const longest = Math.max(...durations, 100);
 
         return longest;
     }
