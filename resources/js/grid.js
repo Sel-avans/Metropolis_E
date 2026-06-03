@@ -25,13 +25,16 @@ document.addEventListener("DOMContentLoaded", () => {
     // --- EVENT LISTENER FOR APPROVE & LOCK BUTTON WITH HIGHLIGHT FIX ---
     const approveBtn = document.getElementById("approve-btn");
     if (approveBtn) {
+        console.log("De knop is gelukkig gevonden in de HTML!"); // <-- DIT MOET JE DIRECT ZIEN BIJ HET LADEN
+        
         approveBtn.addEventListener("click", async () => {
+            console.log("Er is OP DE KNOP GEKLIKT!"); // <-- DIT MOET JE ZIEN BIJ EEN KLIK
+            
             const selectedCell = document.querySelector(".grid-cell.selected");
             if (!selectedCell) {
                 alert("Please select a grid cell first to lock or unlock it.");
                 return;
             }
-
             try {
                 const response = await fetch('/grid/approve', {
                     method: 'POST',

@@ -6,7 +6,7 @@
             <div class="flex flex-col margin-bottom-4 gap-3">    
                 <h1 class="text-2xl dark:text-teal-500 font-bold mb-4">Function Library</h1>
 
-                {{-- kleine toevoeging: focus ring voor keyboard users --}}
+                {{-- Kleine toevoeging: focus ring voor keyboard users --}}
                 <a href="{{ route('effects.index') }}" 
                     class="px-3 py-1.5 bg-teal-600 text-white rounded hover:bg-teal-700 text-xs shadow
                            focus:outline-none focus:ring-2 focus:ring-teal-500">
@@ -42,8 +42,8 @@
                             >
 
                             <img src="{{ asset($function->image) }}" 
-                                alt="image of {{ $function->name }}" 
-                                class="w-8 h-8 object-contain pointer-events-none">
+                                 alt="image of {{ $function->name }}" 
+                                 class="w-8 h-8 object-contain pointer-events-none">
 
                             <span class="library-name text-base">{{ $function->name }}</span>
                         </li>
@@ -56,7 +56,6 @@
 
         <div class="flex flex-col mx-auto">
 
-
             {{-- QoL Score Display --}}
             <div class="w-auto h-min mt-4 border-4 border-gray-400 dark:bg-indigo-800 dark:border-teal-600 rounded-md p-6">
                 <span id="qol-score" class="text-xl font-semibold mb-2 dark:text-teal-300">
@@ -67,18 +66,19 @@
                 </span>
             </div>
 
-            {{-- Undo knop toegevoegd --}}
+            {{-- Undo knop --}}
             <button id="undoButton" class="mt-4 px-4 py-2 bg-yellow-500 text-black font-semibold rounded shadow hover:bg-yellow-600 transition">
                 Undo
             </button>
 
-          {{-- Check direct of de Enum-naam City_planner is --}}
-@if(auth()->user() && auth()->user()->role->name === 'City_planner')
-    <button type="button" id="approve-btn" class="mt-2 px-4 py-2 bg-amber-600 text-white font-semibold rounded shadow hover:bg-amber-700 transition">
-          Approve & Lock Area
-    </button>
-@endif
-            {{-- Grid Display --}}
+            {{-- Alleen zichtbaar voor de City_planner --}}
+            @if(auth()->user() && auth()->user()->role->name === 'City_planner')
+                <button type="button" id="approve-btn" class="mt-2 px-4 py-2 bg-amber-600 text-white font-semibold rounded shadow hover:bg-amber-700 transition">
+                    Approve & Lock Area
+                </button>
+            @endif
+
+            {{-- Grid Display (3x4) --}}
             <div class="w-auto p-6">
                 <h1 class="text-2xl text-center font-bold mb-4 dark:text-teal-300">
                     City Grid (3x4)
@@ -93,9 +93,10 @@
                                     return $c->row == $row && $c->col == $col;
                                 });
                             @endphp
+                            
                             <div 
                                 class="grid-cell relative border-2 bg-gray-300 border-gray-800 dark:bg-blue-950 dark:border-gray-300 w-32 h-32 items-center justify-center hover:bg-gray-400 hover:dark:bg-gray-100 cursor-pointer transition
-                                    focus:outline-none focus:ring-2 focus:ring-blue-500"
+                                       focus:outline-none focus:ring-2 focus:ring-blue-500"
                                 data-row="{{ $row }}"
                                 data-col="{{ $col }}"
                                 data-id="{{ $cell ? $cell->id : '' }}"
@@ -112,13 +113,12 @@
                                     >
 
                                     <button 
-                                            type="button"
-                                            class="delete-btn absolute top-[2px] right-[2px] bg-red-600/80 text-white w-5 h-5 text-[14px] rounded cursor-pointer flex items-center justify-center"
-                                            aria-label="Remove {{ $cell->function->name }} from grid cell"
-                                            title="Remove {{ $cell->function->name }} from grid cell">
-                                            <span class="sr-only">Remove {{ $cell->function->name }} from grid cell</span>✖
+                                        type="button"
+                                        class="delete-btn absolute top-[2px] right-[2px] bg-red-600/80 text-white w-5 h-5 text-[14px] rounded cursor-pointer flex items-center justify-center"
+                                        aria-label="Remove {{ $cell->function->name }} from grid cell"
+                                        title="Remove {{ $cell->function->name }} from grid cell">
+                                        <span class="sr-only">Remove {{ $cell->function->name }} from grid cell</span>✖
                                     </button>
-
                                 @endif
                             </div>
 
@@ -144,5 +144,6 @@
         </div>
     </div>
 
+    {{-- JavaScript bundel inladen --}}
     @vite(['resources/js/grid.js'])
 </x-app-layout>
