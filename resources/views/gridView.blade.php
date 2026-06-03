@@ -57,10 +57,10 @@
             </button>
 
             {{-- Section City Grid --}}
-            <div class="w-auto p-6">
+            <div class="w-auto p-6 justify-center">
                 <h1 class="text-2xl text-center font-bold mb-4 dark:text-teal-300">City Grid</h1>
 
-                <div class="city-grid grid grid-flow-col grid-rows-3 gap-3 w-min">
+                <div class="city-grid grid grid-flow-col grid-rows-3 gap-3 w-min mx-auto">
                     @for($col = 1; $col <= 4; $col++)
                         @for($row = 1; $row <= 3; $row++)
                             @php
@@ -71,13 +71,22 @@
                                 draggable="{{ $cell ? 'true' : 'false' }}" role="button"
                                 aria-label="{{ $cell && $cell->function ? 'Cell ' . $row . ',' . $col . ' with ' . $cell->function->name : 'Empty cell ' . $row . ',' . $col }}">
 
-                                @if($cell && $cell->function)
-                                    <img src="{{ asset($cell->function->image) }}" alt="{{ $cell->function->name }}"
-                                        class="grid-function-icon object-contain w-20 h-20"
-                                        data-function-id="{{ $cell->function->id }}">
-                                    <button type="button"
-                                        class="delete-btn absolute top-1 right-1 bg-red-600 text-white w-5 h-5 text-xs rounded-full flex items-center justify-center hover:bg-red-700"
-                                        aria-label="Remove">✖</button>
+                                @if(!empty($cell) && !empty($cell->function))
+                                    <img 
+                                        src="{{ asset($cell->function->image) }}"
+                                        alt="{{ $cell->function->name }}"
+                                        class="grid-function-icon object-contain"
+                                        data-function-id="{{ $cell->function->id }}"
+                                    >
+
+                                    <button 
+                                            type="button"
+                                            class="delete-btn absolute top-[2px] right-[2px] bg-red-600/80 text-white w-5 h-5 text-[14px] rounded cursor-pointer flex items-center justify-center"
+                                            aria-label="Remove {{ $cell->function->name }} from grid cell"
+                                            title="Remove {{ $cell->function->name }} from grid cell">
+                                            <span class="sr-only">Remove {{ $cell->function->name }} from grid cell</span>✖
+                                    </button>
+
                                 @endif
                             </div>
                         @endfor
@@ -161,6 +170,16 @@
                 <div id="active-events-empty" class="text-sm text-gray-500">No events.</div>
                 <ul id="active-events-list" class="space-y-2 text-sm dark:text-white"></ul>
             </div>
+        </div>
+    </div>
+
+    <div id="qol-popup" class="absolute z-50 bg-slate-800/95 text-slate-50 border border-slate-600 rounded-lg p-3 shadow-lg min-w-[200px] pointer-events-none opacity-0 scale-95 transition-all duration-150 hidden">
+        <div class="font-bold border-b border-slate-600 pb-1.5 mb-2 text-[10px] uppercase tracking-wider text-slate-300">
+            Quality of Life Impact
+        </div>
+        <div>
+            <ul id="popup-neighbors-list" class="space-y-1 text-xs">
+            </ul>
         </div>
     </div>
 

@@ -1,17 +1,20 @@
 import { getNeighborsWithQoL } from './neighbours.js';
-
 import './simulation.js';
 
 document.addEventListener("DOMContentLoaded", () => {
-    const cells = document.querySelectorAll(".grid-cell");
-    const items = document.querySelectorAll(".library-item");
+
+    function activateCell(cell) {
+        document.querySelectorAll(".grid-cell").forEach(c => c.classList.remove("selected"));
+        cell.classList.add("selected");
+    }
 
     let draggedItem = null;
     let isDragging = false;
     let sourceCell = null;
+    let dropOccurred = false;
     let old_score;
 
-    // slaat de laatste actie op zodat undo weet wat teruggezet moet worden
+    // Slaat de laatste actie op zodat undo weet wat teruggezet moet worden
     let lastAction = null;
 
     const HOVER_DELAY_MS = 300;
@@ -20,26 +23,197 @@ document.addEventListener("DOMContentLoaded", () => {
     const popup = document.getElementById('qol-popup');
     const neighborsList = document.getElementById('popup-neighbors-list');
 
-    // This is the QoL effects table. hardcoded for now. Should be changed to follow actual scores.
-    const effectsTable = {
-        'Police Station': 3,
-        'Fire Station': 2,
-        'Park': 4,
-        'Cinema': 2,
-        'Sports Park': 3,
-        'Water Treatment': 1,
-        'School': 2,
-        'Store': 1,
-        'Hospital': 3,
-        'Train Station': 2,
-        'Road': -1,
-        'Bicycle Path': 2,
-        'Gas Station': -2
-    };
+    let eventTimerInterval = null;
+    let lastActiveEventSignature = '';
+
+    function formatModifiers(modifiers) {
+        if (!modifiers || typeof modifiers !== 'object') {
+            return '';
+        }
+
+        const items = Object.entries(modifiers)
+            .map(([category, value]) => {
+                const num = Number(value);
+                const sign = num >= 0 ? '+' : '';
+                const label = category.charAt(0).toUpperCase() + category.slice(1);
+                return `<li class="text-amber-400">- ${label}: ${sign}${num}</li>`;
+            });
+
+        if (items.length === 0) {
+            return '';
+        }
+
+        return `<ul class="text-[11px] text-gray-400 mt-1 space-y-0.5 list-none pl-0">${items.join('')}</ul>`;
+    }
+
+    function buildEventSignature(events) {
+        return JSON.stringify(
+            (events || []).map(event => ({
+                id: event.id,
+                end_at: event.end_at ?? null,
+                modifiers: event.modifiers ?? {},
+            }))
+        );
+    }
+
+    async function updateActiveEvents({ forceQolRefresh = false } = {}) {
+        const listEl = document.getElementById('active-events-list');
+        const emptyEl = document.getElementById('active-events-empty');
+
+        if (!listEl || !emptyEl) return;
+
+        try {
+            const response = await fetch('/events/active', {
+                credentials: 'same-origin',
+                headers: { 'Accept': 'application/json' },
+            });
+            if (!response.ok) return;
+
+            const data = await response.json();
+            if (!data || !data.events) return;
+
+            const signature = buildEventSignature(data.events);
+            if (signature !== lastActiveEventSignature) {
+                lastActiveEventSignature = signature;
+                updateQoL();
+            } else if (forceQolRefresh) {
+                updateQoL();
+            }
+
+            if (data.events.length > 0) {
+                emptyEl.classList.add('hidden');
+                listEl.innerHTML = '';
+
+                const activeTimers = [];
+
+                data.events.forEach((event, index) => {
+                    const li = document.createElement('li');
+                    li.className = "p-3 bg-slate-800 border-l-4 border-amber-500 rounded shadow-sm mb-2 text-sm";
+
+                    const timerId = `event-timer-${index}`;
+                    const modifiersHtml = formatModifiers(event.modifiers);
+                    const endsAtHtml = event.ends_at_display
+                        ? `<div class="text-[11px] text-gray-500 mt-0.5">Ends at ${event.ends_at_display}</div>`
+                        : '';
+
+                    li.innerHTML = `
+                        <div class="font-semibold text-slate-200">${event.name || 'Nameless Event'}</div>
+                        ${modifiersHtml}
+                        ${endsAtHtml}
+                        <div id="${timerId}" class="text-[11px] text-emerald-400 font-mono mt-1 font-bold">
+                            Loading...
+                        </div>
+                    `;
+                    listEl.appendChild(li);
+
+                    if (event.end_at) {
+                        let endTimeMs = 0;
+                        if (typeof event.end_at === 'number' || (!isNaN(event.end_at) && !isNaN(parseFloat(event.end_at)))) {
+                            endTimeMs = Number(event.end_at) * 1000;
+                        } else {
+                            const formattedString = String(event.end_at).replace(' ', 'T');
+                            endTimeMs = new Date(formattedString).getTime();
+                        }
+
+                        if (!isNaN(endTimeMs) && endTimeMs > 0) {
+                            activeTimers.push({ elementId: timerId, endTimeMs });
+                        }
+                    } else if (event.type === 'recurring') {
+                        const timerEl = document.getElementById(timerId);
+                        if (timerEl) {
+                            timerEl.textContent = event.timing || 'Recurring';
+                            timerEl.className = "text-[11px] text-teal-400 mt-1";
+                        }
+                    } else {
+                        const timerEl = document.getElementById(timerId);
+                        if (timerEl) timerEl.textContent = "No end time known";
+                    }
+                });
+
+                if (eventTimerInterval) clearInterval(eventTimerInterval);
+
+                if (activeTimers.length > 0) {
+                    const tick = () => {
+                        const nowMs = Date.now();
+                        let stillRunning = false;
+                        let anyExpired = false;
+
+                        activeTimers.forEach(timer => {
+                            const timerEl = document.getElementById(timer.elementId);
+                            if (!timerEl) return;
+
+                            const distance = timer.endTimeMs - nowMs;
+
+                            if (distance <= 0) {
+                                timerEl.textContent = "Expired";
+                                timerEl.className = "text-[11px] text-red-500 font-bold mt-1";
+                                anyExpired = true;
+                            } else {
+                                stillRunning = true;
+                                const totalSeconds = Math.floor(distance / 1000);
+                                const minutes = Math.floor(totalSeconds / 60);
+                                const seconds = totalSeconds % 60;
+                                timerEl.textContent = `Time left: ${String(minutes).padStart(2, '0')}:${String(seconds).padStart(2, '0')}`;
+                            }
+                        });
+
+                        if (anyExpired && !stillRunning) {
+                            clearInterval(eventTimerInterval);
+                            eventTimerInterval = null;
+                            updateActiveEvents();
+                        }
+                    };
+
+                    tick();
+                    eventTimerInterval = setInterval(tick, 1000);
+                }
+            } else {
+                emptyEl.classList.remove('hidden');
+                listEl.innerHTML = '';
+                if (eventTimerInterval) {
+                    clearInterval(eventTimerInterval);
+                    eventTimerInterval = null;
+                }
+            }
+        } catch (err) {
+            console.error("Fout bij updaten events:", err);
+        }
+    }
+
+    updateActiveEvents({ forceQolRefresh: true });
+    setInterval(updateActiveEvents, 5000);
+
+    document.addEventListener("click", async (e) => {
+        if (!e.target.classList.contains("delete-btn")) return;
+
+        const cell = e.target.closest(".grid-cell");
+        if (!cell) return;
+
+        cell.innerHTML = "";
+        cell.removeAttribute("draggable");
+
+        activateCell(cell);
+
+        try {
+            await fetch(`/grid/cell/${cell.dataset.id}/function`, {
+                method: "DELETE",
+                headers: {
+                    "X-CSRF-TOKEN": document.querySelector('meta[name="csrf-token"]').content
+                }
+            });
+        } catch (err) {
+            console.error("Fout bij verwijderen functie:", err);
+        }
+
+        setTimeout(() => updateQoL(), 10);
+    });
+
+    const cells = document.querySelectorAll(".grid-cell");
+    const items = document.querySelectorAll(".library-item");
 
     async function saveMove(oldRow, oldCol, newRow, newCol, force = false) {
         try {
-            const response = await fetch('/grid/update', {
+            const res = await fetch('/grid/update', {
                 method: 'POST',
                 headers: {
                     'Content-Type': 'application/json',
@@ -55,28 +229,10 @@ document.addEventListener("DOMContentLoaded", () => {
                 })
             });
 
-        const data = await response.json();
-        
-        if (response.status === 409) {
-            const userWantsToContinue = window.confirm(data.message);
-            
-            if (userWantsToContinue) {
-                return saveMove(oldRow, oldCol, newRow, newCol, true);
-            } else {
-                location.reload(); 
-                return;
-            }
-        }
-
-        if (!response.ok) {
-            alert(data.message || "Er is een fout opgetreden!"); 
-            location.reload(); 
-            return;
-        }
-
-        updateQoL();
-    } catch (err) {
-        console.error("Fout:", err);
+            return res;
+        } catch (err) {
+            console.error("Fout bij opslaan gridcel:", err);
+            return null;
         }
     }
 
@@ -85,8 +241,6 @@ document.addEventListener("DOMContentLoaded", () => {
             const scoreEl = document.getElementById('qol-score-value');
             const breakdownEl = document.getElementById('breakdown-qol-score');
             const oldScoreEl = document.getElementById('old-qol-score');
-
-            if (!scoreEl && !breakdownEl) return;
 
             const response = await fetch('/qol/details');
             const data = await response.json();
@@ -106,80 +260,60 @@ document.addEventListener("DOMContentLoaded", () => {
     }
 
     function compareScores(data) {
-        let html ='';
+        let html = '';
 
         if (old_score === undefined) {
-            html+=''; 
-        }
-        else {
+            html += ''; 
+        } else {
             const delta_score = data.total_score - old_score;
-            if (delta_score >= 0) {
-                html += ` 
+            html += `
                 <span class="text-xl float-right ${delta_score < 0 ? 'text-red-600' : 'text-green-600'}">
-                    +${delta_score}
+                    ${delta_score >= 0 ? '+' : ''}${delta_score}
                 </span>
-                `;
-            }
-            else{
-                html += ` 
-                <span class="text-xl ${delta_score < 0 ? 'text-red-600' : 'text-green-600'}">
-                    ${delta_score}
-                </span>
-                `;
-            }
+            `;
         }
-
-        if (data.total_score !== 0) {
-            old_score = data.total_score;
-        }
-
+        if (data.total_score !== 0) old_score = data.total_score;
         return html;
     }
 
     function renderQoLBreakdown(data) {
         let html = '';
+        html += '<h3 class="text-xl font-semibold dark:text-teal-500 mb-2">Breakdown QoL Score</h3>';
+        html += '<ul class="space-y-1 list-none pl-0 text-sm">';
 
-        html += '<h3 class="text-xl font-semibold dark:text-teal-500">Breakdown QoL Score</h3>';
         for (const [category, info] of Object.entries(data.categories)) {
-            html += `
-                <h3 class="font-semibold mt-3 dark:text-teal-600">
-                    ${category} (total:
-                    <span class="${info.total <= 0 ? 'text-red-600' : 'text-green-600'}">
-                        ${info.total}
-                    </span>
-                    )
-                </h3>
-            `;
+            const score = Number(info.total);
+            let scoreClass = 'text-slate-400';
+            if (score > 0) scoreClass = 'text-green-600';
+            else if (score < 0) scoreClass = 'text-red-600';
 
-            // Shows what item function contributes to the QoL score and by how much.
-            
-            // info.items.forEach(item => {
-            //     html += `
-            //         <div class="flex justify-between text-gray-700 dark:text-white">
-            //             <span>${item.function}</span>
-            //             <span class="${item.value <= 0 ? 'text-red-600' : 'text-green-600'}">
-            //                 ${item.value}
-            //             </span>
-            //         </div>
-            //     `;
-            // });
+            const scoreSign = score > 0 ? '+' : '';
+            html += `
+                <li class="font-semibold dark:text-teal-600">
+                    - ${category}: <span class="${scoreClass}">${scoreSign}${score}</span>
+                </li>`;
         }
 
-        // Should we keep this?
+        html += '</ul>';
+
+        const totalScore = Number(data.total_score);
+        let totalClass = 'text-slate-400';
+        if (totalScore > 0) totalClass = 'text-green-600';
+        else if (totalScore < 0) totalClass = 'text-red-600';
+
+        const totalSign = totalScore > 0 ? '+' : '';
         html += `
-            <h3 class="font-bold mt-4 dark:text-teal-600">
-                Total QoL: 
-                <span class="${data.total_score <= 0 ? 'text-red-600' : 'text-green-600'}">${data.total_score}</span>
-            </h3>
-        `;
+        <p class="font-bold mt-4 dark:text-teal-600">
+            Total QoL: <span class="${totalClass}">${totalSign}${totalScore}</span>
+        </p>`;
 
         return html;
     }
 
-    function handleTileHover(row, col, event) {
+    async function handleTileHover(row, col, event) {
         positionPopup(event.pageX, event.pageY);
-        const neighbors = getNeighborsWithQoL(row, col, effectsTable);
-        renderNeighborsList(neighbors);
+        const data = await getNeighborsWithQoL(row, col);
+        renderNeighborsList(data);
         showPopup();
     }
 
@@ -189,48 +323,60 @@ document.addEventListener("DOMContentLoaded", () => {
         popup.style.top = `${y + offset}px`;
     }
 
-    function renderNeighborsList(neighbors) {
-        // Clear any previous list items
+    function renderNeighborsList(data) {
         neighborsList.innerHTML = '';
-
-        if (!neighbors || neighbors.length === 0) {
-            neighborsList.innerHTML = '<li class="text-slate-400">No neighbors with buildings</li>';
+        if (!data.categories || Object.keys(data.categories).length === 0) {
+            neighborsList.innerHTML = '<li class="text-slate-400 text-sm">No active QoL influences on this cell</li>';
             return;
         }
 
-        neighbors.forEach(neighbor => {
-            const li = document.createElement('li');
-            li.className = 'flex justify-between items-center gap-4 py-0.5';
+        const eventModifiers = data.event_modifiers || {};
+        const categoryKeys = {
+            Safety: 'safety',
+            Recreation: 'recreation',
+            Environment: 'environment',
+            Amenities: 'amenities',
+            Mobility: 'mobility',
+        };
 
-            const directionName = neighbor.direction.charAt(0).toUpperCase() + neighbor.direction.slice(1);
+        let html = '';
+        for (const [categoryName, info] of Object.entries(data.categories)) {
+            const cellScore = Number(info.total);
+            const eventScore = Number(eventModifiers[categoryKeys[categoryName]] || 0);
+            const displayScore = cellScore + eventScore;
 
-            // Determine the text color and sign (+/-) based on the QoL score
-            let scoreClass = 'text-slate-400'; // Neutral
-            let scoreText = `${neighbor.qol_effect}`;
+            let scoreClass = 'text-slate-400';
+            if (displayScore > 0) scoreClass = 'text-green-600';
+            else if (displayScore < 0) scoreClass = 'text-red-600';
 
-            if (neighbor.qol_effect > 0) {
-                scoreClass = 'text-green-400 font-semibold';
-                scoreText = `+${neighbor.qol_effect}`;
-            } else if (neighbor.qol_effect < 0) {
-                scoreClass = 'text-red-400 font-semibold';
-            }
+            const scoreSign = displayScore > 0 ? '+' : '';
+            html += `
+                <div class="mb-2 last:mb-0 w-full">
+                    <div class="flex justify-between items-center gap-8">
+                        <span class="text-slate-200 font-medium text-sm">${categoryName}</span>
+                        <span class="${scoreClass} font-bold text-sm">${scoreSign}${displayScore}</span>
+                    </div>
+                </div>`;
+        }
 
-            // Fill the list item HTML
-            li.innerHTML = `
-                <span class="text-slate-300 font-medium">${directionName}: ${neighbor.function}</span>
-                <span class="${scoreClass}">${scoreText}</span>
-            `;
+        const cellTotal = Number(data.total_score);
+        let totalClass = 'text-slate-400';
+        if (cellTotal > 0) totalClass = 'text-green-600';
+        else if (cellTotal < 0) totalClass = 'text-red-600';
 
-            neighborsList.appendChild(li);
-        });
+        const totalSign = cellTotal > 0 ? '+' : '';
+        html += `
+            <div class="flex justify-between items-center mt-3 pt-2 border-t border-slate-600/50 w-full">
+                <span class="text-slate-300 font-bold text-xs uppercase tracking-wider">Total QoL:</span>
+                <span class="${totalClass} font-extrabold text-base">${totalSign}${cellTotal}</span>
+            </div>`;
+
+        neighborsList.innerHTML = html;
     }
 
     function showPopup() {
         popup.classList.remove('hidden');
-        
-        // Force browser reflow to ensure the transition plays smoothly
         void popup.offsetWidth;
-        
         popup.classList.remove('opacity-0', 'scale-95');
         popup.classList.add('opacity-100', 'scale-100');
     }
@@ -238,88 +384,100 @@ document.addEventListener("DOMContentLoaded", () => {
     function hidePopup() {
         popup.classList.add('opacity-0', 'scale-95');
         popup.classList.remove('opacity-100', 'scale-100');
-
-        // Hide display after the fade-out transition complete (150ms)
-        setTimeout(() => {
-            popup.classList.add('hidden');
-        }, 150);
+        setTimeout(() => { popup.classList.add('hidden'); }, 150);
     }
 
     items.forEach(item => {
         item.addEventListener("dragstart", e => {
             isDragging = true;
-
+            dropOccurred = false;
             draggedItem = {
                 id: Number(item.dataset.functionId),
                 name: item.dataset.functionName,
                 image: item.dataset.image
             };
-
             e.dataTransfer.setDragImage(item.querySelector("img"), 16, 16);
         });
     });
 
+    // === HIER ZIT DE GECORRIGEERDE CELLS LUS ===
     cells.forEach(cell => {
         cell.addEventListener("dragstart", e => {
             const img = cell.querySelector(".grid-function-icon");
             if (!img) return;
 
             isDragging = true;
-
+            dropOccurred = false;
             draggedItem = {
                 id: Number(img.dataset.functionId),
                 name: img.alt,
                 image: img.src
             };
-
             e.dataTransfer.setDragImage(img, 16, 16);
-
             sourceCell = cell;
             cell.classList.add("drag-source");
         });
 
-        cell.addEventListener("dragover", e => {
-            e.preventDefault();
-            cell.classList.add("drag-over");
-        });
-
-        cell.addEventListener("dragleave", () => {
-            cell.classList.remove("drag-over");
-        });
+        cell.addEventListener("dragover", e => { e.preventDefault(); cell.classList.add("drag-over"); });
+        cell.addEventListener("dragleave", () => { cell.classList.remove("drag-over"); });
 
         cell.addEventListener("drop", async e => {
             e.preventDefault();
             isDragging = false;
-
+            dropOccurred = true;
             cell.classList.remove("drag-over");
+
+            const isOccupied = cell.querySelector("img") !== null;
+
+            if (isOccupied) {
+                const wantsToReplace = window.confirm("Are you sure you want to replace this feature?");
+                if (!wantsToReplace) {
+                    if (sourceCell) sourceCell.classList.remove("drag-source");
+                    return; 
+                }
+            }
 
             const newRow = cell.dataset.row;
             const newCol = cell.dataset.col;
-
             let oldRow = null;
             let oldCol = null;
+            const originalSourceCell = sourceCell;
 
             if (sourceCell) {
                 oldRow = sourceCell.dataset.row;
                 oldCol = sourceCell.dataset.col;
-
                 sourceCell.innerHTML = "";
                 sourceCell.removeAttribute("draggable");
                 sourceCell.classList.remove("drag-source");
-
-                sourceCell = null;
             }
 
+            sourceCell = null;
             cell.innerHTML = "";
+
             const img = document.createElement("img");
             img.src = draggedItem.image;
             img.alt = draggedItem.name;
             img.dataset.functionId = draggedItem.id;
             img.classList.add("grid-function-icon", "object-contain");
             cell.appendChild(img);
-            cell.setAttribute("draggable", "true");
 
-            // laatste actie opslaan zodat undo maar 1 stap terug kan
+            const deleteBtn = document.createElement("button");
+            deleteBtn.type = "button";
+            deleteBtn.className = "delete-btn absolute top-[2px] right-[2px] bg-red-600/80 text-white w-5 h-5 text-[14px] rounded cursor-pointer flex items-center justify-center";
+            const deleteText = `Remove ${draggedItem.name} from grid cell`;
+            deleteBtn.setAttribute("aria-label", deleteText);
+            deleteBtn.setAttribute("title", deleteText);
+            
+            const srText = document.createElement("span");
+            srText.className = "sr-only";
+            srText.textContent = deleteText;
+            deleteBtn.appendChild(srText);
+            deleteBtn.append("✖");
+            cell.appendChild(deleteBtn);
+
+            cell.setAttribute("draggable", "true");
+            activateCell(cell);
+
             lastAction = {
                 oldRow: oldRow,
                 oldCol: oldCol,
@@ -328,56 +486,63 @@ document.addEventListener("DOMContentLoaded", () => {
                 functionId: draggedItem.id
             };
 
-            // undo knop aanzetten zodra er iets is gebeurd
-            const undoBtnEl = document.getElementById("undoButton");
+            const undoBtnEl = document.getElementById("undo-btn");
             if (undoBtnEl) undoBtnEl.disabled = false;
 
-            await saveMove(oldRow, oldCol, newRow, newCol);
-        });
+            const res = await saveMove(oldRow, oldCol, newRow, newCol, false);
 
-        cell.setAttribute("tabindex", "0");
+            if (res && res.status === 409) {
+                const forceChoice = window.confirm("Placement is forbidden by adjacency rules. Force placement anyway?");
 
-        cell.addEventListener("click", () => {
-            if (isDragging) return;
-            cells.forEach(c => c.classList.remove("selected"));
-            cell.classList.add("selected");
-        });
-
-        cell.addEventListener("keydown", e => {
-            if (isDragging) return;
-            if (e.key === "Enter" || e.key === " ") {
-                cells.forEach(c => c.classList.remove("selected"));
-                cell.classList.add("selected");
+                if (forceChoice) {
+                    const res2 = await saveMove(oldRow, oldCol, newRow, newCol, true);
+                    if (!res2 || !res2.ok) {
+                        if (originalSourceCell) {
+                            originalSourceCell.innerHTML = `<img src="${draggedItem.image}" alt="${draggedItem.name}" data-function-id="${draggedItem.id}" class="grid-function-icon object-contain"><button class="delete-btn absolute top-[2px] right-[2px] bg-red-600/80 text-white w-5 h-5 text-[14px] rounded cursor-pointer flex items-center justify-center">✖</button>`;
+                            originalSourceCell.setAttribute('draggable', 'true');
+                        }
+                        cell.innerHTML = "";
+                        cell.removeAttribute('draggable');
+                        updateQoL();
+                        return;
+                    }
+                } else {
+                    if (originalSourceCell) {
+                        originalSourceCell.innerHTML = `<img src="${draggedItem.image}" alt="${draggedItem.name}" data-function-id="${draggedItem.id}" class="grid-function-icon object-contain"><button class="delete-btn absolute top-[2px] right-[2px] bg-red-600/80 text-white w-5 h-5 text-[14px] rounded cursor-pointer flex items-center justify-center">✖</button>`;
+                        originalSourceCell.setAttribute('draggable', 'true');
+                    }
+                    cell.innerHTML = "";
+                    cell.removeAttribute('draggable');
+                    updateQoL();
+                    return;
+                }
             }
+            updateQoL();
         });
+
+        cell.addEventListener("click", () => { if (!isDragging) activateCell(cell); });
+        cell.addEventListener("keydown", e => { if (!isDragging && (e.key === "Enter" || e.key === " ")) activateCell(cell); });
 
         cell.addEventListener('mouseenter', (event) => {
             const row = parseInt(cell.dataset.row);
             const col = parseInt(cell.dataset.col);
-
-            // Start the 300ms delay timer
-            hoverTimer = setTimeout(() => {
-                handleTileHover(row, col, event);
+            clearTimeout(hoverTimer); 
+            hoverTimer = setTimeout(() => { 
+                handleTileHover(row, col, event); 
             }, HOVER_DELAY_MS);
         });
 
-        cell.addEventListener('mouseleave', () => {
-            // Cancel the timer immediately if the mouse leaves before 300ms
-            clearTimeout(hoverTimer);
-            hidePopup();
+        cell.addEventListener('mouseleave', () => { 
+            clearTimeout(hoverTimer); 
+            hidePopup(); 
         });
-    });
+    }); // <-- Dit sloot in jouw code de cells-loop niet af! Nu wel.
 
-    // undo knop oppakken en handler toevoegen
-    const undoBtn = document.getElementById("undoButton");
-
+    const undoBtn = document.getElementById("undo-btn");
     if (undoBtn) {
         undoBtn.addEventListener("click", async () => {
-
-            // als er niks is om terug te draaien, doe niks
             if (!lastAction) return;
 
-            // zet de vorige staat terug (swap new <-> old)
             await fetch('/grid/update', {
                 method: 'POST',
                 headers: {
@@ -394,15 +559,105 @@ document.addEventListener("DOMContentLoaded", () => {
                 })
             });
 
-            // undo wissen zodat je niet meerdere keren terug kan
             lastAction = null;
-
-            // undo knop weer uitzetten
             undoBtn.disabled = true;
 
-            // qol opnieuw ophalen en grid verversen
             updateQoL();
             location.reload();
+        });
+    }
+
+    document.addEventListener("dragend", async (e) => {
+        if (!draggedItem || !sourceCell) return;
+        if (dropOccurred) { dropOccurred = false; return; }
+
+        const grid = document.querySelector(".city-grid");
+        const rect = grid.getBoundingClientRect();
+        const x = e.pageX; const y = e.pageY;
+
+        const outside = x < rect.left || x > rect.right || y < rect.top || y > rect.bottom;
+        if (!outside) return;
+
+        sourceCell.innerHTML = "";
+        sourceCell.removeAttribute("draggable");
+        activateCell(sourceCell);
+
+        try {
+            await fetch(`/grid/cell/${sourceCell.dataset.id}/function`, {
+                method: "DELETE",
+                headers: { "X-CSRF-TOKEN": document.querySelector('meta[name="csrf-token"]').content }
+            });
+        } catch (err) { console.error("Fout bij drag-off delete:", err); }
+
+        draggedItem = null; sourceCell = null;
+        setTimeout(() => updateQoL(), 10);
+    });
+
+    // === INITIËLE CALLS BIJ PAGINA LOAD ===
+
+    const undoButtonAlternative = document.getElementById('undoButton');
+    if (undoButtonAlternative) {
+        undoButtonAlternative.addEventListener('click', () => {
+            fetch('/undo', {
+                method: 'POST',
+                headers: {
+                    'X-CSRF-TOKEN': document.querySelector('meta[name="csrf-token"]').content,
+                    'Content-Type': 'application/json'
+                }
+            })
+            .then(res => res.json())
+            .then(data => {
+                if (!data.success) return;
+
+                const targetCell = document.querySelector(
+                    `[data-row="${data.cell.row}"][data-col="${data.cell.col}"]`
+                );
+
+                if (targetCell) {
+                    if (data.cell.function_id) {
+                        targetCell.innerHTML = `
+                            <img src="${data.cell.image}" 
+                                 class="grid-function-icon object-contain"
+                                 data-function-id="${data.cell.function_id}">
+                            <button 
+                                class="delete-btn absolute top-[2px] right-[2px] bg-red-600/80 text-white w-5 h-5 text-[14px] rounded cursor-pointer flex items-center justify-center">
+                                ✖
+                            </button>
+                        `;
+                        targetCell.setAttribute("draggable", "true");
+                    } else {
+                        targetCell.innerHTML = "";
+                        targetCell.removeAttribute("draggable");
+                    }
+                    activateCell(targetCell);
+                }
+
+                if (data.cleared) {
+                    const clearedCell = document.querySelector(
+                        `[data-row="${data.cleared.row}"][data-col="${data.cleared.col}"]`
+                    );
+
+                    if (clearedCell) {
+                        clearedCell.innerHTML = "";
+                        clearedCell.removeAttribute("draggable");
+                        clearedCell.classList.remove("selected");
+                    }
+                }
+
+                document.querySelectorAll('.grid-cell').forEach(c => {
+                    const cRow = Number(c.dataset.row);
+                    const cCol = Number(c.dataset.col);
+
+                    if (cRow === Number(data.cell.row) && cCol === Number(data.cell.col)) return;
+
+                    if (data.cleared && cRow === Number(data.cleared.row) && cCol === Number(data.cleared.col)) {
+                        c.innerHTML = "";
+                        c.removeAttribute("draggable");
+                    }
+                });
+
+                setTimeout(() => updateQoL(), 50);
+            });
         });
     }
 
