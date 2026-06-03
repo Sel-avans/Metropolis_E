@@ -13,7 +13,6 @@ document.addEventListener("DOMContentLoaded", () => {
     let dropOccurred = false;
     let old_score;
 
-    // Stores the last action so undo knows what state to roll back
     let lastAction = null;
 
     const HOVER_DELAY_MS = 300;
@@ -22,19 +21,15 @@ document.addEventListener("DOMContentLoaded", () => {
     const popup = document.getElementById('qol-popup');
     const neighborsList = document.getElementById('popup-neighbors-list');
 
-    // --- EVENT LISTENER FOR APPROVE & LOCK BUTTON WITH HIGHLIGHT FIX ---
     const approveBtn = document.getElementById("approve-btn");
     if (approveBtn) {
-        console.log("De knop is gelukkig gevonden in de HTML!"); // <-- DIT MOET JE DIRECT ZIEN BIJ HET LADEN
-        
         approveBtn.addEventListener("click", async () => {
-            console.log("Er is OP DE KNOP GEKLIKT!"); // <-- DIT MOET JE ZIEN BIJ EEN KLIK
-            
             const selectedCell = document.querySelector(".grid-cell.selected");
             if (!selectedCell) {
                 alert("Please select a grid cell first to lock or unlock it.");
                 return;
             }
+
             try {
                 const response = await fetch('/grid/approve', {
                     method: 'POST',
@@ -48,32 +43,35 @@ document.addEventListener("DOMContentLoaded", () => {
                 const data = await response.json();
 
                 if (data.success) {
+                    const lockIndicator = selectedCell.querySelector('.lock-indicator');
+                    
                     if (data.is_approved) {
-                        // Lock the cell visually
-                        selectedCell.classList.add("locked-cell", "border-4", "border-red-500", "opacity-80");
+                        selectedCell.classList.add("is-locked", "bg-stripes", "opacity-60", "border-red-600", "pointer-events-none");
+                        selectedCell.classList.remove("bg-gray-300", "border-gray-800", "dark:bg-blue-950", "dark:border-gray-300", "hover:bg-gray-400", "hover:dark:bg-gray-100");
                         selectedCell.setAttribute("draggable", "false");
                         
-                        // Hide the delete button if it exists
+                        if (lockIndicator) lockIndicator.classList.remove('hidden');
+                        
                         const deleteBtn = selectedCell.querySelector(".delete-btn");
                         if (deleteBtn) deleteBtn.classList.add("hidden");
                         
-                        // FIX: Heractiveer highlight-status
                         activateCell(selectedCell);
-                        alert("Cell locked successfully!"); 
+                        alert("Cell successfully approved and locked!"); 
                     } else {
-                        // Unlock the cell visually
-                        selectedCell.classList.remove("locked-cell", "border-4", "border-red-500", "opacity-80");
+                        selectedCell.classList.remove("is-locked", "bg-stripes", "opacity-60", "border-red-600", "pointer-events-none");
+                        selectedCell.classList.add("bg-gray-300", "border-gray-800", "dark:bg-blue-950", "dark:border-gray-300", "hover:bg-gray-400", "hover:dark:bg-gray-100");
+                        
                         if (selectedCell.querySelector("img")) {
                             selectedCell.setAttribute("draggable", "true");
                         }
                         
-                        // Show the delete button again
+                        if (lockIndicator) lockIndicator.classList.add('hidden');
+                        
                         const deleteBtn = selectedCell.querySelector(".delete-btn");
                         if (deleteBtn) deleteBtn.classList.remove("hidden");
                         
-                        // FIX: Heractiveer highlight-status
                         activateCell(selectedCell);
-                        alert("Cell unlocked successfully!"); 
+                        alert("Cell successfully unlocked!"); 
                     }
                 } else {
                     console.error("Failed to toggle lock status:", data.error);
@@ -90,15 +88,13 @@ document.addEventListener("DOMContentLoaded", () => {
         const cell = e.target.closest(".grid-cell");
         if (!cell) return;
 
-        // SECURITY: Check if cell is approved/locked
-        if (cell.classList.contains("locked-cell")) {
-            alert("This cell is approved and locked. Action denied.");
+        if (cell.classList.contains("is-locked")) {
+            alert("Action denied: This cell is approved and locked.");
             return;
         }
 
         cell.innerHTML = "";
         cell.removeAttribute("draggable");
-
         activateCell(cell);
 
         try {
@@ -135,7 +131,6 @@ document.addEventListener("DOMContentLoaded", () => {
                     force: force
                 })
             });
-
             return res;
         } catch (err) {
             console.error("Error saving grid cell:", err);
@@ -160,7 +155,6 @@ document.addEventListener("DOMContentLoaded", () => {
             if (breakdownEl) {
                 breakdownEl.innerHTML = renderQoLBreakdown(data);
             }
-
         } catch (err) {
             console.error("Error fetching QoL data:", err);
         }
@@ -168,11 +162,9 @@ document.addEventListener("DOMContentLoaded", () => {
 
     function compareScores(data) {
         let html = '';
-
         if (old_score === undefined) {
             html+=''; 
-        }
-        else {
+        } else {
             const delta_score = data.total_score - old_score;
             html += `
                 <span class="text-xl float-right ${delta_score < 0 ? 'text-red-600' : 'text-green-600'}">
@@ -295,9 +287,9 @@ document.addEventListener("DOMContentLoaded", () => {
 
     cells.forEach(cell => {
         cell.addEventListener("dragstart", e => {
-            // SECURITY: Prevent drag if cell is approved/locked
-            if (cell.classList.contains("locked-cell")) {
+            if (cell.classList.contains("is-locked")) {
                 e.preventDefault();
+                alert("Modification denied: This cell is locked.");
                 return;
             }
 
@@ -317,8 +309,7 @@ document.addEventListener("DOMContentLoaded", () => {
         });
 
         cell.addEventListener("dragover", e => { 
-            // Prevent dropping onto locked cells
-            if (cell.classList.contains("locked-cell")) return;
+            if (cell.classList.contains("is-locked")) return;
             e.preventDefault(); 
             cell.classList.add("drag-over"); 
         });
@@ -328,9 +319,9 @@ document.addEventListener("DOMContentLoaded", () => {
         cell.addEventListener("drop", async e => {
             e.preventDefault();
             
-            // SECURITY: Guard clause for locked targets
-            if (cell.classList.contains("locked-cell")) {
+            if (cell.classList.contains("is-locked")) {
                 cell.classList.remove("drag-over");
+                alert("Modification denied: The target cell is locked.");
                 return;
             }
 
@@ -338,16 +329,12 @@ document.addEventListener("DOMContentLoaded", () => {
             dropOccurred = true;
             cell.classList.remove("drag-over");
 
-            // Verify if the target cell already has an image (is occupied)
             const isOccupied = cell.querySelector("img") !== null;
 
             if (isOccupied) {
                 const wantsToReplace = window.confirm("Are you sure you want to replace this feature?");
-                
                 if (!wantsToReplace) {
-                    if (sourceCell) {
-                        sourceCell.classList.remove("drag-source");
-                    }
+                    if (sourceCell) sourceCell.classList.remove("drag-source");
                     return; 
                 }
             }
@@ -452,7 +439,6 @@ document.addEventListener("DOMContentLoaded", () => {
     });
 
     const undoBtn = document.getElementById("undo-btn");
-
     if (undoBtn) {
         undoBtn.addEventListener("click", async () => {
             if (!lastAction) return;
@@ -484,8 +470,7 @@ document.addEventListener("DOMContentLoaded", () => {
         if (!draggedItem || !sourceCell) return;
         if (dropOccurred) { dropOccurred = false; return; }
 
-        // SECURITY: If source became locked somehow, prevent removal
-        if (sourceCell.classList.contains("locked-cell")) return;
+        if (sourceCell.classList.contains("is-locked")) return;
 
         const grid = document.querySelector(".city-grid");
         const rect = grid.getBoundingClientRect();
@@ -523,7 +508,6 @@ document.addEventListener("DOMContentLoaded", () => {
             })
             .then(res => res.json())
             .then(data => {
-                console.log("UNDO RESPONSE:", data);
                 if (!data.success) return;
 
                 const targetCell = document.querySelector(
@@ -531,6 +515,11 @@ document.addEventListener("DOMContentLoaded", () => {
                 );
 
                 if (targetCell) {
+                    if (targetCell.classList.contains('is-locked')) {
+                        alert("Undo denied: This point is locked by a City Planner.");
+                        return;
+                    }
+
                     if (data.cell.function_id) {
                         targetCell.innerHTML = `
                             <img src="${data.cell.image}" 
@@ -554,24 +543,12 @@ document.addEventListener("DOMContentLoaded", () => {
                         `[data-row="${data.cleared.row}"][data-col="${data.cleared.col}"]`
                     );
 
-                    if (clearedCell) {
+                    if (clearedCell && !clearedCell.classList.contains('is-locked')) {
                         clearedCell.innerHTML = "";
                         clearedCell.removeAttribute("draggable");
                         clearedCell.classList.remove("selected"); 
                     }
                 }
-
-                document.querySelectorAll('.grid-cell').forEach(c => {
-                    const cRow = Number(c.dataset.row);
-                    const cCol = Number(c.dataset.col);
-
-                    if (cRow === Number(data.cell.row) && cCol === Number(data.cell.col)) return;
-
-                    if (data.cleared && cRow === Number(data.cleared.row) && cCol === Number(data.cleared.col)) {
-                        c.innerHTML = "";
-                        c.removeAttribute("draggable");
-                    }
-                });
 
                 setTimeout(() => updateQoL(), 50);
             });

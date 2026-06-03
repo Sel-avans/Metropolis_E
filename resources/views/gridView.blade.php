@@ -6,7 +6,6 @@
             <div class="flex flex-col margin-bottom-4 gap-3">    
                 <h1 class="text-2xl dark:text-teal-500 font-bold mb-4">Function Library</h1>
 
-                {{-- Kleine toevoeging: focus ring voor keyboard users --}}
                 <a href="{{ route('effects.index') }}" 
                     class="px-3 py-1.5 bg-teal-600 text-white rounded hover:bg-teal-700 text-xs shadow
                            focus:outline-none focus:ring-2 focus:ring-teal-500">
@@ -92,33 +91,42 @@
                                 $cell = $grid->first(function($c) use ($row, $col) {
                                     return $c->row == $row && $c->col == $col;
                                 });
+                                // Check of de cel in de database al gelockt is
+                                $isLocked = $cell && $cell->is_locked; 
                             @endphp
                             
                             <div 
-                                class="grid-cell relative border-2 bg-gray-300 border-gray-800 dark:bg-blue-950 dark:border-gray-300 w-32 h-32 items-center justify-center hover:bg-gray-400 hover:dark:bg-gray-100 cursor-pointer transition
-                                       focus:outline-none focus:ring-2 focus:ring-blue-500"
+                                class="grid-cell relative border-2 w-32 h-32 items-center justify-center cursor-pointer transition focus:outline-none focus:ring-2 focus:ring-blue-500
+                                       {{ $isLocked ? 'is-locked bg-stripes opacity-60 border-red-600 pointer-events-none' : 'bg-gray-300 border-gray-800 dark:bg-blue-950 dark:border-gray-300 hover:bg-gray-400 hover:dark:bg-gray-100' }}"
                                 data-row="{{ $row }}"
                                 data-col="{{ $col }}"
                                 data-id="{{ $cell ? $cell->id : '' }}"
-                                draggable="{{ $cell ? 'true' : 'false' }}"
+                                draggable="{{ $cell && !$isLocked ? 'true' : 'false' }}"
                                 role="button"
                                 aria-label="{{ !empty($cell) && !empty($cell->function) ? 'Grid cell row ' . $cell->row . ', column ' . $cell->col . ' containing ' . $cell->function->name : 'Empty grid cell row ' . $row . ', column ' . $col }}"
                             >
+                                <div class="lock-indicator absolute top-1 left-1 bg-red-600 text-white text-[10px] font-bold px-1 rounded flex items-center gap-0.5 shadow {{ $isLocked ? '' : 'hidden' }}">
+                                    🔒 <span class="uppercase text-[9px]">Locked</span>
+                                </div>
+
                                 @if(!empty($cell) && !empty($cell->function))
                                     <img 
                                         src="{{ asset($cell->function->image) }}"
                                         alt="{{ $cell->function->name }}"
-                                        class="grid-function-icon object-contain"
+                                        class="grid-function-icon object-contain w-full h-full p-4"
                                         data-function-id="{{ $cell->function->id }}"
                                     >
 
-                                    <button 
-                                        type="button"
-                                        class="delete-btn absolute top-[2px] right-[2px] bg-red-600/80 text-white w-5 h-5 text-[14px] rounded cursor-pointer flex items-center justify-center"
-                                        aria-label="Remove {{ $cell->function->name }} from grid cell"
-                                        title="Remove {{ $cell->function->name }} from grid cell">
-                                        <span class="sr-only">Remove {{ $cell->function->name }} from grid cell</span>✖
-                                    </button>
+                                    {{-- Verwijderknop verbergen als hij gelockt is --}}
+                                    @if(!$isLocked)
+                                        <button 
+                                            type="button"
+                                            class="delete-btn absolute top-[2px] right-[2px] bg-red-600/80 text-white w-5 h-5 text-[14px] rounded cursor-pointer flex items-center justify-center"
+                                            aria-label="Remove {{ $cell->function->name }} from grid cell"
+                                            title="Remove {{ $cell->function->name }} from grid cell">
+                                            <span class="sr-only">Remove {{ $cell->function->name }} from grid cell</span>✖
+                                        </button>
+                                    @endif
                                 @endif
                             </div>
 
@@ -143,6 +151,18 @@
             </ul>
         </div>
     </div>
+
+    {{-- CSS styling toevoegen voor de schuine strepen (stripes) achtergrond --}}
+    <style>
+        .bg-stripes {
+            background-color: #fca5a5;
+            background-image: repeating-linear-gradient(45deg, transparent, transparent 10px, rgba(239, 68, 68, 0.15) 10px, rgba(239, 68, 68, 0.15) 20px);
+        }
+        .dark .bg-stripes {
+            background-color: #7f1d1d;
+            background-image: repeating-linear-gradient(45deg, transparent, transparent 10px, rgba(239, 68, 68, 0.3) 10px, rgba(239, 68, 68, 0.3) 20px);
+        }
+    </style>
 
     {{-- JavaScript bundel inladen --}}
     @vite(['resources/js/grid.js'])
