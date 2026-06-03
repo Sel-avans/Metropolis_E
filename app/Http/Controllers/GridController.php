@@ -45,7 +45,21 @@ class GridController extends Controller
         $newCol = intval($request->input('new_col'));
         $functionId = $request->input('function_id');
 
-        // Bepaal de logica voor de UndoAction
+        // SECURITY: Check if the target cell is already approved/locked
+        $targetCell = GridCell::where('row', $newRow)->where('col', $newCol)->first();
+        if ($targetCell && $targetCell->is_approved) {
+            return response()->json(['success' => false, 'error' => 'cell_locked'], 403);
+        }
+
+        // SECURITY: If moving a function, the source cell must not be locked either
+        if ($oldRow !== null && $oldCol !== null) {
+            $sourceCell = GridCell::where('row', $oldRow)->where('col', $oldCol)->first();
+            if ($sourceCell && $sourceCell->is_approved) {
+                return response()->json(['success' => false, 'error' => 'cell_locked'], 403);
+            }
+        }
+
+        // Determine the logic for the UndoAction
         if ($oldRow !== null && $oldCol !== null) {
             $actionRow = $oldRow;
             $actionCol = $oldCol;
@@ -60,7 +74,8 @@ class GridController extends Controller
 
         // Capture previous function id for rollback if needed
         $previousFunctionId = $actionCell ? $actionCell->function_id : null;
-        // Sla de UndoAction op, nu inclusief new_row en new_col!
+        
+        // Save the UndoAction, now including new_row and new_col
         UndoAction::truncate();
         UndoAction::create([
             'row' => $actionRow,
@@ -75,14 +90,14 @@ class GridController extends Controller
                     : ($actionCell && $actionCell->function_id ? 'replace' : 'insert')),
         ]);
 
-        // 1. Oude cel leegmaken bij een move
+        // 1. Clear the old cell during a move action
         if ($oldRow !== null && $oldCol !== null) {
             GridCell::where('row', $oldRow)
                     ->where('col', $oldCol)
                     ->update(['function_id' => null]);
         }
 
-        // 2. Drag-off (verwijderen van grid)
+        // 2. Drag-off (removing from grid)
         if ($functionId === null) {
             GridCell::where('row', $newRow)
                     ->where('col', $newCol)
@@ -100,7 +115,7 @@ class GridController extends Controller
             return response()->json(['error' => 'Function not found'], 404);
         }
 
-        // Adjacency / Naburigheidsregels controleren
+        // Check adjacency rules
         $force = filter_var($request->input('force'), FILTER_VALIDATE_BOOLEAN);
         $dirs = [[0, 1], [1, 0], [0, -1], [-1, 0]];
 
@@ -138,12 +153,11 @@ class GridController extends Controller
             }
         }
 
-        // 3. Update of maak de nieuwe cel aan
+        // 3. Update or create the new grid cell
         GridCell::updateOrCreate(
             ['row' => $newRow, 'col' => $newCol],
             ['function_id' => $function->id]
         );
-
 
         $freshQol = QoLController::recalculateQoL();
 
@@ -155,6 +169,11 @@ class GridController extends Controller
 
     public function removeFunction(GridCell $cell)
     {
+        // SECURITY: If a cell is approved/locked, it cannot be removed
+        if ($cell->is_approved) {
+            return response()->json(['success' => false, 'error' => 'cell_locked'], 403);
+        }
+
         UndoAction::truncate();
         UndoAction::create([
             'row' => $cell->row,
@@ -172,6 +191,33 @@ class GridController extends Controller
         return response()->json([
             'success' => true,
             'qol_data' => $freshQol
+        ]);
+    }
+
+    // NEW METHOD: Approve and lock/unlock a specific grid cell
+    public function approveCell(Request $request)
+    {
+        // Only the City Planner is authorized via the backend
+        if (!auth()->user() || auth()->user()->role->name !== 'City_planner') {
+            return response()->json(['success' => false, 'error' => 'unauthorized'], 403);
+        }
+
+        $row = $request->input('row');
+        $col = $request->input('col');
+
+        $cell = GridCell::where('row', $row)->where('col', $col)->first();
+
+        if (!$cell) {
+            return response()->json(['success' => false, 'error' => 'cell_not_found'], 444);
+        }
+
+        // Toggle the approval status
+        $cell->is_approved = !$cell->is_approved;
+        $cell->save();
+
+        return response()->json([
+            'success' => true,
+            'is_approved' => $cell->is_approved
         ]);
     }
 }

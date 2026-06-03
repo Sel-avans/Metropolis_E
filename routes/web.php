@@ -33,7 +33,7 @@ Route::middleware('auth')->group(function () {
         Route::get('/grid', [GridController::class, 'index'])->name('grid');
         Route::get('/qol/details', [QoLController::class, 'details'])->name('qol.details');
         Route::get('/qol/cell/{row}/{col}', [QoLController::class, 'cellHoverDetails']);
-        
+        Route::post('/grid/approve', [App\Http\Controllers\GridController::class, 'approveCell'])->name('grid.approve');
         // Functies plaatsen/verwijderen op het grid (City Planner)
         Route::post('/grid/update', [GridController::class, 'update'])->middleware('can:CanPlaceFunctions,' . PagePolicy::class);
         Route::post('/undo', [UndoController::class, 'undo'])->middleware('can:CanPlaceFunctions,' . PagePolicy::class);

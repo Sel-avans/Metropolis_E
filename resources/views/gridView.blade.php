@@ -72,6 +72,12 @@
                 Undo
             </button>
 
+          {{-- Check direct of de Enum-naam City_planner is --}}
+@if(auth()->user() && auth()->user()->role->name === 'City_planner')
+    <button type="button" id="approve-btn" class="mt-2 px-4 py-2 bg-amber-600 text-white font-semibold rounded shadow hover:bg-amber-700 transition">
+          Approve & Lock Area
+    </button>
+@endif
             {{-- Grid Display --}}
             <div class="w-auto p-6">
                 <h1 class="text-2xl text-center font-bold mb-4 dark:text-teal-300">
@@ -89,10 +95,10 @@
                             @endphp
                             <div 
                                 class="grid-cell relative border-2 bg-gray-300 border-gray-800 dark:bg-blue-950 dark:border-gray-300 w-32 h-32 items-center justify-center hover:bg-gray-400 hover:dark:bg-gray-100 cursor-pointer transition
-                                   focus:outline-none focus:ring-2 focus:ring-blue-500"
+                                    focus:outline-none focus:ring-2 focus:ring-blue-500"
                                 data-row="{{ $row }}"
                                 data-col="{{ $col }}"
-                                data-id="{{ $cell->id }}"
+                                data-id="{{ $cell ? $cell->id : '' }}"
                                 draggable="{{ $cell ? 'true' : 'false' }}"
                                 role="button"
                                 aria-label="{{ !empty($cell) && !empty($cell->function) ? 'Grid cell row ' . $cell->row . ', column ' . $cell->col . ' containing ' . $cell->function->name : 'Empty grid cell row ' . $row . ', column ' . $col }}"
