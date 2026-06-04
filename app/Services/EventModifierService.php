@@ -350,4 +350,62 @@ class EventModifierService
         }
     }
 
+    /**
+     * @param  int  $functionId
+     * @return array<string, float>
+     */
+    public static function getModifiersByCategoryForFunction(int $functionId): array
+    {
+        $modifiers = array_fill_keys(self::CATEGORY_KEYS, 0.0);
+
+        foreach (self::getActiveEvents() as $event) {
+            $applies = $event->effects->contains(fn ($e) => ($e->city_function_id ?? $e->city_function_id) == $functionId);
+            if (! $applies) {
+                continue;
+            }
+
+            foreach ($event->categoryEffects as $effect) {
+                $catKey = strtolower($effect->category);
+                if (isset($modifiers[$catKey])) {
+                    $modifiers[$catKey] += (float) $effect->value;
+                }
+            }
+        }
+
+        return $modifiers;
+    }
+
+    // The Fix for the grid details & update not working. V
+
+    /**
+     * @param  int  $functionId
+     * @return array<int, array{event_name: string, category: string, value: float}>
+     */
+    public static function getModifierBreakdownForFunction(int $functionId): array
+    {
+        $breakdown = [];
+
+        foreach (self::getActiveEvents() as $event) {
+            $applies = $event->effects->contains(fn ($e) => ($e->city_function_id ?? $e->city_function_id) == $functionId);
+            if (! $applies) {
+                continue;
+            }
+
+            foreach ($event->categoryEffects as $effect) {
+                $catKey = strtolower($effect->category);
+                if (! in_array($catKey, self::CATEGORY_KEYS, true)) {
+                    continue;
+                }
+
+                $breakdown[] = [
+                    'event_name' => $event->name,
+                    'category' => $catKey,
+                    'value' => (float) $effect->value,
+                ];
+            }
+        }
+
+        return $breakdown;
+    }
+
 }

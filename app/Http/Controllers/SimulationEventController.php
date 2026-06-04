@@ -4,6 +4,7 @@ namespace App\Http\Controllers;
 
 use App\Models\SimulationEvent;
 use App\Services\EventModifierService;
+use App\Models\CityFunction;
 use Illuminate\Http\Request;
 use Carbon\Carbon; 
 use App\Services\SimSpeedService;
@@ -32,7 +33,12 @@ class SimulationEventController extends Controller
      */
     public function create()
     {
-        return view('events.create');
+        $effectCategories = EventModifierService::CATEGORY_KEYS;
+        $cityFunctions = CityFunction::all();
+        $selectedCategoryModifiers = [];
+        $selectedCityFunctionIds = [];
+
+        return view('events.create', compact('effectCategories', 'cityFunctions', 'selectedCategoryModifiers', 'selectedCityFunctionIds'));
     }
 
     /**
@@ -63,7 +69,23 @@ class SimulationEventController extends Controller
      */
     public function edit(SimulationEvent $event)
     {
-        return view('events.edit', compact('event'));
+        $event->load('effects', 'categoryEffects');
+
+        $effectCategories = EventModifierService::CATEGORY_KEYS;
+        $cityFunctions = CityFunction::all();
+
+        $selectedCategoryModifiers = [];
+        foreach ($event->categoryEffects as $ce) {
+            $selectedCategoryModifiers[strtolower($ce->category)] = $ce->value;
+        }
+
+        $selectedCityFunctionIds = $event->effects->pluck('city_function_id')
+            ->filter()
+            ->map(fn($id) => (int) $id)
+            ->values()
+            ->all();
+
+        return view('events.edit', compact('event', 'effectCategories', 'cityFunctions', 'selectedCategoryModifiers', 'selectedCityFunctionIds'));
     }
 
     /**

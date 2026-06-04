@@ -54,7 +54,7 @@
         <div class="flex flex-col flex-1 min-w-0 py-2">
 
             {{-- QoL Score --}}
-            <div class="border-4 border-gray-400 dark:bg-indigo-900 dark:border-teal-600 rounded-md p-6 mb-4">
+            <div class="border-4 border-gray-400 dark:bg-indigo-900 dark:border-teal-600 rounded-md p-3 mb-2">
                 <span id="qol-score" class="text-xl font-semibold dark:text-teal-300">
                     QoL score: <span id="qol-score-value"></span>
                 </span>
@@ -63,7 +63,7 @@
 
             {{-- Undo Button --}}
             <button id="undoButton"
-                class="mb-4 px-4 py-2 bg-yellow-500 text-black font-semibold rounded shadow hover:bg-yellow-600 transition focus:ring-2 focus:ring-yellow-400">
+                class="mb-1 px-4 py-2 bg-yellow-500 text-black font-semibold rounded shadow hover:bg-yellow-600 transition focus:ring-2 focus:ring-yellow-400">
                 Undo
             </button>
 
