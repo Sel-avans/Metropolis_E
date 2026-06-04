@@ -20,8 +20,6 @@ export const setSimulationSpeed = async (speed) => {
     simulationState.speed = parseInt(speed);
     document.getElementById('active-speed-display').innerText = speed + '×';
 
-    // ... je styling code blijft hetzelfde ...
-
     try {
         const response = await fetch('/api/simulation/speed', {
             method: 'POST',
@@ -50,10 +48,9 @@ export function simulationLoop(timestamp) {
         let currentTime = getCurrentTime();
         
         if (currentTime < maxTime) {
-            // De berekening: deltaTime zorgt voor framerate-onafhankelijke snelheid
             const increment = SIMULATION_UNITS_PER_SECOND * simulationState.speed * deltaTime;
             setCurrentTime(currentTime + increment);
-            syncTimelineUI(); // Dit update nu automatisch ook de "Time left" tekst
+            syncTimelineUI(); 
         }
         lastTimestamp = timestamp;
     } else {
