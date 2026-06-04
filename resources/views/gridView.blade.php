@@ -2,8 +2,8 @@
     <div class="flex gap-4 h-full">
 
         {{-- LEFT: Function Library --}}
-        <div class="w-auto p-6 max-h-[73vh] overflow-y-auto flex-shrink-0">
-            <div class="flex flex-col mb-4 gap-3">
+        <div class="library-sidebar w-auto p-6 max-h-[73vh] overflow-y-auto flex-shrink-0 flex flex-col min-h-0">
+            <div class="flex flex-col mb-4 gap-3 shrink-0">
                 <h1 class="text-2xl dark:text-teal-500 font-bold mb-4">Function Library</h1>
 
                 <div class="grid grid-cols-2 gap-3 w-full">
@@ -30,24 +30,49 @@
                 </div>
             </div>
 
+            <section id="library-filters" class="shrink-0 mb-3" aria-label="Search destinations">
+                <label for="library-search" class="sr-only">Search destinations by name</label>
+                <input
+                    type="search"
+                    id="library-search"
+                    placeholder="Search by name…"
+                    autocomplete="off"
+                    class="library-search-input w-full px-3 py-2 text-sm rounded-md border border-gray-300 dark:border-gray-600 bg-white dark:bg-gray-900 text-gray-900 dark:text-white focus:outline-none focus:ring-2 focus:ring-blue-500"
+                >
+            </section>
+
+            <p
+                id="library-no-results"
+                class="hidden shrink-0 text-sm text-gray-600 dark:text-gray-400 px-2 py-2 mb-2 rounded-md bg-amber-50 dark:bg-amber-900/20 border border-amber-200 dark:border-amber-800"
+                role="status"
+                aria-live="polite"
+            >
+                No destinations match your search.
+            </p>
+
+            <div id="library-list" class="library-list-panel flex-1 min-h-0">
             @forelse($functions as $category => $items)
-                <h2 class="text-xl dark:text-teal-600 font-semibold mt-6 mb-2">{{ ucfirst($category) }}</h2>
-                <ul class="space-y-2 dark:text-white">
-                    @foreach($items as $function)
-                        <li class="library-item flex items-center gap-3 px-4 py-3 border border-gray-400 dark:border-gray-600 rounded cursor-pointer hover:border-blue-500 transition focus:outline-none focus:ring-2 focus:ring-blue-500"
-                            draggable="true"
-                            data-function-id="{{ $function->id }}"
-                            data-function-name="{{ $function->name }}"
-                            data-image="{{ asset($function->image) }}">
-                            <img src="{{ asset($function->image) }}" alt="{{ $function->name }}"
-                                class="w-8 h-8 object-contain pointer-events-none">
-                            <span class="text-sm font-medium">{{ $function->name }}</span>
-                        </li>
-                    @endforeach
-                </ul>
+                <div class="library-category-group mb-4" data-category="{{ $category }}">
+                    <h2 class="text-xl dark:text-teal-600 font-semibold mt-2 mb-2">{{ ucfirst($category) }}</h2>
+                    <ul class="space-y-2 dark:text-white" role="list">
+                        @foreach($items as $function)
+                            <li class="library-item flex items-center gap-3 px-4 py-3 border border-gray-400 dark:border-gray-600 rounded cursor-pointer hover:border-blue-500 transition focus:outline-none focus:ring-2 focus:ring-blue-500"
+                                draggable="true"
+                                data-function-id="{{ $function->id }}"
+                                data-function-name="{{ $function->name }}"
+                                data-category="{{ $function->category }}"
+                                data-image="{{ asset($function->image) }}">
+                                <img src="{{ asset($function->image) }}" alt="{{ $function->name }}"
+                                    class="w-8 h-8 object-contain pointer-events-none">
+                                <span class="text-sm font-medium">{{ $function->name }}</span>
+                            </li>
+                        @endforeach
+                    </ul>
+                </div>
             @empty
                 <p class="text-gray-500">No functions available.</p>
             @endforelse
+            </div>
         </div>
 
         {{-- MIDDLE: QoL + Undo + Grid + Simulation Controls --}}

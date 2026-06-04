@@ -25,8 +25,10 @@ class GridController extends Controller
         }
 
         $grid = GridCell::with('function.effects')->get();
-        $items = CityFunction::all();
-        $functions = $items->groupBy('category');
+        $functions = CityFunction::orderBy('name')
+            ->get()
+            ->groupBy('category')
+            ->sortKeys();
 
         $activeEvents = EventModifierService::getActiveEvents();
 

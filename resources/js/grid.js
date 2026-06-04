@@ -1,9 +1,11 @@
 import { getNeighborsWithQoL } from './neighbours.js';
 import { simulationLoop } from './simulation.js';
 import { setMaxTime, syncTimelineUI } from './regulation.js';
+import { initLibraryFilter } from './library-filter.js';
 
 
 document.addEventListener("DOMContentLoaded", () => {
+    initLibraryFilter();
 
     // =========================================================
     // VARIABELEN
