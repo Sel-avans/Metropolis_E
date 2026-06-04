@@ -1,4 +1,11 @@
 import { getNeighborsWithQoL } from './neighbours.js';
+let draggedItem = null;
+    let isDragging = false;
+    let sourceCell = null;
+    let dropOccurred = false;
+    let old_score;
+    let lastAction = null;
+
 
 document.addEventListener("DOMContentLoaded", () => {
 
@@ -7,13 +14,6 @@ document.addEventListener("DOMContentLoaded", () => {
         cell.classList.add("selected");
     }
 
-    let draggedItem = null;
-    let isDragging = false;
-    let sourceCell = null;
-    let dropOccurred = false;
-    let old_score;
-
-    let lastAction = null;
 
     const HOVER_DELAY_MS = 300;
     let hoverTimer = null;
@@ -21,6 +21,7 @@ document.addEventListener("DOMContentLoaded", () => {
     const popup = document.getElementById('qol-popup');
     const neighborsList = document.getElementById('popup-neighbors-list');
 
+    // --- APPROVE / LOCK LOGIC ---
     const approveBtn = document.getElementById("approve-btn");
     if (approveBtn) {
         approveBtn.addEventListener("click", async () => {
@@ -73,8 +74,6 @@ document.addEventListener("DOMContentLoaded", () => {
                         activateCell(selectedCell);
                         alert("Cell successfully unlocked!"); 
                     }
-                } else {
-                    console.error("Failed to toggle lock status:", data.error);
                 }
             } catch (err) {
                 console.error("Error during cell approval:", err);
@@ -82,6 +81,7 @@ document.addEventListener("DOMContentLoaded", () => {
         });
     }
 
+    // --- DELETE LOGIC ---
     document.addEventListener("click", async (e) => {
         if (!e.target.classList.contains("delete-btn")) return;
 
@@ -89,7 +89,7 @@ document.addEventListener("DOMContentLoaded", () => {
         if (!cell) return;
 
         if (cell.classList.contains("is-locked")) {
-            alert("Action denied: This cell is approved and locked.");
+            alert("You can't delete a function in this area. It is locked.");
             return;
         }
 
@@ -162,9 +162,7 @@ document.addEventListener("DOMContentLoaded", () => {
 
     function compareScores(data) {
         let html = '';
-        if (old_score === undefined) {
-            html+=''; 
-        } else {
+        if (old_score !== undefined) {
             const delta_score = data.total_score - old_score;
             html += `
                 <span class="text-xl float-right ${delta_score < 0 ? 'text-red-600' : 'text-green-600'}">
@@ -177,33 +175,16 @@ document.addEventListener("DOMContentLoaded", () => {
     }
 
     function renderQoLBreakdown(data) {
-        let html = '';
-        html += '<h3 class="text-xl font-semibold dark:text-teal-500">Breakdown QoL Score</h3>';
-
+        let html = '<h3 class="text-xl font-semibold dark:text-teal-500">Breakdown QoL Score</h3>';
         for (const [category, info] of Object.entries(data.categories)) {
             const score = Number(info.total);
-            let scoreClass = 'text-slate-400';
-            if (score > 0) scoreClass = 'text-green-600';
-            else if (score < 0) scoreClass = 'text-red-600';
-
+            let scoreClass = score > 0 ? 'text-green-600' : (score < 0 ? 'text-red-600' : 'text-slate-400');
             let scoreSign = score > 0 ? '+' : '';
-            html += `
-            <h3 class="font-semibold mt-3 dark:text-teal-600">
-                ${category}: <span class="${scoreClass}">${scoreSign}${score}</span>
-            </h3>`;
+            html += `<h3 class="font-semibold mt-3 dark:text-teal-600">${category}: <span class="${scoreClass}">${scoreSign}${score}</span></h3>`;
         }
-
         const totalScore = Number(data.total_score);
-        let totalClass = 'text-slate-400';
-        if (totalScore > 0) totalClass = 'text-green-600';
-        else if (totalScore < 0) totalClass = 'text-red-600';
-
-        let totalSign = totalScore > 0 ? '+' : '';
-        html += `
-        <h3 class="font-bold mt-4 dark:text-teal-600">
-            Total QoL: <span class="${totalClass}">${totalSign}${totalScore}</span>
-        </h3>`;
-
+        let totalClass = totalScore > 0 ? 'text-green-600' : (totalScore < 0 ? 'text-red-600' : 'text-slate-400');
+        html += `<h3 class="font-bold mt-4 dark:text-teal-600">Total QoL: <span class="${totalClass}">${totalScore > 0 ? '+' : ''}${totalScore}</span></h3>`;
         return html;
     }
 
@@ -230,45 +211,33 @@ document.addEventListener("DOMContentLoaded", () => {
         let html = '';
         for (const [categoryName, info] of Object.entries(data.categories)) {
             const totalScore = Number(info.total);
-            let catClass = 'text-slate-400';
-            if (totalScore > 0) catClass = 'text-green-600';
-            else if (totalScore < 0) catClass = 'text-red-600';
-
-            let catSign = totalScore > 0 ? '+' : '';
+            let catClass = totalScore > 0 ? 'text-green-600' : (totalScore < 0 ? 'text-red-600' : 'text-slate-400');
             html += `
-                <div class="mb-2 last:mb-0 w-full">
+                <div class="mb-2 w-full">
                     <div class="flex justify-between items-center gap-8">
                         <span class="text-slate-200 font-medium text-sm">${categoryName}</span>
-                        <span class="${catClass} font-bold text-sm">${catSign}${totalScore}</span>
+                        <span class="${catClass} font-bold text-sm">${totalScore > 0 ? '+' : ''}${totalScore}</span>
                     </div>
                 </div>`;
         }
-
         const finalTotal = Number(data.total_score);
-        let totalClass = 'text-slate-400';
-        if (finalTotal > 0) totalClass = 'text-green-600';
-        else if (finalTotal < 0) totalClass = 'text-red-600';
-
-        let totalSign = finalTotal > 0 ? '+' : '';
         html += `
             <div class="flex justify-between items-center mt-3 pt-2 border-t border-slate-600/50 w-full">
-                <span class="text-slate-300 font-bold text-xs uppercase tracking-wider">Total QoL:</span>
-                <span class="${totalClass} font-extrabold text-base">${totalSign}${finalTotal}</span>
+                <span class="text-slate-300 font-bold text-xs uppercase">Total QoL:</span>
+                <span class="${finalTotal > 0 ? 'text-green-600' : (finalTotal < 0 ? 'text-red-600' : 'text-slate-400')} font-extrabold text-base">${finalTotal > 0 ? '+' : ''}${finalTotal}</span>
             </div>`;
-
         neighborsList.innerHTML = html;
     }
 
     function showPopup() {
         popup.classList.remove('hidden');
-        void popup.offsetWidth;
-        popup.classList.remove('opacity-0', 'scale-95');
-        popup.classList.add('opacity-100', 'scale-100');
+        popup.classList.replace('opacity-0', 'opacity-100');
+        popup.classList.replace('scale-95', 'scale-100');
     }
 
     function hidePopup() {
-        popup.classList.add('opacity-0', 'scale-95');
-        popup.classList.remove('opacity-100', 'scale-100');
+        popup.classList.replace('opacity-100', 'opacity-0');
+        popup.classList.replace('scale-100', 'scale-95');
         setTimeout(() => { popup.classList.add('hidden'); }, 150);
     }
 
@@ -276,282 +245,103 @@ document.addEventListener("DOMContentLoaded", () => {
         item.addEventListener("dragstart", e => {
             isDragging = true;
             dropOccurred = false;
-            draggedItem = {
-                id: Number(item.dataset.functionId),
-                name: item.dataset.functionName,
-                image: item.dataset.image
-            };
+            draggedItem = { id: Number(item.dataset.functionId), name: item.dataset.functionName, image: item.dataset.image };
             e.dataTransfer.setDragImage(item.querySelector("img"), 16, 16);
         });
     });
 
     cells.forEach(cell => {
         cell.addEventListener("dragstart", e => {
-            if (cell.classList.contains("is-locked")) {
-                e.preventDefault();
-                alert("Modification denied: This cell is locked.");
-                return;
-            }
-
+            if (cell.classList.contains("is-locked")) { e.preventDefault(); alert("Modification denied: This cell is locked."); return; }
             const img = cell.querySelector(".grid-function-icon");
             if (!img) return;
-
             isDragging = true;
             dropOccurred = false;
-            draggedItem = {
-                id: Number(img.dataset.functionId),
-                name: img.alt,
-                image: img.src
-            };
-            e.dataTransfer.setDragImage(img, 16, 16);
+            draggedItem = { id: Number(img.dataset.functionId), name: img.alt, image: img.src };
             sourceCell = cell;
             cell.classList.add("drag-source");
         });
 
-        cell.addEventListener("dragover", e => { 
-            if (cell.classList.contains("is-locked")) return;
-            e.preventDefault(); 
-            cell.classList.add("drag-over"); 
-        });
-        
-        cell.addEventListener("dragleave", () => { cell.classList.remove("drag-over"); });
+        cell.addEventListener("dragover", e => { if (!cell.classList.contains("is-locked")) { e.preventDefault(); cell.classList.add("drag-over"); } });
+        cell.addEventListener("dragleave", () => cell.classList.remove("drag-over"));
 
         cell.addEventListener("drop", async e => {
             e.preventDefault();
+            if (cell.classList.contains("is-locked")) { cell.classList.remove("drag-over"); return; }
             
-            if (cell.classList.contains("is-locked")) {
-                cell.classList.remove("drag-over");
-                alert("Modification denied: The target cell is locked.");
+            isDragging = false; dropOccurred = true; cell.classList.remove("drag-over");
+            
+            if (cell.querySelector("img") && !window.confirm("Replace this feature?")) {
+                if (sourceCell) sourceCell.classList.remove("drag-source");
                 return;
             }
 
-            isDragging = false;
-            dropOccurred = true;
-            cell.classList.remove("drag-over");
-
-            const isOccupied = cell.querySelector("img") !== null;
-
-            if (isOccupied) {
-                const wantsToReplace = window.confirm("Are you sure you want to replace this feature?");
-                if (!wantsToReplace) {
-                    if (sourceCell) sourceCell.classList.remove("drag-source");
-                    return; 
-                }
-            }
-
-            const newRow = cell.dataset.row;
-            const newCol = cell.dataset.col;
-            let oldRow = null;
-            let oldCol = null;
-
-            const originalSourceCell = sourceCell; 
-
-            if (sourceCell) {
-                oldRow = sourceCell.dataset.row;
-                oldCol = sourceCell.dataset.col;
-                sourceCell.innerHTML = "";
-                sourceCell.removeAttribute("draggable");
-                sourceCell.classList.remove("drag-source");
-            }
-
-            sourceCell = null;
+            const oldRow = sourceCell?.dataset.row;
+            const oldCol = sourceCell?.dataset.col;
+            if (sourceCell) { sourceCell.innerHTML = ""; sourceCell.classList.remove("drag-source"); }
+            
             cell.innerHTML = "";
-
             const img = document.createElement("img");
             img.src = draggedItem.image;
-            img.alt = draggedItem.name;
-            img.dataset.functionId = draggedItem.id;
-            img.classList.add("grid-function-icon", "object-contain");
+            img.classList.add("grid-function-icon");
             cell.appendChild(img);
-
+            
             const deleteBtn = document.createElement("button");
-            deleteBtn.type = "button";
-            deleteBtn.className =
-                "delete-btn absolute top-[2px] right-[2px] bg-red-600/80 text-white w-5 h-5 text-[14px] rounded cursor-pointer flex items-center justify-center";
-            const deleteText = `Remove ${draggedItem.name} from grid cell`;
-            deleteBtn.setAttribute("aria-label", deleteText);
-            deleteBtn.setAttribute("title", deleteText);
-            const srText = document.createElement("span");
-            srText.className = "sr-only";
-            srText.textContent = deleteText;
-            deleteBtn.appendChild(srText);
-            deleteBtn.append("✖");
+            deleteBtn.className = "delete-btn absolute top-[2px] right-[2px] bg-red-600/80 text-white w-5 h-5 rounded";
+            deleteBtn.innerHTML = "✖";
             cell.appendChild(deleteBtn);
 
-            cell.setAttribute("draggable", "true");
-            activateCell(cell);
-
-            lastAction = {
-                oldRow: oldRow,
-                oldCol: oldCol,
-                newRow: newRow,
-                newCol: newCol,
-                functionId: draggedItem.id
-            };
-
-            const undoBtnEl = document.getElementById("undo-btn");
-            if (undoBtnEl) undoBtnEl.disabled = false;
-
-            const res = await saveMove(oldRow, oldCol, newRow, newCol, false);
-
-            if (res && res.status === 409) {
-                const forceChoice = window.confirm("Placement is forbidden by adjacency rules. Force placement anyway?");
-
-                if (forceChoice) {
-                    const res2 = await saveMove(oldRow, oldCol, newRow, newCol, true);
-                    if (!res2 || !res2.ok) {
-                        if (originalSourceCell) {
-                            originalSourceCell.innerHTML = `<img src="${draggedItem.image}" alt="${draggedItem.name}" data-function-id="${draggedItem.id}" class="grid-function-icon object-contain"><button class="delete-btn absolute top-[2px] right-[2px] bg-red-600/80 text-white w-5 h-5 text-[14px] rounded cursor-pointer flex items-center justify-center">✖</button>`;
-                            originalSourceCell.setAttribute('draggable', 'true');
-                        } else {
-                            cell.innerHTML = "";
-                            cell.removeAttribute('draggable');
-                        }
-                        updateQoL();
-                        return;
-                    }
-                } else {
-                    if (originalSourceCell) {
-                        originalSourceCell.innerHTML = `<img src="${draggedItem.image}" alt="${draggedItem.name}" data-function-id="${draggedItem.id}" class="grid-function-icon object-contain"><button class="delete-btn absolute top-[2px] right-[2px] bg-red-600/80 text-white w-5 h-5 text-[14px] rounded cursor-pointer flex items-center justify-center">✖</button>`;
-                        originalSourceCell.setAttribute('draggable', 'true');
-                    } else {
-                        cell.innerHTML = "";
-                        cell.removeAttribute('draggable');
-                    }
-                    updateQoL();
-                    return;
-                }
+            const res = await saveMove(oldRow, oldCol, cell.dataset.row, cell.dataset.col, false);
+            if (res && res.status === 409 && window.confirm("Placement forbidden. Force placement?")) {
+                await saveMove(oldRow, oldCol, cell.dataset.row, cell.dataset.col, true);
             }
-
             updateQoL();
         });
 
         cell.addEventListener("click", () => { if (!isDragging) activateCell(cell); });
-        cell.addEventListener("keydown", e => { if (!isDragging && (e.key === "Enter" || e.key === " ")) activateCell(cell); });
-
-        cell.addEventListener('mouseenter', (event) => {
-            const row = parseInt(cell.dataset.row);
-            const col = parseInt(cell.dataset.col);
-            hoverTimer = setTimeout(() => { handleTileHover(row, col, event); }, HOVER_DELAY_MS);
-        });
-
+        cell.addEventListener('mouseenter', (event) => { hoverTimer = setTimeout(() => handleTileHover(parseInt(cell.dataset.row), parseInt(cell.dataset.col), event), HOVER_DELAY_MS); });
         cell.addEventListener('mouseleave', () => { clearTimeout(hoverTimer); hidePopup(); });
     });
 
     const undoBtn = document.getElementById("undo-btn");
     if (undoBtn) {
         undoBtn.addEventListener("click", async () => {
-            if (!lastAction) return;
-
-            await fetch('/grid/update', {
-                method: 'POST',
-                headers: {
-                    'Content-Type': 'application/json',
-                    'X-CSRF-TOKEN': document.querySelector('meta[name="csrf-token"]').content
-                },
-                body: JSON.stringify({
-                    old_row: lastAction.newRow,
-                    old_col: lastAction.newCol,
-                    new_row: lastAction.oldRow,
-                    new_col: lastAction.oldCol,
-                    function_id: lastAction.functionId,
-                    force: true
-                })
-            });
-
-            lastAction = null;
-            undoBtn.disabled = true;
-            updateQoL();
-            location.reload();
+            if (lastAction) {
+                await fetch('/grid/undo', { method: 'POST', headers: { 'X-CSRF-TOKEN': document.querySelector('meta[name="csrf-token"]').content } });
+                location.reload();
+            }
         });
     }
 
-    document.addEventListener("dragend", async (e) => {
-        if (!draggedItem || !sourceCell) return;
-        if (dropOccurred) { dropOccurred = false; return; }
-
-        if (sourceCell.classList.contains("is-locked")) return;
-
-        const grid = document.querySelector(".city-grid");
-        const rect = grid.getBoundingClientRect();
-        const x = e.pageX; const y = e.pageY;
-
-        const outside = x < rect.left || x > rect.right || y < rect.top || y > rect.bottom;
-        if (!outside) return;
-
-        sourceCell.innerHTML = "";
-        sourceCell.removeAttribute("draggable");
-        activateCell(sourceCell);
-
-        try {
-            await fetch(`/grid/cell/${sourceCell.dataset.id}/function`, {
-                method: "DELETE",
-                headers: { "X-CSRF-TOKEN": document.querySelector('meta[name="csrf-token"]').content }
-            });
-        } catch (err) { console.error("Error during drag-off delete:", err); }
-
-        draggedItem = null; sourceCell = null;
-        setTimeout(() => updateQoL(), 10);
-    });
+    document.addEventListener("dragend", () => { isDragging = false; if (sourceCell) sourceCell.classList.remove("drag-source"); });
 
     updateQoL();
+    document.addEventListener("DOMContentLoaded", () => {
+    const undoBtn = document.getElementById("undo-btn");
 
-    const undoButtonAlternative = document.getElementById('undoButton');
-    if (undoButtonAlternative) {
-        undoButtonAlternative.addEventListener('click', () => {
-            fetch('/undo', {
-                method: 'POST',
-                headers: {
-                    'X-CSRF-TOKEN': document.querySelector('meta[name="csrf-token"]').content,
-                    'Content-Type': 'application/json'
-                }
-            })
-            .then(res => res.json())
-            .then(data => {
-                if (!data.success) return;
-
-                const targetCell = document.querySelector(
-                    `[data-row="${data.cell.row}"][data-col="${data.cell.col}"]`
-                );
-
-                if (targetCell) {
-                    if (targetCell.classList.contains('is-locked')) {
-                        alert("Undo denied: This point is locked by a City Planner.");
-                        return;
-                    }
-
-                    if (data.cell.function_id) {
-                        targetCell.innerHTML = `
-                            <img src="${data.cell.image}" 
-                                 class="grid-function-icon object-contain"
-                                 data-function-id="${data.cell.function_id}">
-                            <button 
-                                class="delete-btn absolute top-[2px] right-[2px] bg-red-600/80 text-white w-5 h-5 text-[14px] rounded cursor-pointer flex items-center justify-center">
-                                ✖
-                            </button>
-                        `;
-                        targetCell.setAttribute("draggable", "true");
-                    } else {
-                        targetCell.innerHTML = "";
-                        targetCell.removeAttribute("draggable");
-                    }
-                    activateCell(targetCell);
-                }
-
-                if (data.cleared) {
-                    const clearedCell = document.querySelector(
-                        `[data-row="${data.cleared.row}"][data-col="${data.cleared.col}"]`
-                    );
-
-                    if (clearedCell && !clearedCell.classList.contains('is-locked')) {
-                        clearedCell.innerHTML = "";
-                        clearedCell.removeAttribute("draggable");
-                        clearedCell.classList.remove("selected"); 
-                    }
-                }
-
-                setTimeout(() => updateQoL(), 50);
-            });
+    if (undoBtn) {
+        console.log("Undo knop gevonden!"); // Test 1: Verschijnt dit in je console?
+        
+        undoBtn.addEventListener("click", () => {
+            console.log("Undo knop is aangeklikt!"); // Test 2: Verschijnt dit na klikken?
+            
+            // Simpele test: reload de pagina
+            // location.reload(); 
         });
+    } else {
+        console.error("Undo knop NIET gevonden! Check je HTML ID."); // Test 3: Foutmelding
     }
+    // TEST CODE: Plak dit helemaal onderaan je bestand
+window.addEventListener('load', () => {
+    const btn = document.getElementById('undo-btn');
+    if (btn) {
+        btn.style.border = "5px solid red"; // Krijgt de knop een rode rand?
+        btn.addEventListener('click', () => {
+            alert('De knop werkt en de code bereikt hem!');
+        });
+    } else {
+        console.error("DEBUG: Undo knop is niet gevonden door het systeem.");
+    }
+});
+});
 });
