@@ -2,7 +2,7 @@
     <div class="flex gap-4 h-full">
 
         {{-- LEFT: Function Library --}}
-        <div class="w-auto p-6 max-h-[93vh] overflow-y-auto flex-shrink-0">
+        <div class="w-auto p-6 max-h-[73vh] overflow-y-auto flex-shrink-0">
             <div class="flex flex-col mb-4 gap-3">
                 <h1 class="text-2xl dark:text-teal-500 font-bold mb-4">Function Library</h1>
 
@@ -51,7 +51,7 @@
         </div>
 
         {{-- MIDDLE: QoL + Undo + Grid + Simulation Controls --}}
-        <div class="flex flex-col flex-1 min-w-0 py-4">
+        <div class="flex flex-col flex-1 min-w-0 py-2">
 
             {{-- QoL Score --}}
             <div class="border-4 border-gray-400 dark:bg-indigo-900 dark:border-teal-600 rounded-md p-6 mb-4">
@@ -68,7 +68,7 @@
             </button>
 
             {{-- City Grid --}}
-            <div class="p-6 justify-center">
+            <div class="p-3 justify-center">
                 <h1 class="text-2xl text-center font-bold mb-4 dark:text-teal-300">City Grid</h1>
 
                 <div class="city-grid grid grid-flow-col grid-rows-3 gap-3 w-min mx-auto">
@@ -178,7 +178,7 @@
         {{-- END MIDDLE --}}
 
         {{-- RIGHT: QoL Breakdown + Events panel --}}
-        <div class="border-l border-gray-400 dark:border-gray-700 w-56 flex-shrink-0 p-3 flex flex-col gap-4 max-h-[93vh] overflow-y-auto">
+        <div class="border-l border-gray-400 dark:border-gray-700 w-56 flex-shrink-0 p-3 flex flex-col gap-4 max-h-[73vh] overflow-y-auto">
             <div id="breakdown-qol-score"></div>
 
             <div id="active-events-panel">

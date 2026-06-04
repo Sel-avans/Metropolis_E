@@ -18,6 +18,8 @@ export const setCurrentTime = (time) => {
     currentTime = Math.max(0, Math.min(time, maxTime)); 
 };
 
+
+
 // --- Initialisatie van knoppen en UI ---
 export const initSimulationControls = () => {
     const playPauseBtn = document.getElementById('playPauseBtn');
