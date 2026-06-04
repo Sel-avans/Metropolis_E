@@ -6,6 +6,7 @@ use App\Models\SimulationEvent;
 use App\Services\EventModifierService;
 use Illuminate\Http\Request;
 use Carbon\Carbon; 
+use App\Services\SimSpeedService;
 
 class SimulationEventController extends Controller
 {

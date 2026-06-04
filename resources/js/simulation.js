@@ -1,29 +1,24 @@
-import { getIsPlaying, 
-    getCurrentTime, 
+import {
+    getIsPlaying,
+    getCurrentTime,
     setCurrentTime,
-    syncTimelineUI, 
-    initSimulationControls } from './regulation.js';
+    syncTimelineUI,
+    initSimulationControls,
+    getMaxTime // Importeer deze!
+} from './regulation.js';
 
-//Global State for standard speed
 export const simulationState = {
     speed: 1,
 };
 
+// Berekening: 0.5 uur simulatie = 1 seconde echte tijd.
+// Als 100 units = 24 uur, dan is 1 unit = 0.24 uur.
+// Dus 0.5 uur / 0.24 = 2.083 units per seconde.
+const SIMULATION_UNITS_PER_SECOND = 2.083;
 
 export const setSimulationSpeed = async (speed) => {
-
     simulationState.speed = parseInt(speed);
-
     document.getElementById('active-speed-display').innerText = speed + '×';
-
-    // Updates the styling of active button
-    document.querySelectorAll('.speed-btn').forEach(btn => {
-        const isSelected = parseInt(btn.getAttribute('data-speed')) === speed;
-        btn.classList.toggle('bg-teal-600', isSelected);
-        btn.classList.toggle('text-white', isSelected);
-        btn.classList.toggle('bg-gray-200', !isSelected);
-        btn.classList.toggle('dark:bg-gray-700', !isSelected);
-    });
 
     try {
         const response = await fetch('/api/simulation/speed', {
@@ -34,9 +29,7 @@ export const setSimulationSpeed = async (speed) => {
             },
             body: JSON.stringify({ speed: simulationState.speed })
         });
-
         if (!response.ok) throw new Error('Failed to update speed');
-        console.log(`Simulation speed updated to ${speed}x`);
     } catch (error) {
         console.error('Error updating simulation speed:', error);
     }
@@ -44,17 +37,27 @@ export const setSimulationSpeed = async (speed) => {
 
 initSimulationControls();
 
-    function simulationLoop() {
-        if (getIsPlaying()) {
+let lastTimestamp = 0;
 
-            let time = getCurrentTime();
-            if (time < 100) { // MAX_TIME check
-                setCurrentTime(time + 1);
-                syncTimelineUI();
-            } else {
-            }
+export function simulationLoop(timestamp) {
+    if (getIsPlaying()) {
+        if (!lastTimestamp) lastTimestamp = timestamp;
+        
+        const deltaTime = (timestamp - lastTimestamp) / 1000;
+        const maxTime = getMaxTime() || 100;
+        let currentTime = getCurrentTime();
+        
+        if (currentTime < maxTime) {
+            const increment = SIMULATION_UNITS_PER_SECOND * simulationState.speed * deltaTime;
+            setCurrentTime(currentTime + increment);
+            syncTimelineUI(); 
         }
-        requestAnimationFrame(simulationLoop);
+        lastTimestamp = timestamp;
+    } else {
+        lastTimestamp = 0;
     }
-// Code to make function global for inline clicks
+    
+    requestAnimationFrame(simulationLoop);
+};
+
 window.setSimulationSpeed = setSimulationSpeed;
