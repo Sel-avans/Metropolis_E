@@ -4,17 +4,13 @@ import {
     setCurrentTime,
     syncTimelineUI,
     initSimulationControls,
-    getMaxTime // Importeer deze!
+    getMaxTime,
+    MINUTES_PER_SECOND, // 30 min/sec → 1440 min / 48 sec
 } from './regulation.js';
 
 export const simulationState = {
     speed: 1,
 };
-
-// Berekening: 0.5 uur simulatie = 1 seconde echte tijd.
-// Als 100 units = 24 uur, dan is 1 unit = 0.24 uur.
-// Dus 0.5 uur / 0.24 = 2.083 units per seconde.
-const SIMULATION_UNITS_PER_SECOND = 2.083;
 
 export const setSimulationSpeed = async (speed) => {
     simulationState.speed = parseInt(speed);
@@ -39,25 +35,43 @@ initSimulationControls();
 
 let lastTimestamp = 0;
 
+// Callback die grid.js kan registreren om events te activeren/deactiveren
+let onTimeUpdateCallback = null;
+export const onSimulationTimeUpdate = (cb) => { onTimeUpdateCallback = cb; };
+
 export function simulationLoop(timestamp) {
     if (getIsPlaying()) {
         if (!lastTimestamp) lastTimestamp = timestamp;
-        
-        const deltaTime = (timestamp - lastTimestamp) / 1000;
-        const maxTime = getMaxTime() || 100;
-        let currentTime = getCurrentTime();
-        
-        if (currentTime < maxTime) {
-            const increment = SIMULATION_UNITS_PER_SECOND * simulationState.speed * deltaTime;
-            setCurrentTime(currentTime + increment);
-            syncTimelineUI(); 
+
+        const deltaTime = (timestamp - lastTimestamp) / 1000; // seconden
+        const maxTime   = getMaxTime(); // 1440 minuten
+        const current   = getCurrentTime();
+
+        if (current < maxTime) {
+            // 24 uur = 48 seconden → 30 minuten per seconde (× speed)
+            const increment = MINUTES_PER_SECOND * simulationState.speed * deltaTime;
+            setCurrentTime(current + increment);
+            syncTimelineUI();
+
+            // Laat grid.js weten wat de huidige simulatietijd is
+            if (onTimeUpdateCallback) {
+                onTimeUpdateCallback(getCurrentTime());
+            }
+        } else {
+            // Einde van de dag bereikt: stop simulatie
+            setCurrentTime(maxTime);
+            syncTimelineUI();
+            // isPlaying stoppen via playPauseBtn simuleren
+            const playPauseBtn = document.getElementById('playPauseBtn');
+            if (playPauseBtn) playPauseBtn.click();
         }
+
         lastTimestamp = timestamp;
     } else {
         lastTimestamp = 0;
     }
-    
+
     requestAnimationFrame(simulationLoop);
-};
+}
 
 window.setSimulationSpeed = setSimulationSpeed;

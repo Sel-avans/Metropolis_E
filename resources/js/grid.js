@@ -1,6 +1,6 @@
 import { getNeighborsWithQoL } from './neighbours.js';
-import { simulationLoop } from './simulation.js';
-import { setMaxTime, syncTimelineUI } from './regulation.js';
+import { simulationLoop, onSimulationTimeUpdate } from './simulation.js';
+import { setMaxTime, syncTimelineUI, minutesToHHMM } from './regulation.js';
 
 document.addEventListener("DOMContentLoaded", () => {
 
@@ -8,15 +8,15 @@ document.addEventListener("DOMContentLoaded", () => {
     // VARIABELEN
     // =========================================================
 
-    let currentSimTime = 0;
-    let maxSimTime = 100;
-
     let draggedItem = null;
     let isDragging = false;
     let sourceCell = null;
     let dropOccurred = false;
     let old_score;
     let lastAction = null;
+
+    // Alle events opgehaald van de server (met start_minutes + end_minutes)
+    let allEvents = [];
 
     const HOVER_DELAY_MS = 300;
     let hoverTimer = null;
@@ -53,17 +53,9 @@ document.addEventListener("DOMContentLoaded", () => {
         return JSON.stringify(
             (events || []).map(event => ({
                 id: event.id,
-                end_at: event.end_at ?? null,
-                modifiers: event.modifiers ?? {},
+                active: event.isActive ?? false,
             }))
         );
-    }
-
-    function calculateMaxDuration(events) {
-        if (!events || events.length === 0) return 100;
-        const now = Date.now() / 1000;
-        const durations = events.map(e => (e.end_at ? (e.end_at - now) : 0));
-        return Math.max(...durations, 100);
     }
 
     function compareScores(data) {
@@ -116,7 +108,7 @@ document.addEventListener("DOMContentLoaded", () => {
     function positionPopup(x, y) {
         const offset = 15;
         popup.style.left = `${x + offset}px`;
-        popup.style.top = `${y + offset}px`;
+        popup.style.top  = `${y + offset}px`;
     }
 
     function renderNeighborsList(data) {
@@ -138,7 +130,7 @@ document.addEventListener("DOMContentLoaded", () => {
 
         let html = '';
         for (const [categoryName, info] of Object.entries(data.categories)) {
-            const cellScore = Number(info.total);
+            const cellScore  = Number(info.total);
             const eventScore = Number(eventModifiers[categoryKeys[categoryName]] || 0);
             const displayScore = cellScore + eventScore;
 
@@ -197,15 +189,15 @@ document.addEventListener("DOMContentLoaded", () => {
 
     async function updateQoL() {
         try {
-            const scoreEl = document.getElementById('qol-score-value');
+            const scoreEl     = document.getElementById('qol-score-value');
             const breakdownEl = document.getElementById('breakdown-qol-score');
-            const oldScoreEl = document.getElementById('old-qol-score');
+            const oldScoreEl  = document.getElementById('old-qol-score');
 
             const response = await fetch('/qol/details');
             const data = await response.json();
 
             if (scoreEl) {
-                scoreEl.textContent = data.total_score;
+                scoreEl.textContent  = data.total_score;
                 oldScoreEl.innerHTML = compareScores(data);
             }
 
@@ -218,15 +210,84 @@ document.addEventListener("DOMContentLoaded", () => {
     }
 
     // =========================================================
-    // ACTIVE EVENTS
+    // SIMULATIE TIJD → EVENTS AAN/UIT
     // =========================================================
 
-    async function updateActiveEvents({ forceQolRefresh = false } = {}) {
-        const listEl = document.getElementById('active-events-list');
-        const emptyEl = document.getElementById('active-events-empty');
+    /**
+     * Wordt aangeroepen door simulation.js elke animatieframe.
+     * simTime = huidige tijd in minuten (0–1440).
+     *
+     * Elk event in allEvents moet bevatten:
+     *   - start_minutes: number  (bijv. 840 = 14:00)
+     *   - end_minutes:   number  (bijv. 1020 = 17:00)
+     *   - manuallyEnabled: bool  (aan/uit toggle van de stadsplanner)
+     */
+    function onSimulationTick(simTime) {
+        if (!allEvents.length) return;
 
+        let changed = false;
+
+        allEvents.forEach(event => {
+            const inWindow = simTime >= event.start_minutes && simTime <= event.end_minutes;
+            const shouldBeActive = event.manuallyEnabled && inWindow;
+
+            if (event.isActive !== shouldBeActive) {
+                event.isActive = shouldBeActive;
+                changed = true;
+            }
+        });
+
+        // Alleen QoL herberekenen als er iets veranderd is
+        if (changed) {
+            renderActiveEventsList();
+            updateQoL();
+        }
+    }
+
+    // Registreer de tick-callback in simulation.js
+    onSimulationTimeUpdate(onSimulationTick);
+
+    // =========================================================
+    // ACTIVE EVENTS (ophalen van server + renderen)
+    // =========================================================
+
+    function renderActiveEventsList() {
+        const listEl  = document.getElementById('active-events-list');
+        const emptyEl = document.getElementById('active-events-empty');
         if (!listEl || !emptyEl) return;
 
+        const active = allEvents.filter(e => e.isActive);
+
+        if (active.length === 0) {
+            emptyEl.classList.remove('hidden');
+            listEl.innerHTML = '';
+            return;
+        }
+
+        emptyEl.classList.add('hidden');
+        listEl.innerHTML = '';
+
+        active.forEach(event => {
+            const li = document.createElement('li');
+            li.className = "p-3 bg-slate-800 border-l-4 border-amber-500 rounded shadow-sm mb-2 text-sm";
+
+            const modifiersHtml = formatModifiers(event.modifiers);
+            const timeHtml = (event.start_minutes !== undefined && event.end_minutes !== undefined)
+                ? `<div class="text-[11px] text-gray-500 mt-0.5">
+                       ${minutesToHHMM(event.start_minutes)} – ${minutesToHHMM(event.end_minutes)}
+                   </div>`
+                : '';
+
+            li.innerHTML = `
+                <div class="font-semibold text-slate-200">${event.name || 'Nameless Event'}</div>
+                ${modifiersHtml}
+                ${timeHtml}
+            `;
+            listEl.appendChild(li);
+        });
+    }
+
+    async function fetchAllEvents({ forceQolRefresh = false } = {}) {
         try {
             const response = await fetch('/events/active', {
                 credentials: 'same-origin',
@@ -237,77 +298,29 @@ document.addEventListener("DOMContentLoaded", () => {
             const data = await response.json();
             if (!data || !data.events) return;
 
-            const newMax = calculateMaxDuration(data.events);
-            setMaxTime(newMax);
+            // Sla alle events op met start_minutes / end_minutes
+            // Verwacht dat de server deze velden levert, anders fallback naar 0/1440
+            allEvents = data.events.map(e => ({
+                ...e,
+                start_minutes:   e.start_minutes   ?? 0,
+                end_minutes:     e.end_minutes      ?? 1440,
+                manuallyEnabled: e.manuallyEnabled  ?? true,
+                isActive:        false, // simulatie bepaalt wanneer actief
+            }));
+
+            // maxTime blijft altijd 1440 (volledige dag)
+            setMaxTime(1440);
             syncTimelineUI();
 
-            const signature = buildEventSignature(data.events);
-            if (signature !== lastActiveEventSignature) {
+            // Signature check: alleen QoL verversen als events gewijzigd zijn
+            const signature = buildEventSignature(allEvents);
+            if (signature !== lastActiveEventSignature || forceQolRefresh) {
                 lastActiveEventSignature = signature;
                 updateQoL();
-            } else if (forceQolRefresh) {
-                updateQoL();
             }
-
-            if (data.events.length === 0) {
-                emptyEl.classList.remove('hidden');
-                listEl.innerHTML = '';
-                return;
-            }
-
-            emptyEl.classList.add('hidden');
-            listEl.innerHTML = '';
-
-            data.events.forEach((event, index) => {
-                const li = document.createElement('li');
-                li.className = "p-3 bg-slate-800 border-l-4 border-amber-500 rounded shadow-sm mb-2 text-sm";
-
-                const timerId = `event-timer-${index}`;
-                const modifiersHtml = formatModifiers(event.modifiers);
-                const endsAtHtml = event.ends_at_display
-                    ? `<div class="text-[11px] text-gray-500 mt-0.5">Ends at ${event.ends_at_display}</div>`
-                    : '';
-
-                li.innerHTML = `
-                    <div class="font-semibold text-slate-200">${event.name || 'Nameless Event'}</div>
-                    ${modifiersHtml}
-                    ${endsAtHtml}
-                    <div id="${timerId}" class="text-[11px] text-emerald-400 font-mono mt-1 font-bold">
-                        Loading...
-                    </div>
-                `;
-                listEl.appendChild(li);
-
-                if (event.end_at) {
-                    let endTimeMs = 0;
-                    if (typeof event.end_at === 'number' || (!isNaN(event.end_at) && !isNaN(parseFloat(event.end_at)))) {
-                        endTimeMs = Number(event.end_at) * 1000;
-                    } else {
-                        const formattedString = String(event.end_at).replace(' ', 'T');
-                        endTimeMs = new Date(formattedString).getTime();
-                    }
-
-                    if (!isNaN(endTimeMs) && endTimeMs > 0) {
-                        // Timer logic can be added here if needed
-                    }
-                } else if (event.type === 'recurring') {
-                    const timerEl = document.getElementById(timerId);
-                    if (timerEl) {
-                        timerEl.textContent = event.timing || 'Recurring';
-                        timerEl.className = "text-[11px] text-teal-400 mt-1";
-                    }
-                } else {
-                    const timerEl = document.getElementById(timerId);
-                    if (timerEl) timerEl.textContent = "No end time known";
-                }
-            });
-
-            maxSimTime = newMax;
-            const timeline = document.getElementById('simulation-timeline');
-            if (timeline) timeline.max = maxSimTime;
 
         } catch (err) {
-            console.error("Fout bij ophalen active events:", err);
+            console.error("Fout bij ophalen events:", err);
         }
     }
 
@@ -347,11 +360,11 @@ document.addEventListener("DOMContentLoaded", () => {
 
     items.forEach(item => {
         item.addEventListener("dragstart", e => {
-            isDragging = true;
-            dropOccurred = false;
-            draggedItem = {
-                id: Number(item.dataset.functionId),
-                name: item.dataset.functionName,
+            isDragging    = true;
+            dropOccurred  = false;
+            draggedItem   = {
+                id:    Number(item.dataset.functionId),
+                name:  item.dataset.functionName,
                 image: item.dataset.image
             };
             e.dataTransfer.setDragImage(item.querySelector("img"), 16, 16);
@@ -369,11 +382,11 @@ document.addEventListener("DOMContentLoaded", () => {
             const img = cell.querySelector(".grid-function-icon");
             if (!img) return;
 
-            isDragging = true;
+            isDragging   = true;
             dropOccurred = false;
-            draggedItem = {
-                id: Number(img.dataset.functionId),
-                name: img.alt,
+            draggedItem  = {
+                id:    Number(img.dataset.functionId),
+                name:  img.alt,
                 image: img.src
             };
             e.dataTransfer.setDragImage(img, 16, 16);
@@ -392,7 +405,7 @@ document.addEventListener("DOMContentLoaded", () => {
 
         cell.addEventListener("drop", async e => {
             e.preventDefault();
-            isDragging = false;
+            isDragging   = false;
             dropOccurred = true;
             cell.classList.remove("drag-over");
 
@@ -408,8 +421,8 @@ document.addEventListener("DOMContentLoaded", () => {
 
             const newRow = cell.dataset.row;
             const newCol = cell.dataset.col;
-            let oldRow = null;
-            let oldCol = null;
+            let oldRow   = null;
+            let oldCol   = null;
             const originalSourceCell = sourceCell;
 
             if (sourceCell) {
@@ -420,25 +433,25 @@ document.addEventListener("DOMContentLoaded", () => {
                 sourceCell.classList.remove("drag-source");
             }
 
-            sourceCell = null;
+            sourceCell    = null;
             cell.innerHTML = "";
 
             const img = document.createElement("img");
-            img.src = draggedItem.image;
-            img.alt = draggedItem.name;
-            img.dataset.functionId = draggedItem.id;
+            img.src                  = draggedItem.image;
+            img.alt                  = draggedItem.name;
+            img.dataset.functionId   = draggedItem.id;
             img.classList.add("grid-function-icon", "object-contain");
             cell.appendChild(img);
 
-            const deleteBtn = document.createElement("button");
-            deleteBtn.type = "button";
+            const deleteBtn  = document.createElement("button");
+            deleteBtn.type   = "button";
             deleteBtn.className = "delete-btn absolute top-[2px] right-[2px] bg-red-600/80 text-white w-5 h-5 text-[14px] rounded cursor-pointer flex items-center justify-center";
             const deleteText = `Remove ${draggedItem.name} from grid cell`;
             deleteBtn.setAttribute("aria-label", deleteText);
             deleteBtn.setAttribute("title", deleteText);
 
-            const srText = document.createElement("span");
-            srText.className = "sr-only";
+            const srText       = document.createElement("span");
+            srText.className   = "sr-only";
             srText.textContent = deleteText;
             deleteBtn.appendChild(srText);
             deleteBtn.append("✖");
@@ -448,10 +461,7 @@ document.addEventListener("DOMContentLoaded", () => {
             activateCell(cell);
 
             lastAction = {
-                oldRow: oldRow,
-                oldCol: oldCol,
-                newRow: newRow,
-                newCol: newCol,
+                oldRow, oldCol, newRow, newCol,
                 functionId: draggedItem.id
             };
 
@@ -551,10 +561,8 @@ document.addEventListener("DOMContentLoaded", () => {
 
         const grid = document.querySelector(".city-grid");
         const rect = grid.getBoundingClientRect();
-        const x = e.pageX;
-        const y = e.pageY;
-
-        const outside = x < rect.left || x > rect.right || y < rect.top || y > rect.bottom;
+        const outside = e.pageX < rect.left || e.pageX > rect.right ||
+                        e.pageY < rect.top  || e.pageY > rect.bottom;
         if (!outside) return;
 
         sourceCell.innerHTML = "";
@@ -571,7 +579,7 @@ document.addEventListener("DOMContentLoaded", () => {
         }
 
         draggedItem = null;
-        sourceCell = null;
+        sourceCell  = null;
         setTimeout(() => updateQoL(), 10);
     });
 
@@ -600,8 +608,8 @@ document.addEventListener("DOMContentLoaded", () => {
                 })
             });
 
-            lastAction = null;
-            undoBtn.disabled = true;
+            lastAction         = null;
+            undoBtn.disabled   = true;
             updateQoL();
             location.reload();
         });
@@ -632,13 +640,10 @@ document.addEventListener("DOMContentLoaded", () => {
                     if (targetCell) {
                         if (data.cell.function_id) {
                             targetCell.innerHTML = `
-                                <img src="${data.cell.image}" 
+                                <img src="${data.cell.image}"
                                      class="grid-function-icon object-contain"
                                      data-function-id="${data.cell.function_id}">
-                                <button 
-                                    class="delete-btn absolute top-[2px] right-[2px] bg-red-600/80 text-white w-5 h-5 text-[14px] rounded cursor-pointer flex items-center justify-center">
-                                    ✖
-                                </button>
+                                <button class="delete-btn absolute top-[2px] right-[2px] bg-red-600/80 text-white w-5 h-5 text-[14px] rounded cursor-pointer flex items-center justify-center">✖</button>
                             `;
                             targetCell.setAttribute("draggable", "true");
                         } else {
@@ -652,7 +657,6 @@ document.addEventListener("DOMContentLoaded", () => {
                         const clearedCell = document.querySelector(
                             `[data-row="${data.cleared.row}"][data-col="${data.cleared.col}"]`
                         );
-
                         if (clearedCell) {
                             clearedCell.innerHTML = "";
                             clearedCell.removeAttribute("draggable");
@@ -681,12 +685,12 @@ document.addEventListener("DOMContentLoaded", () => {
     // INITIËLE CALLS
     // =========================================================
 
-    updateActiveEvents();
+    fetchAllEvents();
     updateQoL();
     requestAnimationFrame(simulationLoop);
 
-    setInterval(() => {
-        updateActiveEvents({ forceQolRefresh: false });
-    }, 10000);
+    // Ververs de eventlijst elke 30 seconden (niet meer elke 10s,
+    // want de simulatie bepaalt nu zelf wanneer events actief zijn)
+    setInterval(() => fetchAllEvents(), 30000);
 
-}); 
+});
