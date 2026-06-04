@@ -10,10 +10,9 @@ let draggedItem = null;
 document.addEventListener("DOMContentLoaded", () => {
 
     function activateCell(cell) {
-        document.querySelectorAll(".grid-cell").forEach(c => c.classList.remove("selected"));
-        cell.classList.add("selected");
+        // Toggle the selected class to allow multi-select
+        cell.classList.toggle("selected");
     }
-
 
     const HOVER_DELAY_MS = 300;
     let hoverTimer = null;
@@ -36,11 +35,18 @@ document.addEventListener("DOMContentLoaded", () => {
     const approveBtn = document.getElementById("approve-btn");
     if (approveBtn) {
         approveBtn.addEventListener("click", async () => {
-            const selectedCell = document.querySelector(".grid-cell.selected");
-            if (!selectedCell) {
-                alert("Please select a grid cell first to lock or unlock it.");
+            // Find all currently selected cells
+            const selectedCells = document.querySelectorAll(".grid-cell.selected");
+            if (selectedCells.length === 0) {
+                alert("Please select at least one grid cell first to lock or unlock it.");
                 return;
             }
+
+            // Map selected cells to an array of row/col objects
+            const cellsPayload = Array.from(selectedCells).map(cell => ({
+                row: cell.dataset.row,
+                col: cell.dataset.col
+            }));
 
             try {
                 const response = await fetch('/grid/approve', {
@@ -49,42 +55,51 @@ document.addEventListener("DOMContentLoaded", () => {
                         'Content-Type': 'application/json',
                         'X-CSRF-TOKEN': document.querySelector('meta[name="csrf-token"]').content
                     },
-                    body: JSON.stringify({ row: selectedCell.dataset.row, col: selectedCell.dataset.col })
+                    // Send the array of cells to the backend
+                    body: JSON.stringify({ cells: cellsPayload })
                 });
 
                 const data = await response.json();
 
                 if (data.success) {
-                    const lockIndicator = selectedCell.querySelector('.lock-indicator');
-                    
-                    if (data.is_approved) {
-                        selectedCell.classList.add("is-locked", "bg-stripes", "opacity-60", "border-red-600");
-                        selectedCell.classList.remove("bg-gray-300", "border-gray-800", "dark:bg-blue-950", "dark:border-gray-300", "hover:bg-gray-400", "hover:dark:bg-gray-100");
-                        selectedCell.setAttribute("draggable", "false");
+                    // Update the UI for each modified cell returned by the server
+                    data.updated_cells.forEach(updatedData => {
+                        const cell = document.querySelector(`.grid-cell[data-row="${updatedData.row}"][data-col="${updatedData.col}"]`);
+                        if (!cell) return;
+
+                        const lockIndicator = cell.querySelector('.lock-indicator');
                         
-                        if (lockIndicator) lockIndicator.classList.remove('hidden');
-                        
-                        const deleteBtn = selectedCell.querySelector(".delete-btn");
-                        if (deleteBtn) deleteBtn.classList.add("hidden");
-                        
-                        activateCell(selectedCell);
-                        alert("Cell successfully approved and locked!"); 
-                    } else {
-                        selectedCell.classList.remove("is-locked", "bg-stripes", "opacity-60", "border-red-600");
-                        selectedCell.classList.add("bg-gray-300", "border-gray-800", "dark:bg-blue-950", "dark:border-gray-300", "hover:bg-gray-400", "hover:dark:bg-gray-100");
-                        
-                        if (selectedCell.querySelector("img")) {
-                            selectedCell.setAttribute("draggable", "true");
+                        // Apply locked styling
+                        if (updatedData.is_approved) {
+                            cell.classList.add("is-locked", "bg-stripes", "opacity-60", "border-red-600");
+                            cell.classList.remove("bg-gray-300", "border-gray-800", "dark:bg-blue-950", "dark:border-gray-300", "hover:bg-gray-400", "hover:dark:bg-gray-100");
+                            cell.setAttribute("draggable", "false");
+                            
+                            if (lockIndicator) lockIndicator.classList.remove('hidden');
+                            
+                            const deleteBtn = cell.querySelector(".delete-btn");
+                            if (deleteBtn) deleteBtn.classList.add("hidden");
+                        } 
+                        // Apply unlocked styling
+                        else {
+                            cell.classList.remove("is-locked", "bg-stripes", "opacity-60", "border-red-600");
+                            cell.classList.add("bg-gray-300", "border-gray-800", "dark:bg-blue-950", "dark:border-gray-300", "hover:bg-gray-400", "hover:dark:bg-gray-100");
+                            
+                            if (cell.querySelector("img")) {
+                                cell.setAttribute("draggable", "true");
+                            }
+                            
+                            if (lockIndicator) lockIndicator.classList.add('hidden');
+                            
+                            const deleteBtn = cell.querySelector(".delete-btn");
+                            if (deleteBtn) deleteBtn.classList.remove("hidden");
                         }
                         
-                        if (lockIndicator) lockIndicator.classList.add('hidden');
-                        
-                        const deleteBtn = selectedCell.querySelector(".delete-btn");
-                        if (deleteBtn) deleteBtn.classList.remove("hidden");
-                        
-                        activateCell(selectedCell);
-                        alert("Cell successfully unlocked!"); 
-                    }
+                        // Clear the selection outline
+                        cell.classList.remove("selected");
+                    });
+                    
+                    alert("Selected areas successfully updated!"); 
                 }
             } catch (err) {
                 console.error("Error during cell approval:", err);

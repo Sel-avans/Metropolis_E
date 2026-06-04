@@ -86,19 +86,45 @@ class GridController extends Controller
 
     public function approveCell(Request $request)
     {
+        // Security check
         if (!auth()->user() || auth()->user()->role->name !== 'City_planner') {
             return response()->json(['success' => false, 'error' => 'unauthorized'], 403);
         }
 
-        $cell = GridCell::where('row', $request->input('row'))
-                        ->where('col', $request->input('col'))
-                        ->first();
+        // Retrieve the array of cells from the request payload
+        $cellsData = $request->input('cells', []);
 
-        if (!$cell) return response()->json(['success' => false, 'error' => 'cell_not_found'], 404);
+        // Fallback to support the old single-cell format (if needed)
+        if ($request->has('row') && $request->has('col')) {
+            $cellsData[] = ['row' => $request->input('row'), 'col' => $request->input('col')];
+        }
 
-        $cell->is_approved = !$cell->is_approved;
-        $cell->save();
+        if (empty($cellsData)) {
+            return response()->json(['success' => false, 'error' => 'no_cells_provided'], 400);
+        }
 
-        return response()->json(['success' => true, 'is_approved' => $cell->is_approved]);
+        $updatedCells = [];
+
+        // Process each cell in the array
+        foreach ($cellsData as $cellData) {
+            $cell = GridCell::where('row', $cellData['row'])
+                            ->where('col', $cellData['col'])
+                            ->first();
+
+            if ($cell) {
+                // Toggle the approval state
+                $cell->is_approved = !$cell->is_approved;
+                $cell->save();
+                
+                // Track the updated state to return to the frontend
+                $updatedCells[] = [
+                    'row' => $cell->row,
+                    'col' => $cell->col,
+                    'is_approved' => $cell->is_approved
+                ];
+            }
+        }
+
+        return response()->json(['success' => true, 'updated_cells' => $updatedCells]);
     }
 }
