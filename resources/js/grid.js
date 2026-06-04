@@ -1,11 +1,15 @@
 import { getNeighborsWithQoL } from './neighbours.js';
-let draggedItem = null;
-    let isDragging = false;
-    let sourceCell = null;
-    let dropOccurred = false;
-    let old_score;
-    let lastAction = null;
 
+let draggedItem = null;
+let isDragging = false;
+let sourceCell = null;
+let dropOccurred = false;
+let old_score;
+let lastAction = null;
+
+function notify(message) {
+    alert(message); 
+}
 
 document.addEventListener("DOMContentLoaded", () => {
 
@@ -14,10 +18,8 @@ document.addEventListener("DOMContentLoaded", () => {
         cell.classList.add("selected");
     }
 
-
     const HOVER_DELAY_MS = 300;
     let hoverTimer = null;
-
     const popup = document.getElementById('qol-popup');
     const neighborsList = document.getElementById('popup-neighbors-list');
 
@@ -45,30 +47,24 @@ document.addEventListener("DOMContentLoaded", () => {
 
                 if (data.success) {
                     const lockIndicator = selectedCell.querySelector('.lock-indicator');
+                    const deleteBtn = selectedCell.querySelector(".delete-btn");
                     
                     if (data.is_approved) {
-                        selectedCell.classList.add("is-locked", "bg-stripes", "opacity-60", "border-red-600", "pointer-events-none");
+                        selectedCell.classList.add("is-locked", "bg-stripes", "opacity-60", "border-red-600");
                         selectedCell.classList.remove("bg-gray-300", "border-gray-800", "dark:bg-blue-950", "dark:border-gray-300", "hover:bg-gray-400", "hover:dark:bg-gray-100");
                         selectedCell.setAttribute("draggable", "false");
                         
                         if (lockIndicator) lockIndicator.classList.remove('hidden');
-                        
-                        const deleteBtn = selectedCell.querySelector(".delete-btn");
                         if (deleteBtn) deleteBtn.classList.add("hidden");
                         
                         activateCell(selectedCell);
                         alert("Cell successfully approved and locked!"); 
                     } else {
-                        selectedCell.classList.remove("is-locked", "bg-stripes", "opacity-60", "border-red-600", "pointer-events-none");
+                        selectedCell.classList.remove("is-locked", "bg-stripes", "opacity-60", "border-red-600");
                         selectedCell.classList.add("bg-gray-300", "border-gray-800", "dark:bg-blue-950", "dark:border-gray-300", "hover:bg-gray-400", "hover:dark:bg-gray-100");
                         
-                        if (selectedCell.querySelector("img")) {
-                            selectedCell.setAttribute("draggable", "true");
-                        }
-                        
+                        if (selectedCell.querySelector("img")) selectedCell.setAttribute("draggable", "true");
                         if (lockIndicator) lockIndicator.classList.add('hidden');
-                        
-                        const deleteBtn = selectedCell.querySelector(".delete-btn");
                         if (deleteBtn) deleteBtn.classList.remove("hidden");
                         
                         activateCell(selectedCell);
@@ -80,36 +76,6 @@ document.addEventListener("DOMContentLoaded", () => {
             }
         });
     }
-
-    // --- DELETE LOGIC ---
-    document.addEventListener("click", async (e) => {
-        if (!e.target.classList.contains("delete-btn")) return;
-
-        const cell = e.target.closest(".grid-cell");
-        if (!cell) return;
-
-        if (cell.classList.contains("is-locked")) {
-            alert("You can't delete a function in this area. It is locked.");
-            return;
-        }
-
-        cell.innerHTML = "";
-        cell.removeAttribute("draggable");
-        activateCell(cell);
-
-        try {
-            await fetch(`/grid/cell/${cell.dataset.id}/function`, {
-                method: "DELETE",
-                headers: {
-                    "X-CSRF-TOKEN": document.querySelector('meta[name="csrf-token"]').content
-                }
-            });
-        } catch (err) {
-            console.error("Error removing function:", err);
-        }
-
-        setTimeout(() => updateQoL(), 10);
-    });
 
     const cells = document.querySelectorAll(".grid-cell");
     const items = document.querySelectorAll(".library-item");
@@ -152,9 +118,7 @@ document.addEventListener("DOMContentLoaded", () => {
                 oldScoreEl.innerHTML = compareScores(data);
             }
 
-            if (breakdownEl) {
-                breakdownEl.innerHTML = renderQoLBreakdown(data);
-            }
+            if (breakdownEl) breakdownEl.innerHTML = renderQoLBreakdown(data);
         } catch (err) {
             console.error("Error fetching QoL data:", err);
         }
@@ -164,11 +128,7 @@ document.addEventListener("DOMContentLoaded", () => {
         let html = '';
         if (old_score !== undefined) {
             const delta_score = data.total_score - old_score;
-            html += `
-                <span class="text-xl float-right ${delta_score < 0 ? 'text-red-600' : 'text-green-600'}">
-                    ${delta_score >= 0 ? '+' : ''}${delta_score}
-                </span>
-            `;
+            html += `<span class="text-xl float-right ${delta_score < 0 ? 'text-red-600' : 'text-green-600'}">${delta_score >= 0 ? '+' : ''}${delta_score}</span>`;
         }
         if (data.total_score !== 0) old_score = data.total_score;
         return html;
@@ -179,72 +139,15 @@ document.addEventListener("DOMContentLoaded", () => {
         for (const [category, info] of Object.entries(data.categories)) {
             const score = Number(info.total);
             let scoreClass = score > 0 ? 'text-green-600' : (score < 0 ? 'text-red-600' : 'text-slate-400');
-            let scoreSign = score > 0 ? '+' : '';
-            html += `<h3 class="font-semibold mt-3 dark:text-teal-600">${category}: <span class="${scoreClass}">${scoreSign}${score}</span></h3>`;
+            html += `<h3 class="font-semibold mt-3 dark:text-teal-600">${category}: <span class="${scoreClass}">${score > 0 ? '+' : ''}${score}</span></h3>`;
         }
-        const totalScore = Number(data.total_score);
-        let totalClass = totalScore > 0 ? 'text-green-600' : (totalScore < 0 ? 'text-red-600' : 'text-slate-400');
-        html += `<h3 class="font-bold mt-4 dark:text-teal-600">Total QoL: <span class="${totalClass}">${totalScore > 0 ? '+' : ''}${totalScore}</span></h3>`;
         return html;
     }
 
-    async function handleTileHover(row, col, event) {
-        positionPopup(event.pageX, event.pageY);
-        const data = await getNeighborsWithQoL(row, col);
-        renderNeighborsList(data);
-        showPopup();
-    }
-
-    function positionPopup(x, y) {
-        const offset = 15;
-        popup.style.left = `${x + offset}px`;
-        popup.style.top = `${y + offset}px`;
-    }
-
-    function renderNeighborsList(data) {
-        neighborsList.innerHTML = '';
-        if (!data.categories || Object.keys(data.categories).length === 0) {
-            neighborsList.innerHTML = '<li class="text-slate-400 text-sm">No active QoL influences on this cell</li>';
-            return;
-        }
-
-        let html = '';
-        for (const [categoryName, info] of Object.entries(data.categories)) {
-            const totalScore = Number(info.total);
-            let catClass = totalScore > 0 ? 'text-green-600' : (totalScore < 0 ? 'text-red-600' : 'text-slate-400');
-            html += `
-                <div class="mb-2 w-full">
-                    <div class="flex justify-between items-center gap-8">
-                        <span class="text-slate-200 font-medium text-sm">${categoryName}</span>
-                        <span class="${catClass} font-bold text-sm">${totalScore > 0 ? '+' : ''}${totalScore}</span>
-                    </div>
-                </div>`;
-        }
-        const finalTotal = Number(data.total_score);
-        html += `
-            <div class="flex justify-between items-center mt-3 pt-2 border-t border-slate-600/50 w-full">
-                <span class="text-slate-300 font-bold text-xs uppercase">Total QoL:</span>
-                <span class="${finalTotal > 0 ? 'text-green-600' : (finalTotal < 0 ? 'text-red-600' : 'text-slate-400')} font-extrabold text-base">${finalTotal > 0 ? '+' : ''}${finalTotal}</span>
-            </div>`;
-        neighborsList.innerHTML = html;
-    }
-
-    function showPopup() {
-        popup.classList.remove('hidden');
-        popup.classList.replace('opacity-0', 'opacity-100');
-        popup.classList.replace('scale-95', 'scale-100');
-    }
-
-    function hidePopup() {
-        popup.classList.replace('opacity-100', 'opacity-0');
-        popup.classList.replace('scale-100', 'scale-95');
-        setTimeout(() => { popup.classList.add('hidden'); }, 150);
-    }
-
+    // --- DRAG & DROP & CELL LISTENERS ---
     items.forEach(item => {
         item.addEventListener("dragstart", e => {
             isDragging = true;
-            dropOccurred = false;
             draggedItem = { id: Number(item.dataset.functionId), name: item.dataset.functionName, image: item.dataset.image };
             e.dataTransfer.setDragImage(item.querySelector("img"), 16, 16);
         });
@@ -252,29 +155,27 @@ document.addEventListener("DOMContentLoaded", () => {
 
     cells.forEach(cell => {
         cell.addEventListener("dragstart", e => {
-            if (cell.classList.contains("is-locked")) { e.preventDefault(); alert("Modification denied: This cell is locked."); return; }
+            if (cell.classList.contains("is-locked")) { e.preventDefault(); notify("Modification denied: This cell is locked."); return; }
             const img = cell.querySelector(".grid-function-icon");
             if (!img) return;
             isDragging = true;
-            dropOccurred = false;
             draggedItem = { id: Number(img.dataset.functionId), name: img.alt, image: img.src };
             sourceCell = cell;
             cell.classList.add("drag-source");
         });
 
-        cell.addEventListener("dragover", e => { if (!cell.classList.contains("is-locked")) { e.preventDefault(); cell.classList.add("drag-over"); } });
+        cell.addEventListener("dragover", e => { 
+            if (!cell.classList.contains("is-locked")) { e.preventDefault(); cell.classList.add("drag-over"); } 
+        });
+        
         cell.addEventListener("dragleave", () => cell.classList.remove("drag-over"));
 
         cell.addEventListener("drop", async e => {
             e.preventDefault();
             if (cell.classList.contains("is-locked")) { cell.classList.remove("drag-over"); return; }
             
-            isDragging = false; dropOccurred = true; cell.classList.remove("drag-over");
-            
-            if (cell.querySelector("img") && !window.confirm("Replace this feature?")) {
-                if (sourceCell) sourceCell.classList.remove("drag-source");
-                return;
-            }
+            cell.classList.remove("drag-over");
+            if (cell.querySelector("img") && !window.confirm("Replace this feature?")) return;
 
             const oldRow = sourceCell?.dataset.row;
             const oldCol = sourceCell?.dataset.col;
@@ -299,49 +200,9 @@ document.addEventListener("DOMContentLoaded", () => {
         });
 
         cell.addEventListener("click", () => { if (!isDragging) activateCell(cell); });
-        cell.addEventListener('mouseenter', (event) => { hoverTimer = setTimeout(() => handleTileHover(parseInt(cell.dataset.row), parseInt(cell.dataset.col), event), HOVER_DELAY_MS); });
-        cell.addEventListener('mouseleave', () => { clearTimeout(hoverTimer); hidePopup(); });
     });
 
-    const undoBtn = document.getElementById("undo-btn");
-    if (undoBtn) {
-        undoBtn.addEventListener("click", async () => {
-            if (lastAction) {
-                await fetch('/grid/undo', { method: 'POST', headers: { 'X-CSRF-TOKEN': document.querySelector('meta[name="csrf-token"]').content } });
-                location.reload();
-            }
-        });
-    }
-
+    // Cleanup
     document.addEventListener("dragend", () => { isDragging = false; if (sourceCell) sourceCell.classList.remove("drag-source"); });
-
     updateQoL();
-    document.addEventListener("DOMContentLoaded", () => {
-    const undoBtn = document.getElementById("undo-btn");
-
-    if (undoBtn) {
-        console.log("Undo knop gevonden!"); // Test 1: Verschijnt dit in je console?
-        
-        undoBtn.addEventListener("click", () => {
-            console.log("Undo knop is aangeklikt!"); // Test 2: Verschijnt dit na klikken?
-            
-            // Simpele test: reload de pagina
-            // location.reload(); 
-        });
-    } else {
-        console.error("Undo knop NIET gevonden! Check je HTML ID."); // Test 3: Foutmelding
-    }
-    // TEST CODE: Plak dit helemaal onderaan je bestand
-window.addEventListener('load', () => {
-    const btn = document.getElementById('undo-btn');
-    if (btn) {
-        btn.style.border = "5px solid red"; // Krijgt de knop een rode rand?
-        btn.addEventListener('click', () => {
-            alert('De knop werkt en de code bereikt hem!');
-        });
-    } else {
-        console.error("DEBUG: Undo knop is niet gevonden door het systeem.");
-    }
-});
-});
 });
