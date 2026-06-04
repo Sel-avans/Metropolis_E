@@ -14,7 +14,18 @@ class GridController extends Controller
 {
     public function index()
     {
+        // 1. Fetch grid data including functions
         $grid = GridCell::with('function.effects')->get();
+
+        // 2. Filter: If a cell is NOT approved, remove the function data
+        // This ensures the view treats these cells as empty upon loading.
+        foreach ($grid as $cell) {
+            if (!$cell->is_approved) {
+                $cell->function_id = null;
+                $cell->function = null;
+            }
+        }
+
         $items = CityFunction::all();
         $functions = $items->groupBy('category');
 
@@ -29,21 +40,30 @@ class GridController extends Controller
         $newCol = intval($request->input('new_col'));
         $functionId = $request->input('function_id');
 
+        // 1. Fetch the target cell and source cell from the database
         $targetCell = GridCell::where('row', $newRow)->where('col', $newCol)->first();
-        if ($targetCell && $targetCell->is_approved) {
+        $sourceCell = ($oldRow !== null && $oldCol !== null) 
+                      ? GridCell::where('row', $oldRow)->where('col', $oldCol)->first() 
+                      : null;
+
+        // 2. Security check: prevent modification if either cell is approved (locked)
+        if (($targetCell && $targetCell->is_approved) || ($sourceCell && $sourceCell->is_approved)) {
             return response()->json(['success' => false, 'error' => 'cell_locked'], 403);
         }
 
-        if ($oldRow !== null && $oldCol !== null) {
-            $sourceCell = GridCell::where('row', $oldRow)->where('col', $oldCol)->first();
-            if ($sourceCell && $sourceCell->is_approved) {
-                return response()->json(['success' => false, 'error' => 'cell_locked'], 403);
-            }
+        // 3. Remove the function from the source cell if moving from an existing position
+        if ($sourceCell) {
+            $sourceCell->function_id = null;
+            $sourceCell->save();
         }
 
-        // Logic for Undo, Adjacency, and Placement...
-        // [Your existing logic for update remains here]
+        // 4. Assign the function to the target cell
+        if ($targetCell) {
+            $targetCell->function_id = $functionId;
+            $targetCell->save();
+        }
 
+        // 5. Recalculate Quality of Life metrics and return response
         $freshQol = QoLController::recalculateQoL();
         return response()->json(['success' => true, 'qol_data' => $freshQol]);
     }
