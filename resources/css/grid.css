@@ -15,16 +15,11 @@
     object-position: center;
 }
 
-/* --- AANPASSINGEN VOOR LOCKED CELLS --- */
-.grid-cell.is-locked {
-    cursor: not-allowed !important;
-}
-
 /* --- AANPASSINGEN VOOR ACCESSIBILITY --- */
 /* iets donkerdere kleur voor betere zichtbaarheid */
 .grid-cell.selected {
-    outline-color: #b91c1c; 
-    background-color: #fef2f2; 
+    outline-color: #b91c1c; /* iets donkerder rood */
+    background-color: #fef2f2; /* iets duidelijker */
 }
 
 /* hover kleur iets donkerder gemaakt */
