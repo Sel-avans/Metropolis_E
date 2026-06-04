@@ -21,6 +21,17 @@ document.addEventListener("DOMContentLoaded", () => {
     const popup = document.getElementById('qol-popup');
     const neighborsList = document.getElementById('popup-neighbors-list');
 
+    function isCellOccupied(cell) {
+        return cell.querySelector('.grid-function-icon') !== null;
+    }
+
+    function showLockedCellMessage(cell) {
+        const message = isCellOccupied(cell)
+            ? "You can't replace the function in this area"
+            : "You can't add a function in this area";
+        alert(message);
+    }
+
     // --- APPROVE / LOCK LOGIC ---
     const approveBtn = document.getElementById("approve-btn");
     if (approveBtn) {
@@ -47,7 +58,7 @@ document.addEventListener("DOMContentLoaded", () => {
                     const lockIndicator = selectedCell.querySelector('.lock-indicator');
                     
                     if (data.is_approved) {
-                        selectedCell.classList.add("is-locked", "bg-stripes", "opacity-60", "border-red-600", "pointer-events-none");
+                        selectedCell.classList.add("is-locked", "bg-stripes", "opacity-60", "border-red-600");
                         selectedCell.classList.remove("bg-gray-300", "border-gray-800", "dark:bg-blue-950", "dark:border-gray-300", "hover:bg-gray-400", "hover:dark:bg-gray-100");
                         selectedCell.setAttribute("draggable", "false");
                         
@@ -59,7 +70,7 @@ document.addEventListener("DOMContentLoaded", () => {
                         activateCell(selectedCell);
                         alert("Cell successfully approved and locked!"); 
                     } else {
-                        selectedCell.classList.remove("is-locked", "bg-stripes", "opacity-60", "border-red-600", "pointer-events-none");
+                        selectedCell.classList.remove("is-locked", "bg-stripes", "opacity-60", "border-red-600");
                         selectedCell.classList.add("bg-gray-300", "border-gray-800", "dark:bg-blue-950", "dark:border-gray-300", "hover:bg-gray-400", "hover:dark:bg-gray-100");
                         
                         if (selectedCell.querySelector("img")) {
@@ -252,7 +263,11 @@ document.addEventListener("DOMContentLoaded", () => {
 
     cells.forEach(cell => {
         cell.addEventListener("dragstart", e => {
-            if (cell.classList.contains("is-locked")) { e.preventDefault(); alert("Modification denied: This cell is locked."); return; }
+            if (cell.classList.contains("is-locked")) {
+                e.preventDefault();
+                showLockedCellMessage(cell);
+                return;
+            }
             const img = cell.querySelector(".grid-function-icon");
             if (!img) return;
             isDragging = true;
@@ -262,14 +277,28 @@ document.addEventListener("DOMContentLoaded", () => {
             cell.classList.add("drag-source");
         });
 
-        cell.addEventListener("dragover", e => { if (!cell.classList.contains("is-locked")) { e.preventDefault(); cell.classList.add("drag-over"); } });
+        cell.addEventListener("dragover", e => {
+            e.preventDefault();
+            if (cell.classList.contains("is-locked")) {
+                return;
+            }
+            cell.classList.add("drag-over");
+        });
         cell.addEventListener("dragleave", () => cell.classList.remove("drag-over"));
 
         cell.addEventListener("drop", async e => {
             e.preventDefault();
-            if (cell.classList.contains("is-locked")) { cell.classList.remove("drag-over"); return; }
+            cell.classList.remove("drag-over");
+
+            if (cell.classList.contains("is-locked")) {
+                isDragging = false;
+                dropOccurred = true;
+                showLockedCellMessage(cell);
+                if (sourceCell) sourceCell.classList.remove("drag-source");
+                return;
+            }
             
-            isDragging = false; dropOccurred = true; cell.classList.remove("drag-over");
+            isDragging = false; dropOccurred = true;
             
             if (cell.querySelector("img") && !window.confirm("Replace this feature?")) {
                 if (sourceCell) sourceCell.classList.remove("drag-source");
@@ -292,6 +321,12 @@ document.addEventListener("DOMContentLoaded", () => {
             cell.appendChild(deleteBtn);
 
             const res = await saveMove(oldRow, oldCol, cell.dataset.row, cell.dataset.col, false);
+            if (res && res.status === 403) {
+                const data = await res.json();
+                alert(data.message ?? "You can't modify this locked area.");
+                location.reload();
+                return;
+            }
             if (res && res.status === 409 && window.confirm("Placement forbidden. Force placement?")) {
                 await saveMove(oldRow, oldCol, cell.dataset.row, cell.dataset.col, true);
             }

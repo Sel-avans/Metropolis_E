@@ -47,8 +47,24 @@ class GridController extends Controller
                       : null;
 
         // 2. Security check: prevent modification if either cell is approved (locked)
-        if (($targetCell && $targetCell->is_approved) || ($sourceCell && $sourceCell->is_approved)) {
-            return response()->json(['success' => false, 'error' => 'cell_locked'], 403);
+        if ($targetCell && $targetCell->is_approved) {
+            $message = $targetCell->function_id
+                ? "You can't replace the function in this area"
+                : "You can't add a function in this area";
+
+            return response()->json([
+                'success' => false,
+                'error' => 'cell_locked',
+                'message' => $message,
+            ], 403);
+        }
+
+        if ($sourceCell && $sourceCell->is_approved) {
+            return response()->json([
+                'success' => false,
+                'error' => 'cell_locked',
+                'message' => "You can't replace the function in this area",
+            ], 403);
         }
 
         // 3. Remove the function from the source cell if moving from an existing position
