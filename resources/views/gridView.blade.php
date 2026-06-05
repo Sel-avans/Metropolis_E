@@ -1,30 +1,33 @@
 <x-app-layout>
+    {{-- Highlight stijl voor event-beïnvloede cellen --}}
+    <style>
+        .event-highlight {
+            border-color: #f59e0b !important;
+            box-shadow: 0 0 0 2px #f59e0b66;
+        }
+    </style>
+
     <div class="flex gap-4 h-full">
 
         {{-- LEFT: Function Library --}}
         <div class="w-auto p-6 max-h-[73vh] overflow-y-auto flex-shrink-0">
             <div class="flex flex-col mb-4 gap-3">
                 <h1 class="text-2xl dark:text-teal-500 font-bold mb-4">Function Library</h1>
-
                 <div class="grid grid-cols-2 gap-3 w-full">
                     <a href="{{ route('functions.index') }}"
-                        class="px-3 py-2 bg-blue-600 text-white rounded hover:bg-blue-700 text-sm shadow text-center focus:outline-none focus:ring-2 focus:ring-blue-500"
-                        aria-label="Navigate to Function Management page">
+                        class="px-3 py-2 bg-blue-600 text-white rounded hover:bg-blue-700 text-sm shadow text-center focus:outline-none focus:ring-2 focus:ring-blue-500">
                         Function Management
                     </a>
                     <a href="{{ route('effects.index') }}"
-                        class="px-3 py-2 bg-green-600 text-white rounded hover:bg-green-700 text-sm shadow text-center focus:outline-none focus:ring-2 focus:ring-green-500"
-                        aria-label="Navigate to Effect Management page">
+                        class="px-3 py-2 bg-green-600 text-white rounded hover:bg-green-700 text-sm shadow text-center focus:outline-none focus:ring-2 focus:ring-green-500">
                         Effect Management
                     </a>
                     <a href="{{ route('conditions.index') }}"
-                        class="px-3 py-2 bg-blue-600 text-white rounded hover:bg-blue-700 text-sm shadow text-center focus:outline-none focus:ring-2 focus:ring-blue-500"
-                        aria-label="Navigate to Condition Management page">
+                        class="px-3 py-2 bg-blue-600 text-white rounded hover:bg-blue-700 text-sm shadow text-center focus:outline-none focus:ring-2 focus:ring-blue-500">
                         Condition Management
                     </a>
                     <a href="{{ route('events.index') }}"
-                        class="px-3 py-2 bg-purple-600 text-white rounded hover:bg-purple-700 text-sm shadow text-center focus:outline-none focus:ring-2 focus:ring-purple-500"
-                        aria-label="Navigate to Events page">
+                        class="px-3 py-2 bg-purple-600 text-white rounded hover:bg-purple-700 text-sm shadow text-center focus:outline-none focus:ring-2 focus:ring-purple-500">
                         Events
                     </a>
                 </div>
@@ -76,26 +79,32 @@
                         @for($row = 1; $row <= 3; $row++)
                             @php
                                 $cell = $grid->first(fn($c) => $c->row == $row && $c->col == $col);
+                                $fn   = $cell?->function ?? null;
+                                // Categorieën als kommalijst op het img-element zetten
+                                // zodat de highlight-logica in grid.js ze kan lezen.
+                                // Pas dit aan als jouw model een andere relatie heeft.
+                                $categories = $fn ? collect($fn->effects)->pluck('category')->unique()->implode(',') : '';
                             @endphp
                             <div class="grid-cell relative border-2 bg-gray-200 border-gray-400 dark:bg-blue-950 dark:border-gray-600 w-32 h-32 flex items-center justify-center cursor-pointer transition hover:bg-gray-300 dark:hover:bg-blue-900 focus:outline-none focus:ring-2 focus:ring-blue-500"
                                 data-row="{{ $row }}"
                                 data-col="{{ $col }}"
                                 data-id="{{ $cell->id ?? '' }}"
-                                draggable="{{ $cell ? 'true' : 'false' }}"
+                                draggable="{{ $fn ? 'true' : 'false' }}"
                                 role="button"
-                                aria-label="{{ $cell && $cell->function ? 'Cell ' . $row . ',' . $col . ' with ' . $cell->function->name : 'Empty cell ' . $row . ',' . $col }}">
+                                aria-label="{{ $fn ? 'Cell ' . $row . ',' . $col . ' with ' . $fn->name : 'Empty cell ' . $row . ',' . $col }}">
 
-                                @if(!empty($cell) && !empty($cell->function))
-                                    <img src="{{ asset($cell->function->image) }}"
-                                        alt="{{ $cell->function->name }}"
+                                @if($fn)
+                                    <img src="{{ asset($fn->image) }}"
+                                        alt="{{ $fn->name }}"
                                         class="grid-function-icon object-contain"
-                                        data-function-id="{{ $cell->function->id }}">
+                                        data-function-id="{{ $fn->id }}"
+                                        data-categories="{{ $categories }}">
 
                                     <button type="button"
                                         class="delete-btn absolute top-[2px] right-[2px] bg-red-600/80 text-white w-5 h-5 text-[14px] rounded cursor-pointer flex items-center justify-center"
-                                        aria-label="Remove {{ $cell->function->name }} from grid cell"
-                                        title="Remove {{ $cell->function->name }} from grid cell">
-                                        <span class="sr-only">Remove {{ $cell->function->name }} from grid cell</span>✖
+                                        aria-label="Remove {{ $fn->name }} from grid cell"
+                                        title="Remove {{ $fn->name }} from grid cell">
+                                        <span class="sr-only">Remove {{ $fn->name }} from grid cell</span>✖
                                     </button>
                                 @endif
                             </div>
@@ -111,11 +120,14 @@
 
                 {{-- Timeline --}}
                 <div class="mb-6">
-                    <input type="range" id="simulation-timeline" class="w-full" min="0" max="100" value="0">
+                    <input type="range" id="simulation-timeline" class="w-full" min="0" max="1440" value="0">
                     <div class="flex justify-between items-center mt-2 text-xs text-gray-500 dark:text-gray-400">
-                        <span>Start</span>
-                        <span id="simulation-time-left" class="font-bold text-sky-600 dark:text-teal-500">Time left: --:--</span>
-                        <span>End</span>
+                        <span class="font-mono">06:00</span>
+                        <span id="simulation-time-display"
+                            class="font-bold font-mono text-sky-600 dark:text-teal-400 text-base tabular-nums">
+                            06:00
+                        </span>
+                        <span class="font-mono">06:00</span>
                     </div>
                 </div>
 
@@ -151,24 +163,24 @@
                             </button>
                             <button type="button" id="playPauseBtn" title="Play/Pause"
                                 class="px-4 py-2 bg-white dark:bg-gray-700 hover:bg-sky-600 hover:text-white text-gray-700 dark:text-gray-200 shadow-sm border border-gray-300 dark:border-gray-600 font-medium rounded transition">
-                                &#x23F8;
+                                &#x25B6;
                             </button>
                             <button type="button" id="forwardBtn" title="Skip Forward"
                                 class="px-4 py-2 bg-white dark:bg-gray-700 hover:bg-sky-600 hover:text-white text-gray-700 dark:text-gray-200 shadow-sm border border-gray-300 dark:border-gray-600 font-medium rounded transition">
                                 &#x23E9;
                             </button>
-                            <button type="button" id="replayBtn" title="Repeat"
+                            <button type="button" id="replayBtn" title="Restart"
                                 class="px-4 py-2 bg-white dark:bg-gray-700 hover:bg-sky-600 hover:text-white text-gray-700 dark:text-gray-200 shadow-sm border border-gray-300 dark:border-gray-600 font-medium rounded transition">
                                 &#x21BB;
                             </button>
                         </div>
                     </div>
 
-                    {{-- Active Events --}}
+                    {{-- Active Events (onderin simulatie) --}}
                     <div class="flex-1 min-w-[200px] bg-gray-50 dark:bg-gray-800 p-4 rounded-md border border-gray-200 dark:border-gray-600">
                         <h4 class="text-sm font-semibold text-sky-500 dark:text-teal-500 mb-2">Active Events</h4>
-                        <ul id="active-events-list" class="text-xs text-gray-700 dark:text-gray-300 list-disc pl-4 space-y-1">
-                            <li id="active-events-empty">No active events</li>
+                        <ul id="active-events-list" class="text-xs text-gray-700 dark:text-gray-300 space-y-1">
+                            <li id="active-events-empty" class="text-gray-500">No active events</li>
                         </ul>
                     </div>
 
@@ -178,14 +190,22 @@
         {{-- END MIDDLE --}}
 
         {{-- RIGHT: QoL Breakdown + Events panel --}}
-        <div class="border-l border-gray-400 dark:border-gray-700 w-56 flex-shrink-0 p-3 flex flex-col gap-4 max-h-[73vh] overflow-y-auto">
+        <div class="border-l border-gray-400 dark:border-gray-700 w-64 flex-shrink-0 p-3 flex flex-col gap-4 max-h-[73vh] overflow-y-auto">
+
+            {{-- QoL Breakdown --}}
             <div id="breakdown-qol-score"></div>
 
-            <div id="active-events-panel">
+            {{-- Events panel: alle events met activate/deactivate knop --}}
+            <div id="all-events-panel">
                 <h3 class="text-lg font-semibold mb-2 dark:text-teal-500">Events</h3>
-                <div id="active-events-empty" class="text-sm text-gray-500">No events.</div>
-                <ul id="active-events-detail-list" class="space-y-2 text-sm dark:text-white"></ul>
+                <p class="text-xs text-gray-400 dark:text-gray-500 mb-3">
+                    Toggle events to include them in the simulation. Active events highlight affected grid cells in yellow.
+                </p>
+                <ul id="all-events-detail-list" class="space-y-1 text-sm dark:text-white">
+                    <li class="text-sm text-gray-500">Loading events...</li>
+                </ul>
             </div>
+
         </div>
         {{-- END RIGHT --}}
 

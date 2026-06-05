@@ -1,6 +1,6 @@
 import { getNeighborsWithQoL } from './neighbours.js';
 import { simulationLoop, onSimulationTimeUpdate } from './simulation.js';
-import { setMaxTime, syncTimelineUI, minutesToHHMM } from './regulation.js';
+import { setMaxTime, syncTimelineUI, minutesToHHMM, datetimeToSimMinutes } from './regulation.js';
 
 document.addEventListener("DOMContentLoaded", () => {
 
@@ -9,20 +9,20 @@ document.addEventListener("DOMContentLoaded", () => {
     // =========================================================
 
     let draggedItem = null;
-    let isDragging = false;
-    let sourceCell = null;
+    let isDragging  = false;
+    let sourceCell  = null;
     let dropOccurred = false;
     let old_score;
     let lastAction = null;
 
-    // Alle events opgehaald van de server (met start_minutes + end_minutes)
+    // Alle events van de server — manuallyEnabled = door planner aan/uit gezet
     let allEvents = [];
 
     const HOVER_DELAY_MS = 300;
     let hoverTimer = null;
     let lastActiveEventSignature = '';
 
-    const popup = document.getElementById('qol-popup');
+    const popup        = document.getElementById('qol-popup');
     const neighborsList = document.getElementById('popup-neighbors-list');
 
     // =========================================================
@@ -36,37 +36,29 @@ document.addEventListener("DOMContentLoaded", () => {
 
     function formatModifiers(modifiers) {
         if (!modifiers || typeof modifiers !== 'object') return '';
-
         const items = Object.entries(modifiers).map(([category, value]) => {
-            const num = Number(value);
+            const num  = Number(value);
             const sign = num >= 0 ? '+' : '';
             const label = category.charAt(0).toUpperCase() + category.slice(1);
             return `<li class="text-amber-400">- ${label}: ${sign}${num}</li>`;
         });
-
         if (items.length === 0) return '';
-
         return `<ul class="text-[11px] text-gray-400 mt-1 space-y-0.5 list-none pl-0">${items.join('')}</ul>`;
     }
 
     function buildEventSignature(events) {
         return JSON.stringify(
-            (events || []).map(event => ({
-                id: event.id,
-                active: event.isActive ?? false,
-            }))
+            (events || []).map(e => ({ id: e.id, active: e.isActive ?? false }))
         );
     }
 
     function compareScores(data) {
         let html = '';
         if (old_score !== undefined) {
-            const delta_score = data.total_score - old_score;
-            html += `
-                <span class="text-xl float-right ${delta_score < 0 ? 'text-red-600' : 'text-green-600'}">
-                    ${delta_score >= 0 ? '+' : ''}${delta_score}
-                </span>
-            `;
+            const delta = data.total_score - old_score;
+            html += `<span class="text-xl float-right ${delta < 0 ? 'text-red-600' : 'text-green-600'}">
+                ${delta >= 0 ? '+' : ''}${delta}
+            </span>`;
         }
         if (data.total_score !== 0) old_score = data.total_score;
         return html;
@@ -75,91 +67,57 @@ document.addEventListener("DOMContentLoaded", () => {
     function renderQoLBreakdown(data) {
         let html = '<h3 class="text-xl font-semibold dark:text-teal-500 mb-2">Breakdown QoL Score</h3>';
         html += '<ul class="space-y-1 list-none pl-0 text-sm">';
-
         for (const [category, info] of Object.entries(data.categories)) {
             const score = Number(info.total);
-            let scoreClass = 'text-slate-400';
-            if (score > 0) scoreClass = 'text-green-600';
-            else if (score < 0) scoreClass = 'text-red-600';
-
-            const scoreSign = score > 0 ? '+' : '';
-            html += `
-                <li class="font-semibold dark:text-teal-600">
-                    - ${category}: <span class="${scoreClass}">${scoreSign}${score}</span>
-                </li>`;
+            const cls   = score > 0 ? 'text-green-600' : score < 0 ? 'text-red-600' : 'text-slate-400';
+            const sign  = score > 0 ? '+' : '';
+            html += `<li class="font-semibold dark:text-teal-600">- ${category}: <span class="${cls}">${sign}${score}</span></li>`;
         }
-
         html += '</ul>';
-
-        const totalScore = Number(data.total_score);
-        let totalClass = 'text-slate-400';
-        if (totalScore > 0) totalClass = 'text-green-600';
-        else if (totalScore < 0) totalClass = 'text-red-600';
-
-        const totalSign = totalScore > 0 ? '+' : '';
-        html += `
-            <p class="font-bold mt-4 dark:text-teal-600">
-                Total QoL: <span class="${totalClass}">${totalSign}${totalScore}</span>
-            </p>`;
-
+        const total = Number(data.total_score);
+        const tcls  = total > 0 ? 'text-green-600' : total < 0 ? 'text-red-600' : 'text-slate-400';
+        const tsign = total > 0 ? '+' : '';
+        html += `<p class="font-bold mt-4 dark:text-teal-600">Total QoL: <span class="${tcls}">${tsign}${total}</span></p>`;
         return html;
     }
 
     function positionPopup(x, y) {
-        const offset = 15;
-        popup.style.left = `${x + offset}px`;
-        popup.style.top  = `${y + offset}px`;
+        popup.style.left = `${x + 15}px`;
+        popup.style.top  = `${y + 15}px`;
     }
 
     function renderNeighborsList(data) {
         neighborsList.innerHTML = '';
-
         if (!data.categories || Object.keys(data.categories).length === 0) {
             neighborsList.innerHTML = '<li class="text-slate-400 text-sm">No active QoL influences on this cell</li>';
             return;
         }
-
-        const eventModifiers = data.event_modifiers || {};
         const categoryKeys = {
-            Safety: 'safety',
-            Recreation: 'recreation',
-            Environment: 'environment',
-            Amenities: 'amenities',
-            Mobility: 'mobility',
+            Safety: 'safety', Recreation: 'recreation', Environment: 'environment',
+            Amenities: 'amenities', Mobility: 'mobility',
         };
-
         let html = '';
+        const eventModifiers = data.event_modifiers || {};
         for (const [categoryName, info] of Object.entries(data.categories)) {
-            const cellScore  = Number(info.total);
-            const eventScore = Number(eventModifiers[categoryKeys[categoryName]] || 0);
+            const cellScore    = Number(info.total);
+            const eventScore   = Number(eventModifiers[categoryKeys[categoryName]] || 0);
             const displayScore = cellScore + eventScore;
-
-            let scoreClass = 'text-slate-400';
-            if (displayScore > 0) scoreClass = 'text-green-600';
-            else if (displayScore < 0) scoreClass = 'text-red-600';
-
-            const scoreSign = displayScore > 0 ? '+' : '';
-            html += `
-                <div class="mb-2 last:mb-0 w-full">
-                    <div class="flex justify-between items-center gap-8">
-                        <span class="text-slate-200 font-medium text-sm">${categoryName}</span>
-                        <span class="${scoreClass} font-bold text-sm">${scoreSign}${displayScore}</span>
-                    </div>
-                </div>`;
-        }
-
-        const cellTotal = Number(data.total_score);
-        let totalClass = 'text-slate-400';
-        if (cellTotal > 0) totalClass = 'text-green-600';
-        else if (cellTotal < 0) totalClass = 'text-red-600';
-
-        const totalSign = cellTotal > 0 ? '+' : '';
-        html += `
-            <div class="flex justify-between items-center mt-3 pt-2 border-t border-slate-600/50 w-full">
-                <span class="text-slate-300 font-bold text-xs uppercase tracking-wider">Total QoL:</span>
-                <span class="${totalClass} font-extrabold text-base">${totalSign}${cellTotal}</span>
+            const cls  = displayScore > 0 ? 'text-green-600' : displayScore < 0 ? 'text-red-600' : 'text-slate-400';
+            const sign = displayScore > 0 ? '+' : '';
+            html += `<div class="mb-2 last:mb-0 w-full">
+                <div class="flex justify-between items-center gap-8">
+                    <span class="text-slate-200 font-medium text-sm">${categoryName}</span>
+                    <span class="${cls} font-bold text-sm">${sign}${displayScore}</span>
+                </div>
             </div>`;
-
+        }
+        const cellTotal = Number(data.total_score);
+        const tcls  = cellTotal > 0 ? 'text-green-600' : cellTotal < 0 ? 'text-red-600' : 'text-slate-400';
+        const tsign = cellTotal > 0 ? '+' : '';
+        html += `<div class="flex justify-between items-center mt-3 pt-2 border-t border-slate-600/50 w-full">
+            <span class="text-slate-300 font-bold text-xs uppercase tracking-wider">Total QoL:</span>
+            <span class="${tcls} font-extrabold text-base">${tsign}${cellTotal}</span>
+        </div>`;
         neighborsList.innerHTML = html;
     }
 
@@ -173,7 +131,7 @@ document.addEventListener("DOMContentLoaded", () => {
     function hidePopup() {
         popup.classList.add('opacity-0', 'scale-95');
         popup.classList.remove('opacity-100', 'scale-100');
-        setTimeout(() => { popup.classList.add('hidden'); }, 150);
+        setTimeout(() => popup.classList.add('hidden'), 150);
     }
 
     async function handleTileHover(row, col, event) {
@@ -192,44 +150,74 @@ document.addEventListener("DOMContentLoaded", () => {
             const scoreEl     = document.getElementById('qol-score-value');
             const breakdownEl = document.getElementById('breakdown-qol-score');
             const oldScoreEl  = document.getElementById('old-qol-score');
-
-            const response = await fetch('/qol/details');
-            const data = await response.json();
-
-            if (scoreEl) {
-                scoreEl.textContent  = data.total_score;
-                oldScoreEl.innerHTML = compareScores(data);
-            }
-
-            if (breakdownEl) {
-                breakdownEl.innerHTML = renderQoLBreakdown(data);
-            }
+            const response    = await fetch('/qol/details');
+            const data        = await response.json();
+            if (scoreEl)     { scoreEl.textContent = data.total_score; oldScoreEl.innerHTML = compareScores(data); }
+            if (breakdownEl) { breakdownEl.innerHTML = renderQoLBreakdown(data); }
         } catch (err) {
             console.error("Fout bij ophalen QoL:", err);
         }
     }
 
     // =========================================================
-    // SIMULATIE TIJD → EVENTS AAN/UIT
+    // HIGHLIGHT LOGICA
+    // Cellen die beïnvloed worden door een actief event krijgen
+    // een gele rand. We bepalen welke cellen beïnvloed zijn op
+    // basis van de categorieën van het event die matchen met
+    // de functie-categorieën in de grid.
     // =========================================================
 
-    /**
-     * Wordt aangeroepen door simulation.js elke animatieframe.
-     * simTime = huidige tijd in minuten (0–1440).
-     *
-     * Elk event in allEvents moet bevatten:
-     *   - start_minutes: number  (bijv. 840 = 14:00)
-     *   - end_minutes:   number  (bijv. 1020 = 17:00)
-     *   - manuallyEnabled: bool  (aan/uit toggle van de stadsplanner)
-     */
+    function updateCellHighlights() {
+        const activeEvents = allEvents.filter(e => e.isActive && e.manuallyEnabled);
+
+        // Verzamel alle categorieën van actieve events.
+        // Gebruik affected_categories van de server als die beschikbaar is,
+        // anders fallback naar de keys van modifiers.
+        const activeCategories = new Set();
+        activeEvents.forEach(event => {
+            if (Array.isArray(event.affected_categories) && event.affected_categories.length) {
+                event.affected_categories.forEach(cat => activeCategories.add(cat.toLowerCase()));
+            } else if (event.modifiers && typeof event.modifiers === 'object') {
+                Object.keys(event.modifiers).forEach(cat => activeCategories.add(cat.toLowerCase()));
+            }
+        });
+
+        document.querySelectorAll('.grid-cell').forEach(cell => {
+            const functionImg = cell.querySelector('.grid-function-icon');
+            if (!functionImg) {
+                cell.classList.remove('event-highlight');
+                return;
+            }
+
+            // Cel heeft een functie — check of die functie een categorie
+            // heeft die overlapt met de actieve event modifiers.
+            // data-categories wordt als kommalijst op het img-element gezet
+            // vanuit de blade (bijv. data-categories="amenities,recreation").
+            const cellCategories = (functionImg.dataset.categories || '').toLowerCase().split(',').filter(Boolean);
+            const isAffected = cellCategories.some(cat => activeCategories.has(cat));
+
+            cell.classList.toggle('event-highlight', isAffected);
+        });
+    }
+
+    // =========================================================
+    // SIMULATIE TICK — events aan/uit op basis van simulatietijd
+    // =========================================================
+
     function onSimulationTick(simTime) {
         if (!allEvents.length) return;
 
         let changed = false;
 
         allEvents.forEach(event => {
-            const inWindow = simTime >= event.start_minutes && simTime <= event.end_minutes;
-            const shouldBeActive = event.manuallyEnabled && inWindow;
+            // Alleen als de planner het event handmatig heeft ingeschakeld
+            if (!event.manuallyEnabled) {
+                if (event.isActive) { event.isActive = false; changed = true; }
+                return;
+            }
+
+            const inWindow     = simTime >= event.start_minutes && simTime <= event.end_minutes;
+            const shouldBeActive = inWindow;
 
             if (event.isActive !== shouldBeActive) {
                 event.isActive = shouldBeActive;
@@ -237,34 +225,76 @@ document.addEventListener("DOMContentLoaded", () => {
             }
         });
 
-        // Alleen QoL herberekenen als er iets veranderd is
         if (changed) {
-            renderActiveEventsList();
+            renderActiveEventsPanel();
+            updateCellHighlights();
             updateQoL();
         }
     }
 
-    // Registreer de tick-callback in simulation.js
     onSimulationTimeUpdate(onSimulationTick);
 
     // =========================================================
-    // ACTIVE EVENTS (ophalen van server + renderen)
+    // EVENTS PANEL — rechts in de blade
+    // Toont ALLE events met een Activate/Deactivate knop.
     // =========================================================
 
-    function renderActiveEventsList() {
+    function renderAllEventsPanel() {
+        const listEl = document.getElementById('all-events-detail-list');
+        if (!listEl) return;
+
+        listEl.innerHTML = '';
+
+        if (!allEvents.length) {
+            listEl.innerHTML = '<li class="text-sm text-gray-500">No events available.</li>';
+            return;
+        }
+
+        allEvents.forEach(event => {
+            const li = document.createElement('li');
+            li.className = "p-3 bg-slate-800 border border-slate-600 rounded mb-2 text-sm";
+            li.dataset.eventId = event.id;
+
+            const modifiersHtml = formatModifiers(event.modifiers);
+            const startLabel    = minutesToHHMM(event.start_minutes);
+            const endLabel      = minutesToHHMM(event.end_minutes);
+            const isEnabled     = event.manuallyEnabled;
+
+            li.innerHTML = `
+                <div class="flex items-start justify-between gap-2">
+                    <div class="flex-1 min-w-0">
+                        <div class="font-semibold text-slate-200 truncate">${event.name || 'Nameless Event'}</div>
+                        <div class="text-[11px] text-gray-400 mt-0.5">${startLabel} – ${endLabel}</div>
+                        ${modifiersHtml}
+                    </div>
+                    <button
+                        class="event-toggle-btn flex-shrink-0 px-2 py-1 text-xs font-semibold rounded transition
+                            ${isEnabled
+                                ? 'bg-amber-500 hover:bg-amber-600 text-black'
+                                : 'bg-slate-600 hover:bg-teal-600 hover:text-white text-slate-200'}"
+                        data-event-id="${event.id}">
+                        ${isEnabled ? 'Deactivate' : 'Activate'}
+                    </button>
+                </div>`;
+
+            listEl.appendChild(li);
+        });
+    }
+
+    function renderActiveEventsPanel() {
         const listEl  = document.getElementById('active-events-list');
         const emptyEl = document.getElementById('active-events-empty');
-        if (!listEl || !emptyEl) return;
+        if (!listEl) return;
 
-        const active = allEvents.filter(e => e.isActive);
+        const active = allEvents.filter(e => e.isActive && e.manuallyEnabled);
 
         if (active.length === 0) {
-            emptyEl.classList.remove('hidden');
+            if (emptyEl) emptyEl.classList.remove('hidden');
             listEl.innerHTML = '';
             return;
         }
 
-        emptyEl.classList.add('hidden');
+        if (emptyEl) emptyEl.classList.add('hidden');
         listEl.innerHTML = '';
 
         active.forEach(event => {
@@ -272,24 +302,57 @@ document.addEventListener("DOMContentLoaded", () => {
             li.className = "p-3 bg-slate-800 border-l-4 border-amber-500 rounded shadow-sm mb-2 text-sm";
 
             const modifiersHtml = formatModifiers(event.modifiers);
-            const timeHtml = (event.start_minutes !== undefined && event.end_minutes !== undefined)
-                ? `<div class="text-[11px] text-gray-500 mt-0.5">
-                       ${minutesToHHMM(event.start_minutes)} – ${minutesToHHMM(event.end_minutes)}
-                   </div>`
-                : '';
+            const startLabel    = minutesToHHMM(event.start_minutes);
+            const endLabel      = minutesToHHMM(event.end_minutes);
 
             li.innerHTML = `
-                <div class="font-semibold text-slate-200">${event.name || 'Nameless Event'}</div>
-                ${modifiersHtml}
-                ${timeHtml}
-            `;
+                <div class="flex items-start justify-between gap-2">
+                    <div>
+                        <div class="font-semibold text-slate-200">${event.name || 'Nameless Event'}</div>
+                        <div class="text-[11px] text-gray-500 mt-0.5">${startLabel} – ${endLabel}</div>
+                        ${modifiersHtml}
+                    </div>
+                    <button
+                        class="event-toggle-btn flex-shrink-0 px-2 py-1 text-xs font-semibold rounded bg-amber-500 hover:bg-amber-600 text-black transition"
+                        data-event-id="${event.id}">
+                        Deactivate
+                    </button>
+                </div>`;
+
             listEl.appendChild(li);
         });
     }
 
+    // Toggle handler via event delegation (werkt voor beide panels)
+    document.addEventListener('click', (e) => {
+        const btn = e.target.closest('.event-toggle-btn');
+        if (!btn) return;
+
+        const eventId = parseInt(btn.dataset.eventId);
+        const event   = allEvents.find(ev => ev.id === eventId);
+        if (!event) return;
+
+        event.manuallyEnabled = !event.manuallyEnabled;
+
+        // Als deactivated: ook isActive uitzetten
+        if (!event.manuallyEnabled) event.isActive = false;
+
+        // Herrender beide panels + highlights
+        renderAllEventsPanel();
+        renderActiveEventsPanel();
+        updateCellHighlights();
+        updateQoL();
+    });
+
+    // =========================================================
+    // FETCH EVENTS VAN SERVER
+    // Verwacht van de server per event:
+    //   id, name, modifiers (object), start_at (datetime), end_at (datetime)
+    // =========================================================
+
     async function fetchAllEvents({ forceQolRefresh = false } = {}) {
         try {
-            const response = await fetch('/events/active', {
+            const response = await fetch('/events/simulation', {
                 credentials: 'same-origin',
                 headers: { 'Accept': 'application/json' },
             });
@@ -298,21 +361,27 @@ document.addEventListener("DOMContentLoaded", () => {
             const data = await response.json();
             if (!data || !data.events) return;
 
-            // Sla alle events op met start_minutes / end_minutes
-            // Verwacht dat de server deze velden levert, anders fallback naar 0/1440
+            // Bewaar manuallyEnabled state voor events die al bekend zijn
+            const prevState = {};
+            allEvents.forEach(e => { prevState[e.id] = e.manuallyEnabled; });
+
             allEvents = data.events.map(e => ({
-                ...e,
-                start_minutes:   e.start_minutes   ?? 0,
-                end_minutes:     e.end_minutes      ?? 1440,
-                manuallyEnabled: e.manuallyEnabled  ?? true,
-                isActive:        false, // simulatie bepaalt wanneer actief
+                id:             e.id,
+                name:           e.name,
+                modifiers:      e.modifiers ?? {},
+                // Server levert start_at / end_at als datetime string
+                // of start_minutes / end_minutes als integers — beide ondersteund
+                start_minutes:  e.start_minutes ?? datetimeToSimMinutes(e.start_at),
+                end_minutes:    e.end_minutes   ?? datetimeToSimMinutes(e.end_at),
+                // Behoudt vorige toggle-staat van de planner, default = ingeschakeld
+                manuallyEnabled: prevState[e.id] ?? true,
+                isActive:        false,
             }));
 
-            // maxTime blijft altijd 1440 (volledige dag)
-            setMaxTime(1440);
+            setMaxTime();
             syncTimelineUI();
+            renderAllEventsPanel();
 
-            // Signature check: alleen QoL verversen als events gewijzigd zijn
             const signature = buildEventSignature(allEvents);
             if (signature !== lastActiveEventSignature || forceQolRefresh) {
                 lastActiveEventSignature = signature;
@@ -337,10 +406,8 @@ document.addEventListener("DOMContentLoaded", () => {
                     'X-CSRF-TOKEN': document.querySelector('meta[name="csrf-token"]').content
                 },
                 body: JSON.stringify({
-                    old_row: oldRow,
-                    old_col: oldCol,
-                    new_row: newRow,
-                    new_col: newCol,
+                    old_row: oldRow, old_col: oldCol,
+                    new_row: newRow, new_col: newCol,
                     function_id: draggedItem.id,
                     force: force
                 })
@@ -356,13 +423,11 @@ document.addEventListener("DOMContentLoaded", () => {
     // EVENT LISTENERS — LIBRARY ITEMS
     // =========================================================
 
-    const items = document.querySelectorAll(".library-item");
-
-    items.forEach(item => {
+    document.querySelectorAll(".library-item").forEach(item => {
         item.addEventListener("dragstart", e => {
-            isDragging    = true;
-            dropOccurred  = false;
-            draggedItem   = {
+            isDragging   = true;
+            dropOccurred = false;
+            draggedItem  = {
                 id:    Number(item.dataset.functionId),
                 name:  item.dataset.functionName,
                 image: item.dataset.image
@@ -375,33 +440,20 @@ document.addEventListener("DOMContentLoaded", () => {
     // EVENT LISTENERS — GRID CELLS
     // =========================================================
 
-    const cells = document.querySelectorAll(".grid-cell");
-
-    cells.forEach(cell => {
+    document.querySelectorAll(".grid-cell").forEach(cell => {
         cell.addEventListener("dragstart", e => {
             const img = cell.querySelector(".grid-function-icon");
             if (!img) return;
-
             isDragging   = true;
             dropOccurred = false;
-            draggedItem  = {
-                id:    Number(img.dataset.functionId),
-                name:  img.alt,
-                image: img.src
-            };
+            draggedItem  = { id: Number(img.dataset.functionId), name: img.alt, image: img.src };
             e.dataTransfer.setDragImage(img, 16, 16);
             sourceCell = cell;
             cell.classList.add("drag-source");
         });
 
-        cell.addEventListener("dragover", e => {
-            e.preventDefault();
-            cell.classList.add("drag-over");
-        });
-
-        cell.addEventListener("dragleave", () => {
-            cell.classList.remove("drag-over");
-        });
+        cell.addEventListener("dragover",  e => { e.preventDefault(); cell.classList.add("drag-over"); });
+        cell.addEventListener("dragleave", () => cell.classList.remove("drag-over"));
 
         cell.addEventListener("drop", async e => {
             e.preventDefault();
@@ -409,20 +461,14 @@ document.addEventListener("DOMContentLoaded", () => {
             dropOccurred = true;
             cell.classList.remove("drag-over");
 
-            const isOccupied = cell.querySelector("img") !== null;
-
-            if (isOccupied) {
-                const wantsToReplace = window.confirm("Are you sure you want to replace this feature?");
-                if (!wantsToReplace) {
-                    if (sourceCell) sourceCell.classList.remove("drag-source");
-                    return;
-                }
+            if (cell.querySelector("img") && !window.confirm("Are you sure you want to replace this feature?")) {
+                if (sourceCell) sourceCell.classList.remove("drag-source");
+                return;
             }
 
             const newRow = cell.dataset.row;
             const newCol = cell.dataset.col;
-            let oldRow   = null;
-            let oldCol   = null;
+            let oldRow = null, oldCol = null;
             const originalSourceCell = sourceCell;
 
             if (sourceCell) {
@@ -433,121 +479,85 @@ document.addEventListener("DOMContentLoaded", () => {
                 sourceCell.classList.remove("drag-source");
             }
 
-            sourceCell    = null;
+            sourceCell = null;
             cell.innerHTML = "";
 
             const img = document.createElement("img");
-            img.src                  = draggedItem.image;
-            img.alt                  = draggedItem.name;
-            img.dataset.functionId   = draggedItem.id;
+            img.src = draggedItem.image; img.alt = draggedItem.name;
+            img.dataset.functionId = draggedItem.id;
             img.classList.add("grid-function-icon", "object-contain");
             cell.appendChild(img);
 
-            const deleteBtn  = document.createElement("button");
-            deleteBtn.type   = "button";
+            const deleteBtn = document.createElement("button");
+            deleteBtn.type  = "button";
             deleteBtn.className = "delete-btn absolute top-[2px] right-[2px] bg-red-600/80 text-white w-5 h-5 text-[14px] rounded cursor-pointer flex items-center justify-center";
-            const deleteText = `Remove ${draggedItem.name} from grid cell`;
-            deleteBtn.setAttribute("aria-label", deleteText);
-            deleteBtn.setAttribute("title", deleteText);
-
-            const srText       = document.createElement("span");
-            srText.className   = "sr-only";
-            srText.textContent = deleteText;
-            deleteBtn.appendChild(srText);
+            deleteBtn.setAttribute("aria-label", `Remove ${draggedItem.name} from grid cell`);
             deleteBtn.append("✖");
             cell.appendChild(deleteBtn);
-
             cell.setAttribute("draggable", "true");
             activateCell(cell);
 
-            lastAction = {
-                oldRow, oldCol, newRow, newCol,
-                functionId: draggedItem.id
-            };
-
+            lastAction = { oldRow, oldCol, newRow, newCol, functionId: draggedItem.id };
             const undoBtnEl = document.getElementById("undo-btn");
             if (undoBtnEl) undoBtnEl.disabled = false;
 
             const res = await saveMove(oldRow, oldCol, newRow, newCol, false);
 
             if (res && res.status === 409) {
-                const forceChoice = window.confirm("Placement is forbidden by adjacency rules. Force placement anyway?");
-
-                if (forceChoice) {
+                if (window.confirm("Placement is forbidden by adjacency rules. Force placement anyway?")) {
                     const res2 = await saveMove(oldRow, oldCol, newRow, newCol, true);
                     if (!res2 || !res2.ok) {
                         if (originalSourceCell) {
                             originalSourceCell.innerHTML = `<img src="${draggedItem.image}" alt="${draggedItem.name}" data-function-id="${draggedItem.id}" class="grid-function-icon object-contain"><button class="delete-btn absolute top-[2px] right-[2px] bg-red-600/80 text-white w-5 h-5 text-[14px] rounded cursor-pointer flex items-center justify-center">✖</button>`;
                             originalSourceCell.setAttribute('draggable', 'true');
                         }
-                        cell.innerHTML = "";
-                        cell.removeAttribute('draggable');
-                        updateQoL();
-                        return;
+                        cell.innerHTML = ""; cell.removeAttribute('draggable');
+                        updateQoL(); return;
                     }
                 } else {
                     if (originalSourceCell) {
                         originalSourceCell.innerHTML = `<img src="${draggedItem.image}" alt="${draggedItem.name}" data-function-id="${draggedItem.id}" class="grid-function-icon object-contain"><button class="delete-btn absolute top-[2px] right-[2px] bg-red-600/80 text-white w-5 h-5 text-[14px] rounded cursor-pointer flex items-center justify-center">✖</button>`;
                         originalSourceCell.setAttribute('draggable', 'true');
                     }
-                    cell.innerHTML = "";
-                    cell.removeAttribute('draggable');
-                    updateQoL();
-                    return;
+                    cell.innerHTML = ""; cell.removeAttribute('draggable');
+                    updateQoL(); return;
                 }
             }
 
+            updateCellHighlights();
             updateQoL();
         });
 
-        cell.addEventListener("click", () => {
-            if (!isDragging) activateCell(cell);
-        });
-
-        cell.addEventListener("keydown", e => {
-            if (!isDragging && (e.key === "Enter" || e.key === " ")) activateCell(cell);
-        });
+        cell.addEventListener("click",   () => { if (!isDragging) activateCell(cell); });
+        cell.addEventListener("keydown", e  => { if (!isDragging && (e.key === "Enter" || e.key === " ")) activateCell(cell); });
 
         cell.addEventListener('mouseenter', (event) => {
             const row = parseInt(cell.dataset.row);
             const col = parseInt(cell.dataset.col);
             clearTimeout(hoverTimer);
-            hoverTimer = setTimeout(() => {
-                handleTileHover(row, col, event);
-            }, HOVER_DELAY_MS);
+            hoverTimer = setTimeout(() => handleTileHover(row, col, event), HOVER_DELAY_MS);
         });
-
-        cell.addEventListener('mouseleave', () => {
-            clearTimeout(hoverTimer);
-            hidePopup();
-        });
+        cell.addEventListener('mouseleave', () => { clearTimeout(hoverTimer); hidePopup(); });
     });
 
     // =========================================================
-    // DELETE BUTTON (event delegation)
+    // DELETE BUTTON
     // =========================================================
 
     document.addEventListener("click", async (e) => {
         if (!e.target.classList.contains("delete-btn")) return;
-
         const cell = e.target.closest(".grid-cell");
         if (!cell) return;
-
         cell.innerHTML = "";
         cell.removeAttribute("draggable");
         activateCell(cell);
-
         try {
             await fetch(`/grid/cell/${cell.dataset.id}/function`, {
                 method: "DELETE",
-                headers: {
-                    "X-CSRF-TOKEN": document.querySelector('meta[name="csrf-token"]').content
-                }
+                headers: { "X-CSRF-TOKEN": document.querySelector('meta[name="csrf-token"]').content }
             });
-        } catch (err) {
-            console.error("Fout bij verwijderen functie:", err);
-        }
-
+        } catch (err) { console.error("Fout bij verwijderen functie:", err); }
+        updateCellHighlights();
         setTimeout(() => updateQoL(), 10);
     });
 
@@ -558,65 +568,42 @@ document.addEventListener("DOMContentLoaded", () => {
     document.addEventListener("dragend", async (e) => {
         if (!draggedItem || !sourceCell) return;
         if (dropOccurred) { dropOccurred = false; return; }
-
-        const grid = document.querySelector(".city-grid");
-        const rect = grid.getBoundingClientRect();
-        const outside = e.pageX < rect.left || e.pageX > rect.right ||
-                        e.pageY < rect.top  || e.pageY > rect.bottom;
-        if (!outside) return;
-
+        const rect = document.querySelector(".city-grid").getBoundingClientRect();
+        if (e.pageX >= rect.left && e.pageX <= rect.right && e.pageY >= rect.top && e.pageY <= rect.bottom) return;
         sourceCell.innerHTML = "";
         sourceCell.removeAttribute("draggable");
         activateCell(sourceCell);
-
         try {
             await fetch(`/grid/cell/${sourceCell.dataset.id}/function`, {
                 method: "DELETE",
                 headers: { "X-CSRF-TOKEN": document.querySelector('meta[name="csrf-token"]').content }
             });
-        } catch (err) {
-            console.error("Fout bij drag-off delete:", err);
-        }
-
-        draggedItem = null;
-        sourceCell  = null;
+        } catch (err) { console.error("Fout bij drag-off delete:", err); }
+        draggedItem = null; sourceCell = null;
+        updateCellHighlights();
         setTimeout(() => updateQoL(), 10);
     });
 
     // =========================================================
-    // UNDO KNOP (primair)
+    // UNDO (primair)
     // =========================================================
 
     const undoBtn = document.getElementById("undo-btn");
     if (undoBtn) {
         undoBtn.addEventListener("click", async () => {
             if (!lastAction) return;
-
             await fetch('/grid/update', {
                 method: 'POST',
-                headers: {
-                    'Content-Type': 'application/json',
-                    'X-CSRF-TOKEN': document.querySelector('meta[name="csrf-token"]').content
-                },
-                body: JSON.stringify({
-                    old_row: lastAction.newRow,
-                    old_col: lastAction.newCol,
-                    new_row: lastAction.oldRow,
-                    new_col: lastAction.oldCol,
-                    function_id: lastAction.functionId,
-                    force: true
-                })
+                headers: { 'Content-Type': 'application/json', 'X-CSRF-TOKEN': document.querySelector('meta[name="csrf-token"]').content },
+                body: JSON.stringify({ old_row: lastAction.newRow, old_col: lastAction.newCol, new_row: lastAction.oldRow, new_col: lastAction.oldCol, function_id: lastAction.functionId, force: true })
             });
-
-            lastAction         = null;
-            undoBtn.disabled   = true;
-            updateQoL();
-            location.reload();
+            lastAction = null; undoBtn.disabled = true;
+            updateQoL(); location.reload();
         });
     }
 
     // =========================================================
-    // UNDO KNOP (alternatief via /undo endpoint)
+    // UNDO (alternatief)
     // =========================================================
 
     const undoButtonAlternative = document.getElementById('undoButton');
@@ -624,60 +611,28 @@ document.addEventListener("DOMContentLoaded", () => {
         undoButtonAlternative.addEventListener('click', () => {
             fetch('/undo', {
                 method: 'POST',
-                headers: {
-                    'X-CSRF-TOKEN': document.querySelector('meta[name="csrf-token"]').content,
-                    'Content-Type': 'application/json'
-                }
+                headers: { 'X-CSRF-TOKEN': document.querySelector('meta[name="csrf-token"]').content, 'Content-Type': 'application/json' }
             })
-                .then(res => res.json())
-                .then(data => {
-                    if (!data.success) return;
-
-                    const targetCell = document.querySelector(
-                        `[data-row="${data.cell.row}"][data-col="${data.cell.col}"]`
-                    );
-
-                    if (targetCell) {
-                        if (data.cell.function_id) {
-                            targetCell.innerHTML = `
-                                <img src="${data.cell.image}"
-                                     class="grid-function-icon object-contain"
-                                     data-function-id="${data.cell.function_id}">
-                                <button class="delete-btn absolute top-[2px] right-[2px] bg-red-600/80 text-white w-5 h-5 text-[14px] rounded cursor-pointer flex items-center justify-center">✖</button>
-                            `;
-                            targetCell.setAttribute("draggable", "true");
-                        } else {
-                            targetCell.innerHTML = "";
-                            targetCell.removeAttribute("draggable");
-                        }
-                        activateCell(targetCell);
+            .then(res => res.json())
+            .then(data => {
+                if (!data.success) return;
+                const targetCell = document.querySelector(`[data-row="${data.cell.row}"][data-col="${data.cell.col}"]`);
+                if (targetCell) {
+                    if (data.cell.function_id) {
+                        targetCell.innerHTML = `<img src="${data.cell.image}" class="grid-function-icon object-contain" data-function-id="${data.cell.function_id}"><button class="delete-btn absolute top-[2px] right-[2px] bg-red-600/80 text-white w-5 h-5 text-[14px] rounded cursor-pointer flex items-center justify-center">✖</button>`;
+                        targetCell.setAttribute("draggable", "true");
+                    } else {
+                        targetCell.innerHTML = ""; targetCell.removeAttribute("draggable");
                     }
-
-                    if (data.cleared) {
-                        const clearedCell = document.querySelector(
-                            `[data-row="${data.cleared.row}"][data-col="${data.cleared.col}"]`
-                        );
-                        if (clearedCell) {
-                            clearedCell.innerHTML = "";
-                            clearedCell.removeAttribute("draggable");
-                            clearedCell.classList.remove("selected");
-                        }
-                    }
-
-                    document.querySelectorAll('.grid-cell').forEach(c => {
-                        const cRow = Number(c.dataset.row);
-                        const cCol = Number(c.dataset.col);
-
-                        if (cRow === Number(data.cell.row) && cCol === Number(data.cell.col)) return;
-
-                        if (data.cleared && cRow === Number(data.cleared.row) && cCol === Number(data.cleared.col)) {
-                            c.innerHTML = "";
-                            c.removeAttribute("draggable");
-                        }
-                    });
-
-                    setTimeout(() => updateQoL(), 50);
-                });
+                    activateCell(targetCell);
+                }
+                if (data.cleared) {
+                    const clearedCell = document.querySelector(`[data-row="${data.cleared.row}"][data-col="${data.cleared.col}"]`);
+                    if (clearedCell) { clearedCell.innerHTML = ""; clearedCell.removeAttribute("draggable"); clearedCell.classList.remove("selected"); }
+                }
+                updateCellHighlights();
+                setTimeout(() => updateQoL(), 50);
+            });
         });
     }
 
@@ -689,8 +644,6 @@ document.addEventListener("DOMContentLoaded", () => {
     updateQoL();
     requestAnimationFrame(simulationLoop);
 
-    // Ververs de eventlijst elke 30 seconden (niet meer elke 10s,
-    // want de simulatie bepaalt nu zelf wanneer events actief zijn)
     setInterval(() => fetchAllEvents(), 30000);
 
 });

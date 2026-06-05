@@ -45,7 +45,6 @@ Route::middleware('auth')->group(function () {
     });
 
     // === FUNCTIONS / FUNCTIEBEHEER ===
-    // Pagina bekijken (City planner & Administrator)
     Route::middleware('can:CanViewFunctionPage,' . PagePolicy::class)->group(function () {
         Route::get('/functions', [FunctionManagementController::class, 'index'])->name('functions.index');
         Route::get('/library', [FunctionController::class, 'index'])->name('library');
@@ -53,7 +52,6 @@ Route::middleware('auth')->group(function () {
         Route::get('/events', [EventController::class, 'index'])->name('events.index');
     });
 
-    // Functies aanmaken, aanpassen en verwijderen (Alleen City Planner)
     Route::middleware('can:CanPlaceFunctions,' . PagePolicy::class)->group(function () {
         Route::get('/functions/create', [FunctionManagementController::class, 'create'])->name('functions.create');
         Route::post('/functions', [FunctionManagementController::class, 'store'])->name('functions.store');
@@ -65,7 +63,6 @@ Route::middleware('auth')->group(function () {
     // === EFFECTS ===
     Route::middleware('can:CanViewEffectsPage,' . PagePolicy::class)->group(function () {
         Route::get('/effects', [EffectsController::class, 'index'])->name('effects.index');
-        // Updaten van effecten mag alleen de Administrator (CanChangeQOLEffect)
         Route::get('/functions/create', [FunctionManagementController::class, 'create'])->middleware('can:CanChangeQOLEffect,' . PagePolicy::class)->name('functions.create');
         Route::post('/functions', [FunctionManagementController::class, 'store'])->name('functions.store');
         Route::get('/functions/{function}/edit', [FunctionManagementController::class, 'edit'])->name('functions.edit');
@@ -75,13 +72,11 @@ Route::middleware('auth')->group(function () {
         Route::post('/effects/update', [EffectsController::class, 'update'])->middleware('can:CanChangeQOLEffect,' . PagePolicy::class)->name('effects.update');
     });
 
-    // === CONDITIONS (Resource Route) ===
-    // Bekijken mag via CanViewConditionsPage
+    // === CONDITIONS ===
     Route::get('/conditions', [ConditionsController::class, 'index'])
         ->middleware('can:CanViewConditionsPage,' . PagePolicy::class)
         ->name('conditions.index');
 
-    // Aanmaken/wijzigen/verwijderen mag alleen de Administrator
     Route::middleware('can:CanEditConditions,' . PagePolicy::class)->group(function () {
         Route::get('/conditions/create', [ConditionsController::class, 'create'])->name('conditions.create');
         Route::post('/conditions', [ConditionsController::class, 'store'])->name('conditions.store');
@@ -90,8 +85,7 @@ Route::middleware('auth')->group(function () {
         Route::delete('/conditions/{condition}', [ConditionsController::class, 'destroy'])->name('conditions.destroy');
     });
 
-    
-// === SIMULATION EVENTS ===
+    // === SIMULATION EVENTS ===
     // 1. MANAGING: Only accessible by Administrator and Municipal Policy Maker
     Route::middleware('can:CanManageEvents,' . PagePolicy::class)->group(function () {
         Route::get('/events/create', [SimulationEventController::class, 'create'])->name('events.create');
@@ -103,10 +97,12 @@ Route::middleware('auth')->group(function () {
 
     // 2. VIEWING & ACTIVE ENDPOINT: Accessible by anyone who can see the grid
     Route::middleware('can:CanViewGridPage,' . PagePolicy::class)->group(function () {
-        // EERST de specifieke actieve route:
+        // Specifieke routes ALTIJD vóór wildcard {event}
         Route::get('/events/active', [SimulationEventController::class, 'active'])->name('events.active');
-        
-        // DAARNA pas de algemene routes en wildcards:
+
+        // ↓ NIEUW: alle events voor de simulatie (start/end als simulatieminuten)
+        Route::get('/events/simulation', [SimulationEventController::class, 'simulation'])->name('events.simulation');
+
         Route::get('/events', [SimulationEventController::class, 'index'])->name('events.index');
         Route::get('/events/{event}', [SimulationEventController::class, 'show'])->name('events.show');
     });

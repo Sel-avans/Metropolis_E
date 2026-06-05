@@ -5,7 +5,7 @@ import {
     syncTimelineUI,
     initSimulationControls,
     getMaxTime,
-    MINUTES_PER_SECOND, // 30 min/sec → 1440 min / 48 sec
+    MINUTES_PER_SECOND,
 } from './regulation.js';
 
 export const simulationState = {
@@ -14,7 +14,10 @@ export const simulationState = {
 
 export const setSimulationSpeed = async (speed) => {
     simulationState.speed = parseInt(speed);
-    document.getElementById('active-speed-display').innerText = speed + '×';
+
+    // Update active-speed-display
+    const display = document.getElementById('active-speed-display');
+    if (display) display.innerText = speed + '×';
 
     try {
         const response = await fetch('/api/simulation/speed', {
@@ -35,7 +38,7 @@ initSimulationControls();
 
 let lastTimestamp = 0;
 
-// Callback die grid.js kan registreren om events te activeren/deactiveren
+// Callback die grid.js registreert voor tick-updates
 let onTimeUpdateCallback = null;
 export const onSimulationTimeUpdate = (cb) => { onTimeUpdateCallback = cb; };
 
@@ -43,27 +46,24 @@ export function simulationLoop(timestamp) {
     if (getIsPlaying()) {
         if (!lastTimestamp) lastTimestamp = timestamp;
 
-        const deltaTime = (timestamp - lastTimestamp) / 1000; // seconden
-        const maxTime   = getMaxTime(); // 1440 minuten
+        const deltaTime = (timestamp - lastTimestamp) / 1000;
+        const maxTime   = getMaxTime();
         const current   = getCurrentTime();
 
         if (current < maxTime) {
-            // 24 uur = 48 seconden → 30 minuten per seconde (× speed)
             const increment = MINUTES_PER_SECOND * simulationState.speed * deltaTime;
             setCurrentTime(current + increment);
             syncTimelineUI();
 
-            // Laat grid.js weten wat de huidige simulatietijd is
             if (onTimeUpdateCallback) {
                 onTimeUpdateCallback(getCurrentTime());
             }
         } else {
-            // Einde van de dag bereikt: stop simulatie
+            // Dag voorbij: stop
             setCurrentTime(maxTime);
             syncTimelineUI();
-            // isPlaying stoppen via playPauseBtn simuleren
             const playPauseBtn = document.getElementById('playPauseBtn');
-            if (playPauseBtn) playPauseBtn.click();
+            if (playPauseBtn && getIsPlaying()) playPauseBtn.click();
         }
 
         lastTimestamp = timestamp;
