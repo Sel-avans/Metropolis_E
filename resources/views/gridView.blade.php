@@ -54,7 +54,7 @@
             <div class="flex justify-between items-center mb-2">
                 <span id="preview-title" class="font-bold dark:text-white"></span>
                 <button id="preview-close"
-                    class="text-gray-400 hover:text-gray-600 dark:hover:text-white text-xs">✕ sluiten</button>
+                    class="text-gray-400 hover:text-gray-600 dark:hover:text-white text-xs"> </button>
             </div>
             <div id="preview-body" class="dark:text-gray-300">
                 <p class="text-gray-400 text-xs">Laden...</p>
