@@ -1,11 +1,13 @@
 import { getNeighborsWithQoL } from './neighbours.js';
 import { simulationLoop } from './simulation.js';
 import { setMaxTime, syncTimelineUI } from './regulation.js';
-import { initLibraryFilter } from './library-filter.js';
+import { initLibraryFilter } from './library-filter.js';  // Import van de library preview functionaliteit
+import { initLibraryPreview } from './library-preview.js';
 
 
 document.addEventListener("DOMContentLoaded", () => {
     initLibraryFilter();
+    initLibraryPreview();  // Start de preview listeners op library items
 
     // =========================================================
     // VARIABELEN
@@ -132,7 +134,7 @@ document.addEventListener("DOMContentLoaded", () => {
 
             const visibleEvents = data.events.filter((event) => event.is_active || event.start_at);
 
-                        if (visibleEvents.length > 0) {
+            if (visibleEvents.length > 0) {
                 emptyEl.classList.add('hidden');
                 listEl.innerHTML = '';
 
@@ -839,7 +841,6 @@ document.addEventListener("DOMContentLoaded", () => {
                             c.removeAttribute("draggable");
                         }
                     });
-
                     setTimeout(() => updateQoL(), 50);
                 });
         });
@@ -848,7 +849,6 @@ document.addEventListener("DOMContentLoaded", () => {
     // =========================================================
     // INITIËLE CALLS
     // =========================================================
-
     updateActiveEvents();
     updateQoL();
     requestAnimationFrame(simulationLoop);
@@ -856,5 +856,4 @@ document.addEventListener("DOMContentLoaded", () => {
     setInterval(() => {
         updateActiveEvents({ forceQolRefresh: false });
     }, 10000);
-
-}); 
+});
