@@ -136,17 +136,23 @@ class EventModifierService
 
     /**
      * @return array{0: int, 1: int, 2: int} [startMinutes, endMinutes, windowMinutes]
+     *
+     * Tijden worden geconverteerd naar de display-timezone (Europe/Amsterdam) vóór
+     * de uurberekening, zodat een gebruiker die 23:59 invoert ook 23:59 krijgt —
+     * ongeacht de UTC-offset op dat moment.
      */
     public static function resolveSimulationWindow(SimulationEvent $event): array
     {
         $startOffset = 360; // 06:00 = start of simulation day
 
         if ($event->type === 'one-off' && $event->start_moment && $event->end_moment) {
-            $start = self::parseMoment($event->start_moment);
-            $end = self::parseMoment($event->end_moment);
+            // Converteer naar Amsterdam-tijd zodat de uurwaarden overeenkomen met
+            // wat de gebruiker heeft ingevoerd (bijv. 23:59 blijft 23:59).
+            $start = self::parseMoment($event->start_moment)->timezone(self::DISPLAY_TIMEZONE);
+            $end   = self::parseMoment($event->end_moment)->timezone(self::DISPLAY_TIMEZONE);
 
             $startMins = (($start->hour * 60 + $start->minute) - $startOffset + self::SIMULATION_CYCLE_MINUTES) % self::SIMULATION_CYCLE_MINUTES;
-            $endMins = (($end->hour * 60 + $end->minute) - $startOffset + self::SIMULATION_CYCLE_MINUTES) % self::SIMULATION_CYCLE_MINUTES;
+            $endMins   = (($end->hour * 60 + $end->minute) - $startOffset + self::SIMULATION_CYCLE_MINUTES) % self::SIMULATION_CYCLE_MINUTES;
 
             if ($end->format('H:i') === $start->format('H:i') && $end->gt($start)) {
                 $endMins = $startMins + self::SIMULATION_CYCLE_MINUTES;
@@ -158,11 +164,13 @@ class EventModifierService
         }
 
         if ($event->type === 'recurring' && $event->recurring_start_time && $event->recurring_end_time) {
+            // recurring_start_time / recurring_end_time worden opgeslagen als pure tijdstrings
+            // (bijv. "19:00:00") zonder timezone — geen conversie nodig.
             [$sh, $sm] = array_map('intval', explode(':', substr((string) $event->recurring_start_time, 0, 5)));
             [$eh, $em] = array_map('intval', explode(':', substr((string) $event->recurring_end_time, 0, 5)));
 
             $startMins = (($sh * 60 + $sm) - $startOffset + self::SIMULATION_CYCLE_MINUTES) % self::SIMULATION_CYCLE_MINUTES;
-            $endMins = (($eh * 60 + $em) - $startOffset + self::SIMULATION_CYCLE_MINUTES) % self::SIMULATION_CYCLE_MINUTES;
+            $endMins   = (($eh * 60 + $em) - $startOffset + self::SIMULATION_CYCLE_MINUTES) % self::SIMULATION_CYCLE_MINUTES;
 
             if ($endMins <= $startMins) {
                 $endMins += self::SIMULATION_CYCLE_MINUTES;
@@ -341,5 +349,4 @@ class EventModifierService
             $totals[$catKey] += $value;
         }
     }
-
 }

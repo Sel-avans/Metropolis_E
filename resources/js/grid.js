@@ -1,18 +1,14 @@
-import { getNeighborsWithQoL } from './neighbours.js';
+import { registerActiveEventIdsProvider, getNeighborsWithQoL } from './neighbours.js';
 import { simulationLoop, onSimulationTimeUpdate } from './simulation.js';
 import { setMaxTime, syncTimelineUI, syncPlayPauseUI, minutesToHHMM, datetimeToSimMinutes, getCurrentTime, getMaxTime, getIsPlaying, setCurrentTime, setIsPlaying } from './regulation.js';
 
 const SIM_STATE_KEY = 'metropolis_simulation_state';
 
 function initGridPage() {
-    if (!document.querySelector('.city-grid')) {
-        return;
-    }
+    if (!document.querySelector('.city-grid')) return;
 
     const gridRoot = document.querySelector('.city-grid');
-    if (gridRoot.dataset.gridInitialized === 'true') {
-        return;
-    }
+    if (gridRoot.dataset.gridInitialized === 'true') return;
     gridRoot.dataset.gridInitialized = 'true';
 
     // =========================================================
@@ -26,8 +22,6 @@ function initGridPage() {
     let old_score;
     let lastAction = null;
 
-    // activatedEarly = cycle-event vroegtijdig geactiveerd
-    // activatedForCycle = lang event handmatig actief voor rest van simulatiedag
     let allEvents = [];
     let simulationReferenceDate = null;
 
@@ -41,20 +35,19 @@ function initGridPage() {
     let saveStateTimer = null;
     let lastActiveEventSignature = '';
 
+    // =========================================================
+    // SESSION STATE
+    // =========================================================
+
     function loadSimulationState() {
         try {
             const raw = sessionStorage.getItem(SIM_STATE_KEY);
             return raw ? JSON.parse(raw) : null;
-        } catch {
-            return null;
-        }
+        } catch { return null; }
     }
 
     function saveSimulationState() {
-        if (!allEvents.length) {
-            return;
-        }
-
+        if (!allEvents.length) return;
         sessionStorage.setItem(SIM_STATE_KEY, JSON.stringify({
             currentTime: getCurrentTime(),
             isPlaying: getIsPlaying(),
@@ -68,9 +61,7 @@ function initGridPage() {
     }
 
     function scheduleSaveSimulationState() {
-        if (saveStateTimer) {
-            clearTimeout(saveStateTimer);
-        }
+        if (saveStateTimer) clearTimeout(saveStateTimer);
         saveStateTimer = setTimeout(saveSimulationState, 300);
     }
 
@@ -130,50 +121,28 @@ function initGridPage() {
     }
 
     function matchesRecurringSchedule(event, referenceDate) {
-        if (event.type !== 'recurring') {
-            return true;
-        }
-
-        // Simulation runs one 24h cycle — match recurring events by time window only.
-        if (event.recurringStartDate && referenceDate && referenceDate < event.recurringStartDate) {
-            return false;
-        }
-        if (event.recurringEndDate && referenceDate && referenceDate > event.recurringEndDate) {
-            return false;
-        }
-
+        if (event.type !== 'recurring') return true;
+        if (event.recurringStartDate && referenceDate && referenceDate < event.recurringStartDate) return false;
+        if (event.recurringEndDate && referenceDate && referenceDate > event.recurringEndDate) return false;
         return true;
     }
 
     function isScheduledEventActive(event, simTime) {
-        if (event.type === 'recurring' && !matchesRecurringSchedule(event, simulationReferenceDate)) {
-            return false;
-        }
-
+        if (event.type === 'recurring' && !matchesRecurringSchedule(event, simulationReferenceDate)) return false;
         return isEventActiveAtSimTime(event, simTime);
     }
 
     function isEventContributingToQoL(event, simTime) {
-        if (isSimulationAtDayStart(simTime)) {
-            return false;
-        }
+        if (isSimulationAtDayStart(simTime)) return false;
 
         if (!event.fitsInCycle) {
-            if (!event.activatedForCycle) {
-                return false;
-            }
-
+            if (!event.activatedForCycle) return false;
             const activationStart = Number(event.cycleActivationStart);
-            if (Number.isNaN(activationStart) || simTime < activationStart || simTime >= getMaxTime()) {
-                return false;
-            }
-
+            if (Number.isNaN(activationStart) || simTime < activationStart || simTime >= getMaxTime()) return false;
             return true;
         }
 
-        if (hasEventEnded(event, simTime)) {
-            return false;
-        }
+        if (hasEventEnded(event, simTime)) return false;
 
         const scheduledActive = isScheduledEventActive(event, simTime);
         const earlyActive = event.activatedEarly && isBeforeEventStart(event, simTime);
@@ -189,24 +158,11 @@ function initGridPage() {
         return getActiveEventIdsForQoL(simTime).slice().sort((a, b) => a - b).join(',');
     }
 
-    function buildQoLQueryString() {
-        return `?active_event_ids=${getActiveEventIdsForQoL().join(',')}`;
-    }
-
     function isEventActiveAtSimTime(event, simTime) {
         const start = Number(event.start_minutes);
-        const end = Number(event.end_minutes);
-
-        if (Number.isNaN(start) || Number.isNaN(end)) {
-            return false;
-        }
-
-        // Simulation timeline runs 06:00 → 06:00 (0–1440). Events that cross midnight
-        // only run from their start time until the end of this cycle.
-        if (end > 1440) {
-            return simTime >= start;
-        }
-
+        const end   = Number(event.end_minutes);
+        if (Number.isNaN(start) || Number.isNaN(end)) return false;
+        if (end > 1440) return simTime >= start;
         return simTime >= start && simTime <= end;
     }
 
@@ -216,62 +172,36 @@ function initGridPage() {
 
     function hasEventEnded(event, simTime) {
         const end = Number(event.end_minutes);
-        if (Number.isNaN(end)) {
-            return false;
-        }
-        if (end > 1440) {
-            return false;
-        }
+        if (Number.isNaN(end)) return false;
+        if (end > 1440) return false;
         return simTime > end;
     }
 
     function syncEventActiveStates(simTime) {
         if (!allEvents.length) return false;
-
         let changed = false;
 
         allEvents.forEach(event => {
             if (!event.fitsInCycle) {
                 if (!event.activatedForCycle) {
-                    if (event.isActive) {
-                        event.isActive = false;
-                        changed = true;
-                    }
+                    if (event.isActive) { event.isActive = false; changed = true; }
                     return;
                 }
-
                 const activationStart = Number(event.cycleActivationStart);
                 const cycleEnd = getMaxTime();
                 if (simTime >= cycleEnd || Number.isNaN(activationStart)) {
-                    if (simTime >= cycleEnd) {
-                        resetLongEventCycleActivation(event);
-                        changed = true;
-                    } else if (event.isActive) {
-                        event.isActive = false;
-                        changed = true;
-                    }
+                    if (simTime >= cycleEnd) { resetLongEventCycleActivation(event); changed = true; }
+                    else if (event.isActive) { event.isActive = false; changed = true; }
                     return;
                 }
-
-                const shouldBeActive = isSimulationAtDayStart(simTime)
-                    ? false
-                    : simTime >= activationStart;
-                if (event.isActive !== shouldBeActive) {
-                    event.isActive = shouldBeActive;
-                    changed = true;
-                }
+                const shouldBeActive = isSimulationAtDayStart(simTime) ? false : simTime >= activationStart;
+                if (event.isActive !== shouldBeActive) { event.isActive = shouldBeActive; changed = true; }
                 return;
             }
 
             if (hasEventEnded(event, simTime)) {
-                if (event.activatedEarly) {
-                    event.activatedEarly = false;
-                    changed = true;
-                }
-                if (event.isActive) {
-                    event.isActive = false;
-                    changed = true;
-                }
+                if (event.activatedEarly) { event.activatedEarly = false; changed = true; }
+                if (event.isActive) { event.isActive = false; changed = true; }
                 return;
             }
 
@@ -279,39 +209,25 @@ function initGridPage() {
             const earlyActive = event.activatedEarly && isBeforeEventStart(event, simTime);
             const shouldBeActive = !isSimulationAtDayStart(simTime) && (scheduledActive || earlyActive);
 
-            if (event.isActive !== shouldBeActive) {
-                event.isActive = shouldBeActive;
-                changed = true;
-            }
+            if (event.isActive !== shouldBeActive) { event.isActive = shouldBeActive; changed = true; }
         });
 
         return changed;
     }
 
     function toggleEventEarlyActivation(event, simTime) {
-        if (hasEventEnded(event, simTime) || !isBeforeEventStart(event, simTime)) {
-            return;
-        }
-
+        if (hasEventEnded(event, simTime) || !isBeforeEventStart(event, simTime)) return;
         if (event.activatedEarly) {
             event.activatedEarly = false;
             event.isActive = false;
             return;
         }
-
         event.activatedEarly = true;
     }
 
     function toggleLongEventCycleActivation(event, simTime) {
-        if (event.fitsInCycle || simTime >= getMaxTime()) {
-            return;
-        }
-
-        if (event.activatedForCycle) {
-            resetLongEventCycleActivation(event);
-            return;
-        }
-
+        if (event.fitsInCycle || simTime >= getMaxTime()) return;
+        if (event.activatedForCycle) { resetLongEventCycleActivation(event); return; }
         event.activatedForCycle = true;
         event.cycleActivationStart = simTime;
     }
@@ -319,12 +235,16 @@ function initGridPage() {
     function refreshEventPanelsAndGrid() {
         const simTime = getCurrentTime();
         syncEventActiveStates(simTime);
+
         lastActiveEventSignature = buildEventSignature(allEvents, simTime);
-        lastQoLEventIdsKey = null;
+        lastQoLEventIdsKey = null; // forceer QoL refresh
+
         renderActiveEventsPanel();
         renderAllEventsPanel();
         updateCellHighlights();
-        updateQoL({ immediate: true });
+        updateQoL({ immediate: true }).then(() => {
+            lastQoLEventIdsKey = buildQoLActiveIdsKey(getCurrentTime());
+        });
         scheduleSaveSimulationState();
     }
 
@@ -334,13 +254,11 @@ function initGridPage() {
         syncEventActiveStates(simTime);
 
         const signature = buildEventSignature(allEvents, simTime);
-        const idsKey = buildQoLActiveIdsKey(simTime);
-        const uiChanged = signature !== lastActiveEventSignature;
+        const idsKey    = buildQoLActiveIdsKey(simTime);
+        const uiChanged  = signature !== lastActiveEventSignature;
         const qolChanged = lastQoLEventIdsKey === null || idsKey !== lastQoLEventIdsKey;
 
-        if (!uiChanged && !qolChanged) {
-            return;
-        }
+        if (!uiChanged && !qolChanged) return;
 
         if (uiChanged) {
             lastActiveEventSignature = signature;
@@ -396,15 +314,14 @@ function initGridPage() {
     function renderNeighborsList(data) {
         const listEl = document.getElementById('popup-neighbors-list');
         if (!listEl) return;
-
         listEl.innerHTML = '';
 
-        const categories = data?.categories ?? {};
+        const categories   = data?.categories ?? {};
+        const eventModifiers = data?.event_modifiers ?? {};
         const categoryKeys = {
             Safety: 'safety', Recreation: 'recreation', Environment: 'environment',
             Amenities: 'amenities', Mobility: 'mobility',
         };
-        const eventModifiers = data?.event_modifiers ?? {};
         const entries = Object.entries(categories);
 
         if (!entries.length) {
@@ -416,15 +333,13 @@ function initGridPage() {
         let hasInfluence = false;
 
         for (const [categoryName, info] of entries) {
-            const cellScore  = Number(info?.total ?? 0);
-            const eventScore = Number(eventModifiers[categoryKeys[categoryName]] ?? 0);
+            const cellScore    = Number(info?.total ?? 0);
+            const eventScore   = Number(eventModifiers[categoryKeys[categoryName]] ?? 0);
             const displayScore = cellScore + eventScore;
 
-            if (displayScore === 0 && eventScore === 0 && cellScore === 0) {
-                continue;
-            }
-
+            if (displayScore === 0 && eventScore === 0 && cellScore === 0) continue;
             hasInfluence = true;
+
             const cls  = displayScore > 0 ? 'text-green-600' : displayScore < 0 ? 'text-red-600' : 'text-slate-400';
             const sign = displayScore > 0 ? '+' : '';
 
@@ -435,17 +350,15 @@ function initGridPage() {
                 </div>`;
 
             if (cellScore !== 0) {
-                const cellCls = cellScore > 0 ? 'text-green-500' : 'text-red-500';
+                const cellCls  = cellScore > 0 ? 'text-green-500' : 'text-red-500';
                 const cellSign = cellScore > 0 ? '+' : '';
                 html += `<div class="text-[10px] text-slate-400 mt-0.5">Base: <span class="${cellCls}">${cellSign}${cellScore}</span></div>`;
             }
-
             if (eventScore !== 0) {
-                const eventCls = eventScore > 0 ? 'text-amber-400' : 'text-red-400';
+                const eventCls  = eventScore > 0 ? 'text-amber-400' : 'text-red-400';
                 const eventSign = eventScore > 0 ? '+' : '';
                 html += `<div class="text-[10px] text-slate-400 mt-0.5">Event: <span class="${eventCls}">${eventSign}${eventScore}</span></div>`;
             }
-
             html += '</div>';
         }
 
@@ -483,7 +396,7 @@ function initGridPage() {
 
     async function handleTileHover(row, col, event) {
         positionPopup(event.pageX, event.pageY);
-        const data = await getNeighborsWithQoL(row, col, getActiveEventIdsForQoL());
+        const data = await getNeighborsWithQoL(row, col);
         renderNeighborsList(data);
         showPopup();
     }
@@ -493,14 +406,11 @@ function initGridPage() {
     // =========================================================
 
     async function updateQoL({ immediate = false } = {}) {
-        if (qolUpdateTimer) {
-            clearTimeout(qolUpdateTimer);
-            qolUpdateTimer = null;
-        }
+        if (qolUpdateTimer) { clearTimeout(qolUpdateTimer); qolUpdateTimer = null; }
 
         const executeFetch = async () => {
             qolFetchGeneration += 1;
-            const generation = qolFetchGeneration;
+            const generation  = qolFetchGeneration;
             const queryString = `?active_event_ids=${getActiveEventIdsForQoL().join(',')}`;
 
             qolFetchInFlight = true;
@@ -512,93 +422,73 @@ function initGridPage() {
                     credentials: 'same-origin',
                     headers: { 'Accept': 'application/json' },
                 });
-                if (!response.ok || generation !== qolFetchGeneration) {
-                    return;
-                }
-
+                if (!response.ok || generation !== qolFetchGeneration) return;
                 const data = await response.json();
-                if (generation !== qolFetchGeneration) {
-                    return;
-                }
-
-                if (scoreEl) scoreEl.textContent = data.total_score;
-                if (oldScoreEl) oldScoreEl.innerHTML = compareScores(data);
+                if (generation !== qolFetchGeneration) return;
+                if (scoreEl)     scoreEl.textContent  = data.total_score;
+                if (oldScoreEl)  oldScoreEl.innerHTML = compareScores(data);
                 if (breakdownEl) breakdownEl.innerHTML = renderQoLBreakdown(data);
             } catch (err) {
                 console.error("Fout bij ophalen QoL:", err);
             } finally {
                 qolFetchInFlight = false;
-                if (qolFetchPending) {
-                    qolFetchPending = false;
-                    executeFetch();
-                }
+                if (qolFetchPending) { qolFetchPending = false; executeFetch(); }
             }
         };
 
         const scheduleFetch = () => {
-            if (qolFetchInFlight) {
-                qolFetchPending = true;
-                return;
-            }
+            if (qolFetchInFlight) { qolFetchPending = true; return Promise.resolve(); }
             return executeFetch();
         };
 
-        if (immediate) {
-            await scheduleFetch();
-            return;
-        }
-
-        qolUpdateTimer = setTimeout(() => { scheduleFetch(); }, 250);
+        if (immediate) return scheduleFetch();
+        qolUpdateTimer = setTimeout(() => scheduleFetch(), 250);
     }
 
     // =========================================================
     // HIGHLIGHT LOGICA
-    // Cellen die beïnvloed worden door een actief event krijgen een gele rand.
-    // Events met specifieke city_functions → alleen die functies highlighten.
-    // Events zonder functie-target → fallback op categorie-match.
+    // Per cel wordt per event gecheckt of het (1) actief is op dit tijdstip
+    // EN (2) deze specifieke cel/functie beïnvloedt.
+    // Zo worden nooit functies van event B gehighlight als alleen event A actief is.
     // =========================================================
 
     function updateCellHighlights() {
-        const activeEvents = allEvents.filter(e => e.isActive);
-
-        const activeCategories = new Set();
-        const activeFunctionIds = new Set();
-
-        activeEvents.forEach(event => {
-            const functionIds = (event.affectedFunctionIds || [])
-                .map(id => Number(id))
-                .filter(id => !Number.isNaN(id) && id > 0);
-
-            if (functionIds.length > 0) {
-                functionIds.forEach(id => activeFunctionIds.add(id));
-                return;
-            }
-
-            if (Array.isArray(event.affected_categories) && event.affected_categories.length) {
-                event.affected_categories.forEach(cat => activeCategories.add(cat.toLowerCase()));
-            } else if (event.modifiers && typeof event.modifiers === 'object') {
-                Object.keys(event.modifiers).forEach(cat => activeCategories.add(cat.toLowerCase()));
-            }
-        });
-
         document.querySelectorAll('.grid-cell').forEach(cell => {
             const functionImg = cell.querySelector('.grid-function-icon');
-            if (!functionImg) {
-                cell.classList.remove('event-highlight');
-                return;
-            }
+            if (!functionImg) { cell.classList.remove('event-highlight'); return; }
 
             const functionId = Number(functionImg.dataset.functionId);
-            const cellCategories = (functionImg.dataset.categories || '').toLowerCase().split(',').filter(Boolean);
-            const isAffected = activeFunctionIds.has(functionId)
-                || cellCategories.some(cat => activeCategories.has(cat));
+            const cellCategories = (functionImg.dataset.categories || '')
+                .toLowerCase()
+                .split(',')
+                .map(s => s.trim())
+                .filter(Boolean);
 
-            cell.classList.toggle('event-highlight', isAffected);
+            // Per event checken: actief ÉN raakt deze cel
+            const isHighlighted = allEvents.some(event => {
+                if (!event.isActive) return false;
+
+                const functionIds = (event.affectedFunctionIds || [])
+                    .map(Number)
+                    .filter(id => !Number.isNaN(id) && id > 0);
+
+                if (functionIds.length > 0) {
+                    // Event heeft specifieke functies → alleen die cellen highlighten,
+                    // NIET alle cellen in dezelfde categorie
+                    return functionIds.includes(functionId);
+                }
+
+                // Event heeft geen specifieke functies → match op categorie
+                const eventCats = (event.affected_categories || []).map(c => c.toLowerCase());
+                return cellCategories.some(cat => eventCats.includes(cat));
+            });
+
+            cell.classList.toggle('event-highlight', isHighlighted);
         });
     }
 
     // =========================================================
-    // SIMULATIE TICK — events aan/uit op basis van simulatietijd
+    // SIMULATIE TICK
     // =========================================================
 
     function onSimulationTick(simTime) {
@@ -608,22 +498,19 @@ function initGridPage() {
     onSimulationTimeUpdate(onSimulationTick);
 
     // =========================================================
-    // EVENTS PANEL
-    // Cycle-events: auto op starttijd; Activate = vroegtijdig.
-    // Lang events (>24u): alleen handmatig via Activate in All Events.
+    // EVENTS PANEL RENDERING
     // =========================================================
 
-    function renderToggleButton(event, { panel, simTime, showDeactivate }) {
-        return `
-                <button
-                    type="button"
-                    class="event-toggle-btn flex-shrink-0 px-2 py-1 text-xs font-semibold rounded transition
-                        ${showDeactivate
-                            ? 'bg-amber-500 hover:bg-amber-600 text-white'
-                            : 'bg-slate-600 hover:bg-teal-600 hover:text-white text-slate-200'}"
-                    data-event-id="${event.id}">
-                    ${showDeactivate ? 'Deactivate' : 'Activate'}
-                </button>`;
+    function renderToggleButton(event, { showDeactivate }) {
+        return `<button
+            type="button"
+            class="event-toggle-btn flex-shrink-0 px-2 py-1 text-xs font-semibold rounded transition
+                ${showDeactivate
+                    ? 'bg-amber-500 hover:bg-amber-600 text-white'
+                    : 'bg-slate-600 hover:bg-teal-600 hover:text-white text-slate-200'}"
+            data-event-id="${event.id}">
+            ${showDeactivate ? 'Deactivate' : 'Activate'}
+        </button>`;
     }
 
     function renderEventListItem(event, { panel }) {
@@ -632,23 +519,23 @@ function initGridPage() {
         li.dataset.eventId = event.id;
 
         const modifiersHtml = formatModifiers(event.modifiers);
-        const simTime = getCurrentTime();
-        const isActive = event.isActive;
-        const isWaiting = event.activatedEarly && isBeforeEventStart(event, simTime);
+        const simTime    = getCurrentTime();
+        const isActive   = event.isActive;
+        const isWaiting  = event.activatedEarly && isBeforeEventStart(event, simTime);
         const isLongEvent = !event.fitsInCycle;
         const startLabel = minutesToHHMM(event.start_minutes);
-        const endLabel = minutesToHHMM(event.end_minutes);
+        const endLabel   = minutesToHHMM(event.end_minutes);
 
         let toggleButton = '';
         if (isLongEvent && panel === 'active' && event.activatedForCycle) {
-            toggleButton = renderToggleButton(event, { panel, simTime, showDeactivate: true });
+            toggleButton = renderToggleButton(event, { showDeactivate: true });
         } else if (isLongEvent && panel === 'all') {
-            toggleButton = renderToggleButton(event, { panel, simTime, showDeactivate: false });
+            toggleButton = renderToggleButton(event, { showDeactivate: false });
         } else if (!isLongEvent) {
             const canToggleEarly = isBeforeEventStart(event, simTime) && !hasEventEnded(event, simTime);
             const showDeactivate = event.activatedEarly && isBeforeEventStart(event, simTime);
             if (canToggleEarly) {
-                toggleButton = renderToggleButton(event, { panel, simTime, showDeactivate });
+                toggleButton = renderToggleButton(event, { showDeactivate });
             }
         }
 
@@ -668,8 +555,7 @@ function initGridPage() {
                     <div class="font-semibold text-slate-200 truncate">${event.name || 'Nameless Event'}</div>
                     <div class="text-[11px] text-gray-400 mt-0.5">${durationLabel}</div>
                     ${isActive && !isWaiting ? '<div class="text-[10px] text-amber-400 mt-1 font-semibold uppercase tracking-wide">Active now</div>' : ''}
-                    ${isWaiting && isActive ? '<div class="text-[10px] text-sky-400 mt-1 font-semibold uppercase tracking-wide">Started by triggering activation</div>' : ''}
-                    ${isWaiting && !isActive ? '<div class="text-[10px] text-sky-400 mt-1 font-semibold uppercase tracking-wide">Starts at ' + startLabel + '</div>' : ''}
+                    ${isWaiting ? '<div class="text-[10px] text-sky-400 mt-1 font-semibold uppercase tracking-wide">Manually activated · starts at ' + startLabel + '</div>' : ''}
                     ${isLongEvent && event.activatedForCycle && !isActive && isSimulationAtDayStart(simTime) ? '<div class="text-[10px] text-sky-400 mt-1 font-semibold uppercase tracking-wide">Starts on play</div>' : ''}
                     ${isLongEvent && event.activatedForCycle && isActive ? '<div class="text-[10px] text-sky-400 mt-1 font-semibold uppercase tracking-wide">Active until end of cycle</div>' : ''}
                     ${modifiersHtml}
@@ -683,42 +569,31 @@ function initGridPage() {
     function renderAllEventsPanel() {
         const listEl = document.getElementById('all-events-detail-list');
         if (!listEl) return;
-
         listEl.innerHTML = '';
         const events = longEvents();
-
         if (!events.length) {
             listEl.innerHTML = '<li class="text-sm text-gray-500">No events longer than 24 hours.</li>';
             return;
         }
-
-        events.forEach(event => {
-            listEl.appendChild(renderEventListItem(event, { panel: 'all' }));
-        });
+        events.forEach(event => listEl.appendChild(renderEventListItem(event, { panel: 'all' })));
     }
 
     function renderActiveEventsPanel() {
         const listEl = document.getElementById('active-events-list');
         if (!listEl) return;
-
         listEl.innerHTML = '';
         const events = cycleEvents();
-
         if (!events.length) {
             listEl.innerHTML = '<li class="text-sm text-gray-500">No events within the 24-hour cycle.</li>';
             return;
         }
-
-        events.forEach(event => {
-            listEl.appendChild(renderEventListItem(event, { panel: 'active' }));
-        });
+        events.forEach(event => listEl.appendChild(renderEventListItem(event, { panel: 'active' })));
     }
 
-    // Toggle handler via event delegation (werkt voor beide panels)
+    // Toggle handler
     document.addEventListener('click', (e) => {
         const btn = e.target.closest('.event-toggle-btn');
         if (!btn) return;
-
         e.preventDefault();
         e.stopPropagation();
 
@@ -735,7 +610,7 @@ function initGridPage() {
         refreshEventPanelsAndGrid();
     });
 
-    // Timeline scrub / skip: update highlights even when not playing
+    // Timeline scrub
     const simulationTimeline = document.getElementById('simulation-timeline');
     if (simulationTimeline) {
         simulationTimeline.addEventListener('input', (e) => {
@@ -759,9 +634,7 @@ function initGridPage() {
     document.getElementById('replayBtn')?.addEventListener('click', () => {
         allEvents.forEach(event => {
             event.activatedEarly = false;
-            if (event.activatedForCycle) {
-                resetLongEventCycleActivation(event);
-            }
+            if (event.activatedForCycle) resetLongEventCycleActivation(event);
         });
         clearSimulationState();
         lastQoLEventIdsKey = null;
@@ -770,9 +643,7 @@ function initGridPage() {
     });
 
     // =========================================================
-    // FETCH EVENTS VAN SERVER
-    // Verwacht van de server per event:
-    //   id, name, modifiers (object), start_at (datetime), end_at (datetime)
+    // FETCH EVENTS
     // =========================================================
 
     async function fetchAllEvents() {
@@ -787,13 +658,10 @@ function initGridPage() {
             if (!data || !data.events) return;
 
             simulationReferenceDate = data.simulation_reference_date ?? null;
-            const persisted = loadSimulationState();
+            const persisted  = loadSimulationState();
             const storedById = {};
-            (persisted?.events ?? []).forEach(e => {
-                storedById[e.id] = e;
-            });
+            (persisted?.events ?? []).forEach(e => { storedById[e.id] = e; });
 
-            // Bewaar toggle-state per event (in-memory + sessionStorage)
             const prevState = {};
             allEvents.forEach(e => {
                 prevState[e.id] = {
@@ -806,50 +674,44 @@ function initGridPage() {
             allEvents = data.events.map(e => {
                 const stored = storedById[e.id];
                 const memory = prevState[e.id];
-
                 return {
-                id:              e.id,
-                name:            e.name,
-                type:            e.type ?? 'one-off',
-                recurringSchedule: e.recurring_schedule ?? null,
-                recurringStartDate: e.recurring_start_date ?? null,
-                recurringEndDate: e.recurring_end_date ?? null,
-                modifiers:       e.modifiers ?? {},
-                affected_categories: e.affected_categories ?? [],
-                affectedFunctionIds: e.affected_function_ids ?? [],
-                start_minutes:   e.start_minutes ?? datetimeToSimMinutes(e.start_at),
-                end_minutes:     e.end_minutes   ?? datetimeToSimMinutes(e.end_at),
-                durationMinutes: e.duration_minutes ?? Math.max(0, (e.end_minutes ?? 0) - (e.start_minutes ?? 0)),
-                calendarDurationMinutes: e.calendar_duration_minutes ?? e.duration_minutes ?? 0,
-                fitsInCycle:     e.fits_in_cycle ?? ((e.calendar_duration_minutes ?? e.duration_minutes ?? 1440) <= 1440),
-                activatedEarly:  stored?.activatedEarly ?? memory?.activatedEarly ?? false,
-                activatedForCycle: stored?.activatedForCycle ?? memory?.activatedForCycle ?? false,
-                cycleActivationStart: stored?.cycleActivationStart ?? memory?.cycleActivationStart ?? null,
-                isActive:        false,
-            };
+                    id:                    e.id,
+                    name:                  e.name,
+                    type:                  e.type ?? 'one-off',
+                    recurringSchedule:     e.recurring_schedule ?? null,
+                    recurringStartDate:    e.recurring_start_date ?? null,
+                    recurringEndDate:      e.recurring_end_date ?? null,
+                    modifiers:             e.modifiers ?? {},
+                    affected_categories:   e.affected_categories ?? [],
+                    affectedFunctionIds:   e.affected_function_ids ?? [],
+                    start_minutes:         e.start_minutes ?? datetimeToSimMinutes(e.start_at),
+                    end_minutes:           e.end_minutes   ?? datetimeToSimMinutes(e.end_at),
+                    durationMinutes:       e.duration_minutes ?? 0,
+                    calendarDurationMinutes: e.calendar_duration_minutes ?? e.duration_minutes ?? 0,
+                    fitsInCycle:           e.fits_in_cycle ?? true,
+                    activatedEarly:        stored?.activatedEarly        ?? memory?.activatedEarly        ?? false,
+                    activatedForCycle:     stored?.activatedForCycle     ?? memory?.activatedForCycle     ?? false,
+                    cycleActivationStart:  stored?.cycleActivationStart  ?? memory?.cycleActivationStart  ?? null,
+                    isActive:              false,
+                };
             });
 
-            if (persisted?.currentTime != null) {
-                setCurrentTime(Number(persisted.currentTime));
-            }
+            if (persisted?.currentTime != null) setCurrentTime(Number(persisted.currentTime));
 
             const simTime = getCurrentTime();
             allEvents.forEach(event => {
                 if (hasEventEnded(event, simTime)) {
                     event.activatedEarly = false;
-                    if (event.activatedForCycle) {
-                        resetLongEventCycleActivation(event);
-                    }
+                    if (event.activatedForCycle) resetLongEventCycleActivation(event);
                 }
             });
 
             setMaxTime();
             syncTimelineUI();
 
-            if (persisted?.isPlaying) {
-                setIsPlaying(true);
-                syncPlayPauseUI();
-            }
+            if (persisted?.isPlaying) { setIsPlaying(true); syncPlayPauseUI(); }
+
+            registerActiveEventIdsProvider(getActiveEventIdsForQoL);
 
             applySimulationTime(getCurrentTime());
             updateQoL({ immediate: true });
@@ -875,57 +737,40 @@ function initGridPage() {
                 body: JSON.stringify({
                     old_row: oldRow, old_col: oldCol,
                     new_row: newRow, new_col: newCol,
-                    function_id: draggedItem.id,
-                    force: force
+                    function_id: draggedItem.id, force
                 })
             });
             return res;
-        } catch (err) {
-            console.error("Fout bij opslaan gridcel:", err);
-            return null;
-        }
+        } catch (err) { console.error("Fout bij opslaan gridcel:", err); return null; }
     }
 
     // =========================================================
-    // EVENT LISTENERS — LIBRARY ITEMS
+    // DRAG & DROP
     // =========================================================
 
     document.querySelectorAll(".library-item").forEach(item => {
         item.addEventListener("dragstart", e => {
-            isDragging   = true;
-            dropOccurred = false;
-            draggedItem  = {
-                id:    Number(item.dataset.functionId),
-                name:  item.dataset.functionName,
-                image: item.dataset.image
-            };
+            isDragging = true; dropOccurred = false;
+            draggedItem = { id: Number(item.dataset.functionId), name: item.dataset.functionName, image: item.dataset.image };
             e.dataTransfer.setDragImage(item.querySelector("img"), 16, 16);
         });
     });
-
-    // =========================================================
-    // EVENT LISTENERS — GRID CELLS
-    // =========================================================
 
     document.querySelectorAll(".grid-cell").forEach(cell => {
         cell.addEventListener("dragstart", e => {
             const img = cell.querySelector(".grid-function-icon");
             if (!img) return;
-            isDragging   = true;
-            dropOccurred = false;
-            draggedItem  = { id: Number(img.dataset.functionId), name: img.alt, image: img.src };
+            isDragging = true; dropOccurred = false;
+            draggedItem = { id: Number(img.dataset.functionId), name: img.alt, image: img.src };
             e.dataTransfer.setDragImage(img, 16, 16);
-            sourceCell = cell;
-            cell.classList.add("drag-source");
+            sourceCell = cell; cell.classList.add("drag-source");
         });
 
         cell.addEventListener("dragover",  e => { e.preventDefault(); cell.classList.add("drag-over"); });
         cell.addEventListener("dragleave", () => cell.classList.remove("drag-over"));
 
         cell.addEventListener("drop", async e => {
-            e.preventDefault();
-            isDragging   = false;
-            dropOccurred = true;
+            e.preventDefault(); isDragging = false; dropOccurred = true;
             cell.classList.remove("drag-over");
 
             if (cell.querySelector("img") && !window.confirm("Are you sure you want to replace this feature?")) {
@@ -933,22 +778,17 @@ function initGridPage() {
                 return;
             }
 
-            const newRow = cell.dataset.row;
-            const newCol = cell.dataset.col;
+            const newRow = cell.dataset.row, newCol = cell.dataset.col;
             let oldRow = null, oldCol = null;
             const originalSourceCell = sourceCell;
 
             if (sourceCell) {
-                oldRow = sourceCell.dataset.row;
-                oldCol = sourceCell.dataset.col;
-                sourceCell.innerHTML = "";
-                sourceCell.removeAttribute("draggable");
+                oldRow = sourceCell.dataset.row; oldCol = sourceCell.dataset.col;
+                sourceCell.innerHTML = ""; sourceCell.removeAttribute("draggable");
                 sourceCell.classList.remove("drag-source");
             }
 
-            sourceCell = null;
-            cell.innerHTML = "";
-
+            sourceCell = null; cell.innerHTML = "";
             const img = document.createElement("img");
             img.src = draggedItem.image; img.alt = draggedItem.name;
             img.dataset.functionId = draggedItem.id;
@@ -956,7 +796,7 @@ function initGridPage() {
             cell.appendChild(img);
 
             const deleteBtn = document.createElement("button");
-            deleteBtn.type  = "button";
+            deleteBtn.type = "button";
             deleteBtn.className = "delete-btn absolute top-[2px] right-[2px] bg-red-600/80 text-white w-5 h-5 text-[14px] rounded cursor-pointer flex items-center justify-center";
             deleteBtn.setAttribute("aria-label", `Remove ${draggedItem.name} from grid cell`);
             deleteBtn.append("✖");
@@ -978,16 +818,14 @@ function initGridPage() {
                             originalSourceCell.innerHTML = `<img src="${draggedItem.image}" alt="${draggedItem.name}" data-function-id="${draggedItem.id}" class="grid-function-icon object-contain"><button class="delete-btn absolute top-[2px] right-[2px] bg-red-600/80 text-white w-5 h-5 text-[14px] rounded cursor-pointer flex items-center justify-center">✖</button>`;
                             originalSourceCell.setAttribute('draggable', 'true');
                         }
-                        cell.innerHTML = ""; cell.removeAttribute('draggable');
-                        updateQoL(); return;
+                        cell.innerHTML = ""; cell.removeAttribute('draggable'); updateQoL(); return;
                     }
                 } else {
                     if (originalSourceCell) {
                         originalSourceCell.innerHTML = `<img src="${draggedItem.image}" alt="${draggedItem.name}" data-function-id="${draggedItem.id}" class="grid-function-icon object-contain"><button class="delete-btn absolute top-[2px] right-[2px] bg-red-600/80 text-white w-5 h-5 text-[14px] rounded cursor-pointer flex items-center justify-center">✖</button>`;
                         originalSourceCell.setAttribute('draggable', 'true');
                     }
-                    cell.innerHTML = ""; cell.removeAttribute('draggable');
-                    updateQoL(); return;
+                    cell.innerHTML = ""; cell.removeAttribute('draggable'); updateQoL(); return;
                 }
             }
 
@@ -997,10 +835,8 @@ function initGridPage() {
 
         cell.addEventListener("click",   () => { if (!isDragging) activateCell(cell); });
         cell.addEventListener("keydown", e  => { if (!isDragging && (e.key === "Enter" || e.key === " ")) activateCell(cell); });
-
         cell.addEventListener('mouseenter', (event) => {
-            const row = parseInt(cell.dataset.row);
-            const col = parseInt(cell.dataset.col);
+            const row = parseInt(cell.dataset.row), col = parseInt(cell.dataset.col);
             clearTimeout(hoverTimer);
             hoverTimer = setTimeout(() => handleTileHover(row, col, event), HOVER_DELAY_MS);
         });
@@ -1015,9 +851,7 @@ function initGridPage() {
         if (!e.target.classList.contains("delete-btn")) return;
         const cell = e.target.closest(".grid-cell");
         if (!cell) return;
-        cell.innerHTML = "";
-        cell.removeAttribute("draggable");
-        activateCell(cell);
+        cell.innerHTML = ""; cell.removeAttribute("draggable"); activateCell(cell);
         try {
             await fetch(`/grid/cell/${cell.dataset.id}/function`, {
                 method: "DELETE",
@@ -1037,9 +871,7 @@ function initGridPage() {
         if (dropOccurred) { dropOccurred = false; return; }
         const rect = document.querySelector(".city-grid").getBoundingClientRect();
         if (e.pageX >= rect.left && e.pageX <= rect.right && e.pageY >= rect.top && e.pageY <= rect.bottom) return;
-        sourceCell.innerHTML = "";
-        sourceCell.removeAttribute("draggable");
-        activateCell(sourceCell);
+        sourceCell.innerHTML = ""; sourceCell.removeAttribute("draggable"); activateCell(sourceCell);
         try {
             await fetch(`/grid/cell/${sourceCell.dataset.id}/function`, {
                 method: "DELETE",
@@ -1047,12 +879,11 @@ function initGridPage() {
             });
         } catch (err) { console.error("Fout bij drag-off delete:", err); }
         draggedItem = null; sourceCell = null;
-        updateCellHighlights();
-        setTimeout(() => updateQoL(), 10);
+        updateCellHighlights(); setTimeout(() => updateQoL(), 10);
     });
 
     // =========================================================
-    // UNDO (primair)
+    // UNDO
     // =========================================================
 
     const undoBtn = document.getElementById("undo-btn");
@@ -1064,14 +895,9 @@ function initGridPage() {
                 headers: { 'Content-Type': 'application/json', 'X-CSRF-TOKEN': document.querySelector('meta[name="csrf-token"]').content },
                 body: JSON.stringify({ old_row: lastAction.newRow, old_col: lastAction.newCol, new_row: lastAction.oldRow, new_col: lastAction.oldCol, function_id: lastAction.functionId, force: true })
             });
-            lastAction = null; undoBtn.disabled = true;
-            updateQoL(); location.reload();
+            lastAction = null; undoBtn.disabled = true; updateQoL(); location.reload();
         });
     }
-
-    // =========================================================
-    // UNDO (alternatief)
-    // =========================================================
 
     const undoButtonAlternative = document.getElementById('undoButton');
     if (undoButtonAlternative) {
@@ -1088,23 +914,20 @@ function initGridPage() {
                     if (data.cell.function_id) {
                         targetCell.innerHTML = `<img src="${data.cell.image}" class="grid-function-icon object-contain" data-function-id="${data.cell.function_id}"><button class="delete-btn absolute top-[2px] right-[2px] bg-red-600/80 text-white w-5 h-5 text-[14px] rounded cursor-pointer flex items-center justify-center">✖</button>`;
                         targetCell.setAttribute("draggable", "true");
-                    } else {
-                        targetCell.innerHTML = ""; targetCell.removeAttribute("draggable");
-                    }
+                    } else { targetCell.innerHTML = ""; targetCell.removeAttribute("draggable"); }
                     activateCell(targetCell);
                 }
                 if (data.cleared) {
                     const clearedCell = document.querySelector(`[data-row="${data.cleared.row}"][data-col="${data.cleared.col}"]`);
                     if (clearedCell) { clearedCell.innerHTML = ""; clearedCell.removeAttribute("draggable"); clearedCell.classList.remove("selected"); }
                 }
-                updateCellHighlights();
-                setTimeout(() => updateQoL(), 50);
+                updateCellHighlights(); setTimeout(() => updateQoL(), 50);
             });
         });
     }
 
     // =========================================================
-    // INITIËLE CALLS
+    // INIT
     // =========================================================
 
     fetchAllEvents();
