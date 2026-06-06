@@ -56,23 +56,22 @@
         {{-- MIDDLE: QoL + Undo + Grid + Simulation Controls --}}
         <div class="flex flex-col flex-1 min-w-0 py-2">
 
-            {{-- QoL Score --}}
-            <div class="border-4 border-gray-400 dark:bg-indigo-900 dark:border-teal-600 rounded-md p-6 mb-4">
-                <span id="qol-score" class="text-xl font-semibold dark:text-teal-300">
-                    QoL score: <span id="qol-score-value"></span>
-                </span>
-                <span id="old-qol-score" class="float-right text-gray-500"></span>
+            {{-- Undo and Export Buttons --}}
+            <div class="flex gap-2 mb-4">
+                <button id="undoButton"
+                    class="flex-1 px-4 py-2 bg-yellow-500 text-black font-semibold rounded shadow hover:bg-yellow-600 transition focus:ring-2 focus:ring-yellow-400">
+                    Undo
+                </button>
+                <button id="exportPdfButton" type="button"
+                        class="flex-1 px-4 py-2 bg-teal-600 text-white font-semibold rounded shadow hover:bg-teal-700 focus:outline-none focus:ring-2 focus:ring-teal-500 transition"
+                        aria-label="Export the current simulation as a PDF report">
+                    Export as PDF
+                </button>
             </div>
 
-            {{-- Undo Button --}}
-            <button id="undoButton"
-                class="mb-4 px-4 py-2 bg-yellow-500 text-black font-semibold rounded shadow hover:bg-yellow-600 transition focus:ring-2 focus:ring-yellow-400">
-                Undo
-            </button>
-
             {{-- City Grid --}}
-            <div class="p-3 justify-center">
-                <h1 class="text-2xl text-center font-bold mb-4 dark:text-teal-300">City Grid</h1>
+            <div class="justify-center">
+                <h1 class="text-2xl text-center font-bold mb-2 dark:text-teal-300">City Grid</h1>
 
                 <div class="city-grid grid grid-flow-col grid-rows-3 gap-3 w-min mx-auto">
                     @for($col = 1; $col <= 4; $col++)
@@ -191,6 +190,14 @@
 
         {{-- RIGHT: QoL Breakdown + Events panel --}}
         <div class="border-l border-gray-400 dark:border-gray-700 w-64 flex-shrink-0 p-3 flex flex-col gap-4 max-h-[73vh] overflow-y-auto">
+            
+            {{-- QoL Score --}}
+            <div class="border-4 border-gray-400 dark:bg-indigo-900 dark:border-teal-600 rounded-md p-4">
+                <span id="qol-score" class="text-xl font-semibold dark:text-teal-300">
+                    QoL score: <span id="qol-score-value"></span>
+                </span>
+                <span id="old-qol-score" class="float-right text-gray-500"></span>
+            </div>
 
             {{-- QoL Breakdown --}}
             <div id="breakdown-qol-score"></div>

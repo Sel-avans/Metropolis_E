@@ -37,6 +37,7 @@ Route::middleware('auth')->group(function () {
         Route::get('/grid', [GridController::class, 'index'])->name('grid');
         Route::get('/qol/details', [QoLController::class, 'details'])->name('qol.details');
         Route::get('/qol/cell/{row}/{col}', [QoLController::class, 'cellHoverDetails']);
+        Route::post('/grid/export-pdf', [GridController::class, 'exportPdf'])->name('grid.exportPdf');
         
         // Functies plaatsen/verwijderen op het grid (City Planner)
         Route::post('/grid/update', [GridController::class, 'update'])->middleware('can:CanPlaceFunctions,' . PagePolicy::class);

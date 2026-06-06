@@ -334,13 +334,104 @@ class QoLController extends Controller
         ))));
     }
 
+    /**
+     * Compute QoL data without requiring a Request context.
+     * Used by PDF export and cache recalculation.
+     */
+    public static function computeQoLData()
+    {
+        $cells = GridCell::with('function.effects')->get();
+        $occupiedCells = $cells->filter(fn ($cell) => $cell->function_id && $cell->function);
+
+        if ($occupiedCells->isEmpty()) {
+            return [
+                'categories' => [
+                    'Safety'      => ['total' => 0, 'items' => []],
+                    'Recreation'  => ['total' => 0, 'items' => []],
+                    'Environment' => ['total' => 0, 'items' => []],
+                    'Amenities'   => ['total' => 0, 'items' => []],
+                    'Mobility'    => ['total' => 0, 'items' => []],
+                ],
+                'total_score' => 0,
+            ];
+        }
+
+        $conditions = Condition::with(['functionA', 'functionB'])->get();
+
+        $categories = [
+            'safety'      => [],
+            'recreation'  => [],
+            'environment' => [],
+            'amenities'   => [],
+            'mobility'    => [],
+        ];
+
+        $totals = [
+            'safety'      => 0,
+            'recreation'  => 0,
+            'environment' => 0,
+            'amenities'   => 0,
+            'mobility'    => 0,
+        ];
+
+        $functionBaseByCategory = array_fill_keys(array_keys($totals), 0);
+        $functionsByCategory = array_fill_keys(array_keys($totals), []);
+        $discard = [];
+
+        $controller = new self();
+
+        foreach ($occupiedCells as $cell) {
+            $cellTotals = $controller->computeCellTotals($cell, $cells, $conditions, $discard);
+            foreach ($cellTotals as $catKey => $value) {
+                $totals[$catKey] += $value;
+            }
+        }
+
+        foreach ($occupiedCells as $cell) {
+            foreach ($cell->function->effects as $effect) {
+                $catKey = strtolower($effect->category);
+                if (isset($functionBaseByCategory[$catKey])) {
+                    $functionBaseByCategory[$catKey] += $effect->value;
+                    
+                    // Track function names by category
+                    if (!in_array($cell->function->name, $functionsByCategory[$catKey])) {
+                        $functionsByCategory[$catKey][] = $cell->function->name;
+                    }
+                }
+            }
+        }
+
+        foreach ($functionBaseByCategory as $catKey => $sum) {
+            if ($sum === 0) {
+                continue;
+            }
+
+            $functionNames = !empty($functionsByCategory[$catKey]) 
+                ? implode(', ', $functionsByCategory[$catKey])
+                : 'Functions';
+
+            $categories[$catKey][] = [
+                'function' => $functionNames,
+                'value'    => $sum,
+            ];
+        }
+
+        return [
+            'categories' => [
+                'Safety'      => ['total' => $totals['safety'],      'items' => $categories['safety']],
+                'Recreation'  => ['total' => $totals['recreation'],  'items' => $categories['recreation']],
+                'Environment' => ['total' => $totals['environment'], 'items' => $categories['environment']],
+                'Amenities'   => ['total' => $totals['amenities'],   'items' => $categories['amenities']],
+                'Mobility'    => ['total' => $totals['mobility'],    'items' => $categories['mobility']],
+            ],
+            'total_score' => array_sum($totals),
+        ];
+    }
+
     public static function recalculateQoL()
     {
-        $controller = new self();
-        $response = $controller->details()->getData(true);
-
-        cache()->put('qol_data', $response, 60);
-
-        return $response;
+        $qolData = self::computeQoLData();
+        cache()->put('qol_data', $qolData, 60);
+        return $qolData;
     }
 }

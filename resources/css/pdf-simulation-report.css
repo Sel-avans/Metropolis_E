@@ -1,0 +1,177 @@
+* { 
+    margin: 0; 
+    padding: 0; 
+    box-sizing: border-box; 
+}
+
+html, body { 
+    font-family: 'DejaVu Sans', Arial, sans-serif; 
+    color: #333; 
+    line-height: 1.6; 
+}
+
+body { 
+    padding: 20px; 
+    background: #fff; 
+}
+
+/* Typography */
+h1, h2, h3, h4 { 
+    margin-top: 20px; 
+    margin-bottom: 12px; 
+    font-weight: 700; 
+    color: #1a1a1a; 
+}
+
+h1 { 
+    font-size: 28px; 
+    border-bottom: 3px solid #0ea5e9; 
+    padding-bottom: 10px; 
+}
+
+h2 { 
+    font-size: 20px; 
+    border-bottom: 2px solid #e5e7eb; 
+    padding-bottom: 8px; 
+}
+
+h3 { 
+    font-size: 16px; 
+    color: #0366d6; 
+}
+
+p { 
+    margin-bottom: 12px; 
+}
+
+/* Document sections */
+section { 
+    page-break-inside: avoid; 
+    margin-bottom: 20px; 
+}
+
+/* Info block */
+.info-block { 
+    background: #f3f4f6; 
+    border-left: 4px solid #0ea5e9; 
+    padding: 12px; 
+    margin: 15px 0; 
+    font-size: 14px; 
+}
+
+.info-block strong { 
+    color: #0366d6; 
+}
+
+/* Tables */
+table { 
+    width: 100%; 
+    border-collapse: collapse; 
+    margin: 15px 0; 
+    font-size: 13px; 
+}
+
+th { 
+    background: #e5e7eb; 
+    color: #1a1a1a; 
+    font-weight: 700; 
+    padding: 10px; 
+    text-align: left; 
+    border: 1px solid #d1d5db; 
+}
+
+td { 
+    padding: 10px; 
+    border: 1px solid #d1d5db; 
+}
+
+tr:nth-child(even) { 
+    background: #f9fafb; 
+}
+
+/* Grid cells in table */
+.grid-cell-img { 
+    max-width: 40px; 
+    max-height: 40px; 
+    object-fit: contain; 
+    display: block; 
+    margin-bottom: 4px; 
+}
+
+.cell-content { 
+    font-size: 12px; 
+}
+
+.cell-function { 
+    font-weight: 600; 
+    color: #0366d6; 
+}
+
+.cell-category { 
+    color: #666; 
+    font-size: 11px; 
+}
+
+.cell-empty { 
+    color: #999; 
+    font-style: italic; 
+}
+
+/* Data rows */
+.score-positive { 
+    color: #10b981; 
+    font-weight: 600; 
+}
+
+.score-negative { 
+    color: #ef4444; 
+    font-weight: 600; 
+}
+
+.score-neutral { 
+    color: #666; 
+}
+
+/* Lists */
+ul { 
+    margin-left: 20px; 
+    margin-bottom: 12px; 
+}
+
+li { 
+    margin-bottom: 6px; 
+}
+
+/* Accessibility: text for screen readers */
+.sr-only { 
+    position: absolute; 
+    width: 1px; 
+    height: 1px; 
+    padding: 0; 
+    margin: -1px; 
+    overflow: hidden; 
+    clip: rect(0,0,0,0); 
+    white-space: nowrap; 
+    border: 0; 
+}
+
+/* Placeholders */
+.placeholder-text { 
+    color: #999; 
+    font-style: italic; 
+}
+
+/* Print optimization */
+@media print {
+    body { 
+        padding: 10px; 
+    }
+    
+    section { 
+        page-break-inside: avoid; 
+    }
+    
+    table { 
+        page-break-inside: avoid; 
+    }
+}
