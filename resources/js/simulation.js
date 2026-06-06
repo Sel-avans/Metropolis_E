@@ -34,7 +34,12 @@ export const setSimulationSpeed = async (speed) => {
     }
 };
 
-initSimulationControls();
+window.setSimulationSpeed = setSimulationSpeed;
+
+if (!window.__simControlsInitialized) {
+    window.__simControlsInitialized = true;
+    initSimulationControls();
+}
 
 let lastTimestamp = 0;
 
@@ -59,9 +64,14 @@ export function simulationLoop(timestamp) {
                 onTimeUpdateCallback(getCurrentTime());
             }
         } else {
-            // Dag voorbij: stop
+            // Dag voorbij: stop en sync event-state (eind cyclus 06:00)
             setCurrentTime(maxTime);
             syncTimelineUI();
+
+            if (onTimeUpdateCallback) {
+                onTimeUpdateCallback(getCurrentTime());
+            }
+
             const playPauseBtn = document.getElementById('playPauseBtn');
             if (playPauseBtn && getIsPlaying()) playPauseBtn.click();
         }
@@ -73,5 +83,3 @@ export function simulationLoop(timestamp) {
 
     requestAnimationFrame(simulationLoop);
 }
-
-window.setSimulationSpeed = setSimulationSpeed;

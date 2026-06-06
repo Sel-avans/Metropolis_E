@@ -5,6 +5,7 @@ namespace Tests\Feature;
 use App\Enums\UserRole;
 use App\Models\CityFunction;
 use App\Models\Effect;
+use App\Models\EventEffect;
 use App\Models\SimulationEvent;
 use App\Models\User;
 use App\Services\EventModifierService;
@@ -156,5 +157,48 @@ class SimulationEventTest extends TestCase
         $response->assertOk();
         $response->assertJsonPath('events.0.name', 'test');
         $response->assertJsonPath('events.0.modifiers.recreation', 4);
+    }
+
+    public function test_simulation_endpoint_splits_events_by_cycle_duration(): void
+    {
+        $user = User::factory()->create(['role' => UserRole::Administrator]);
+        $function = CityFunction::factory()->create(['category' => 'recreation']);
+
+        $short = SimulationEvent::create([
+            'name' => 'Short event',
+            'type' => 'one-off',
+            'start_moment' => now(),
+            'end_moment' => now()->addHours(6),
+        ]);
+
+        $long = SimulationEvent::create([
+            'name' => 'Long event',
+            'type' => 'one-off',
+            'start_moment' => '2026-06-12 08:00:00',
+            'end_moment' => '2026-06-19 20:00:00',
+        ]);
+
+        foreach ([$short, $long] as $event) {
+            Effect::create([
+                'function_id' => null,
+                'simulation_event_id' => $event->id,
+                'category' => 'recreation',
+                'value' => 2,
+            ]);
+            EventEffect::create([
+                'simulation_event_id' => $event->id,
+                'city_function_id' => $function->id,
+                'modifier' => 0,
+            ]);
+        }
+
+        $response = $this->actingAs($user)->getJson('/events/simulation');
+
+        $response->assertOk();
+        $response->assertJsonPath('events.0.name', 'Short event');
+        $response->assertJsonPath('events.0.fits_in_cycle', true);
+        $response->assertJsonPath('events.1.name', 'Long event');
+        $response->assertJsonPath('events.1.fits_in_cycle', false);
+        $response->assertJsonPath('events.0.affected_function_ids.0', $function->id);
     }
 }

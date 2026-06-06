@@ -14,6 +14,8 @@ class EventModifierService
     /** Shown to users in the UI (Netherlands). */
     public const DISPLAY_TIMEZONE = 'Europe/Amsterdam';
 
+    public const SIMULATION_CYCLE_MINUTES = 1440;
+
     public const CATEGORY_KEYS = [
         'safety',
         'recreation',
@@ -111,6 +113,73 @@ class EventModifierService
         return $data;
     }
 
+    /** Duration of the daily simulation window in minutes (not total calendar span). */
+    public static function eventDurationMinutes(SimulationEvent $event): int
+    {
+        [, , $window] = self::resolveSimulationWindow($event);
+
+        return $window;
+    }
+
+    /** Total calendar span for one-off events, or daily window for recurring. */
+    public static function calendarDurationMinutes(SimulationEvent $event): int
+    {
+        if ($event->type === 'one-off' && $event->start_moment && $event->end_moment) {
+            $start = self::parseMoment($event->start_moment);
+            $end = self::parseMoment($event->end_moment);
+
+            return max(0, (int) $start->diffInMinutes($end));
+        }
+
+        return self::eventDurationMinutes($event);
+    }
+
+    /**
+     * @return array{0: int, 1: int, 2: int} [startMinutes, endMinutes, windowMinutes]
+     */
+    public static function resolveSimulationWindow(SimulationEvent $event): array
+    {
+        $startOffset = 360; // 06:00 = start of simulation day
+
+        if ($event->type === 'one-off' && $event->start_moment && $event->end_moment) {
+            $start = self::parseMoment($event->start_moment);
+            $end = self::parseMoment($event->end_moment);
+
+            $startMins = (($start->hour * 60 + $start->minute) - $startOffset + self::SIMULATION_CYCLE_MINUTES) % self::SIMULATION_CYCLE_MINUTES;
+            $endMins = (($end->hour * 60 + $end->minute) - $startOffset + self::SIMULATION_CYCLE_MINUTES) % self::SIMULATION_CYCLE_MINUTES;
+
+            if ($end->format('H:i') === $start->format('H:i') && $end->gt($start)) {
+                $endMins = $startMins + self::SIMULATION_CYCLE_MINUTES;
+            } elseif ($endMins <= $startMins) {
+                $endMins += self::SIMULATION_CYCLE_MINUTES;
+            }
+
+            return [$startMins, $endMins, $endMins - $startMins];
+        }
+
+        if ($event->type === 'recurring' && $event->recurring_start_time && $event->recurring_end_time) {
+            [$sh, $sm] = array_map('intval', explode(':', substr((string) $event->recurring_start_time, 0, 5)));
+            [$eh, $em] = array_map('intval', explode(':', substr((string) $event->recurring_end_time, 0, 5)));
+
+            $startMins = (($sh * 60 + $sm) - $startOffset + self::SIMULATION_CYCLE_MINUTES) % self::SIMULATION_CYCLE_MINUTES;
+            $endMins = (($eh * 60 + $em) - $startOffset + self::SIMULATION_CYCLE_MINUTES) % self::SIMULATION_CYCLE_MINUTES;
+
+            if ($endMins <= $startMins) {
+                $endMins += self::SIMULATION_CYCLE_MINUTES;
+            }
+
+            return [$startMins, $endMins, $endMins - $startMins];
+        }
+
+        return [0, self::SIMULATION_CYCLE_MINUTES, self::SIMULATION_CYCLE_MINUTES];
+    }
+
+    /** True when the event spans at most one 24-hour period (Active Events panel). */
+    public static function fitsInSimulationCycle(SimulationEvent $event): bool
+    {
+        return self::calendarDurationMinutes($event) <= self::SIMULATION_CYCLE_MINUTES;
+    }
+
     public static function isActive(SimulationEvent $event, ?Carbon $now = null): bool
     {
         $now = $now ?? self::now();
@@ -129,8 +198,19 @@ class EventModifierService
         return false;
     }
 
-    public static function getActiveEvents(): Collection
+    public static function getActiveEvents(?array $simulationActiveIds = null): Collection
     {
+        if ($simulationActiveIds !== null) {
+            if ($simulationActiveIds === []) {
+                return collect();
+            }
+
+            return SimulationEvent::with(['categoryEffects', 'effects'])
+                ->whereIn('id', $simulationActiveIds)
+                ->get()
+                ->values();
+        }
+
         $now = self::now();
 
         return SimulationEvent::with(['categoryEffects', 'effects'])
@@ -142,11 +222,11 @@ class EventModifierService
     /**
      * @return array<string, float>
      */
-    public static function getModifiersByCategory(): array
+    public static function getModifiersByCategory(?array $simulationActiveIds = null): array
     {
         $modifiers = array_fill_keys(self::CATEGORY_KEYS, 0.0);
 
-        foreach (self::getActiveEvents() as $event) {
+        foreach (self::getActiveEvents($simulationActiveIds) as $event) {
             foreach ($event->categoryEffects as $effect) {
                 $catKey = strtolower($effect->category);
                 if (isset($modifiers[$catKey])) {
@@ -163,11 +243,11 @@ class EventModifierService
      *
      * @return array<string, float>
      */
-    public static function getModifiersByCategoryForFunction(int $functionId): array
+    public static function getModifiersByCategoryForFunction(int $functionId, ?array $simulationActiveIds = null): array
     {
         $modifiers = array_fill_keys(self::CATEGORY_KEYS, 0.0);
 
-        foreach (self::getActiveEvents() as $event) {
+        foreach (self::getActiveEvents($simulationActiveIds) as $event) {
             if (!self::eventAppliesToFunction($event, $functionId)) {
                 continue;
             }
@@ -193,11 +273,11 @@ class EventModifierService
     /**
      * @return array<int, array{event_name: string, category: string, value: float}>
      */
-    public static function getModifierBreakdownForFunction(int $functionId): array
+    public static function getModifierBreakdownForFunction(int $functionId, ?array $simulationActiveIds = null): array
     {
         $breakdown = [];
 
-        foreach (self::getActiveEvents() as $event) {
+        foreach (self::getActiveEvents($simulationActiveIds) as $event) {
             if (!self::eventAppliesToFunction($event, $functionId)) {
                 continue;
             }
@@ -222,11 +302,11 @@ class EventModifierService
     /**
      * @return array<int, array{event_name: string, category: string, value: float}>
      */
-    public static function getModifierBreakdown(): array
+    public static function getModifierBreakdown(?array $simulationActiveIds = null): array
     {
         $breakdown = [];
 
-        foreach (self::getActiveEvents() as $event) {
+        foreach (self::getActiveEvents($simulationActiveIds) as $event) {
             foreach ($event->categoryEffects as $effect) {
                 $catKey = strtolower($effect->category);
                 if (!in_array($catKey, self::CATEGORY_KEYS, true)) {
@@ -244,9 +324,9 @@ class EventModifierService
         return $breakdown;
     }
 
-    public static function applyToTotals(array &$totals, array &$categories): void
+    public static function applyToTotals(array &$totals, array &$categories, ?array $simulationActiveIds = null): void
     {
-        foreach (self::getModifierBreakdown() as $modifier) {
+        foreach (self::getModifierBreakdown($simulationActiveIds) as $modifier) {
             $catKey = $modifier['category'];
             $value = $modifier['value'];
 

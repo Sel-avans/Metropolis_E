@@ -176,11 +176,11 @@
                         </div>
                     </div>
 
-                    {{-- Active Events (onderin simulatie) --}}
+                    {{-- Active Events (≤24h cycle) --}}
                     <div class="flex-1 min-w-[200px] bg-gray-50 dark:bg-gray-800 p-4 rounded-md border border-gray-200 dark:border-gray-600">
                         <h4 class="text-sm font-semibold text-sky-500 dark:text-teal-500 mb-2">Active Events</h4>
                         <ul id="active-events-list" class="text-xs text-gray-700 dark:text-gray-300 space-y-1">
-                            <li id="active-events-empty" class="text-gray-500">No active events</li>
+                            <li class="text-gray-500">Loading events...</li>
                         </ul>
                     </div>
 
@@ -195,12 +195,9 @@
             {{-- QoL Breakdown --}}
             <div id="breakdown-qol-score"></div>
 
-            {{-- Events panel: alle events met activate/deactivate knop --}}
+            {{-- All Events: >24h --}}
             <div id="all-events-panel">
-                <h3 class="text-lg font-semibold mb-2 dark:text-teal-500">Events</h3>
-                <p class="text-xs text-gray-400 dark:text-gray-500 mb-3">
-                    Toggle events to include them in the simulation. Active events highlight affected grid cells in yellow.
-                </p>
+                <h3 class="text-lg font-semibold mb-2 dark:text-teal-500">All Events</h3>
                 <ul id="all-events-detail-list" class="space-y-1 text-sm dark:text-white">
                     <li class="text-sm text-gray-500">Loading events...</li>
                 </ul>
@@ -218,5 +215,4 @@
         <ul id="popup-neighbors-list" class="space-y-1"></ul>
     </div>
 
-    @vite(['resources/js/grid.js'])
 </x-app-layout>

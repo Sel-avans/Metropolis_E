@@ -178,7 +178,14 @@ class SimulationEventController extends Controller
                 // Bepaal start- en eindtijd als minuten van de dag (0–1440)
                 // Start_minutes en end_minutes zijn relatief aan 06:00 (offset = 360 min)
                 // zodat de JS-kant direct kan vergelijken met de simulatietijd.
-                [$startMinutes, $endMinutes] = $this->resolveSimulationMinutes($event);
+                [$startMinutes, $endMinutes] = array_slice(
+                    EventModifierService::resolveSimulationWindow($event),
+                    0,
+                    2
+                );
+                $durationMinutes = EventModifierService::eventDurationMinutes($event);
+                $calendarDuration = EventModifierService::calendarDurationMinutes($event);
+                $fitsInCycle = EventModifierService::fitsInSimulationCycle($event);
 
                 // Welke categorieën beïnvloedt dit event?
                 // Wordt gebruikt door de highlight-logica in grid.js
@@ -189,66 +196,38 @@ class SimulationEventController extends Controller
                     ->values()
                     ->all();
 
+                $affectedFunctionIds = $event->effects
+                    ->pluck('city_function_id')
+                    ->map(fn ($id) => (int) $id)
+                    ->values()
+                    ->all();
+
                 return [
                     'id'                  => $event->id,
                     'name'                => $event->name,
                     'type'                => $event->type,
+                    'recurring_schedule'  => $event->recurring_schedule,
+                    'recurring_start_date'=> $event->recurring_start_date,
+                    'recurring_end_date'  => $event->recurring_end_date,
                     'start_minutes'       => $startMinutes,
                     'end_minutes'         => $endMinutes,
+                    'duration_minutes'    => $durationMinutes,
+                    'calendar_duration_minutes' => $calendarDuration,
+                    'fits_in_cycle'       => $fitsInCycle,
                     'modifiers'           => $modifiers->isEmpty() ? (object) [] : $modifiers->toArray(),
                     'affected_categories' => $affectedCategories,
+                    'affected_function_ids' => $affectedFunctionIds,
                 ];
             })
             ->values();
 
         return response()->json([
             'status' => 'success',
+            'simulation_reference_date' => EventModifierService::now()
+                ->timezone(EventModifierService::DISPLAY_TIMEZONE)
+                ->toDateString(),
             'events' => $events,
         ]);
-    }
-
-    /**
-     * Vertaalt start_moment / end_moment (of recurring tijden) naar
-     * simulatieminuten (0 = 06:00, 1440 = volgende 06:00).
-     *
-     * @return array{int, int}  [$startMinutes, $endMinutes]
-     */
-    private function resolveSimulationMinutes(SimulationEvent $event): array
-    {
-        $startOffset = 360; // 06:00 = 360 minuten
-
-        if ($event->type === 'one-off' && $event->start_moment && $event->end_moment) {
-            $start = EventModifierService::parseMoment($event->start_moment);
-            $end   = EventModifierService::parseMoment($event->end_moment);
-
-            $startMins = (($start->hour * 60 + $start->minute) - $startOffset + 1440) % 1440;
-            $endMins   = (($end->hour   * 60 + $end->minute)   - $startOffset + 1440) % 1440;
-
-            // Als eindtijd voor of gelijk aan starttijd valt, loopt het event over middernacht
-            if ($endMins <= $startMins) {
-                $endMins += 1440;
-            }
-
-            return [$startMins, $endMins];
-        }
-
-        if ($event->type === 'recurring' && $event->recurring_start_time && $event->recurring_end_time) {
-            // recurring_start_time / recurring_end_time zijn "HH:MM" strings
-            [$sh, $sm] = array_map('intval', explode(':', $event->recurring_start_time));
-            [$eh, $em] = array_map('intval', explode(':', $event->recurring_end_time));
-
-            $startMins = (($sh * 60 + $sm) - $startOffset + 1440) % 1440;
-            $endMins   = (($eh * 60 + $em) - $startOffset + 1440) % 1440;
-
-            if ($endMins <= $startMins) {
-                $endMins += 1440;
-            }
-
-            return [$startMins, $endMins];
-        }
-
-        // Fallback: event duurt de hele dag
-        return [0, 1440];
     }
 
     // =========================================================

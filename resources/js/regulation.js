@@ -14,12 +14,23 @@ export const getIsPlaying  = () => isPlaying;
 export const getCurrentTime = () => currentTime;
 export const getMaxTime     = () => maxTime;
 
+export const setIsPlaying = (playing) => {
+    isPlaying = Boolean(playing);
+};
+
 export const setMaxTime = () => {
     maxTime = TOTAL_MINUTES;
 };
 
 export const setCurrentTime = (time) => {
     currentTime = Math.max(0, Math.min(time, maxTime));
+};
+
+export const syncPlayPauseUI = () => {
+    const playPauseBtn = document.getElementById('playPauseBtn');
+    if (playPauseBtn) {
+        playPauseBtn.innerHTML = isPlaying ? '&#x23F8;' : '&#x25B6;';
+    }
 };
 
 // Hulpfunctie: simulatieminuten (0–1440) → weergavetijd als "HH:MM"

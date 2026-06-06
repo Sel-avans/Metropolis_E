@@ -1,8 +1,19 @@
 import { getNeighborsWithQoL } from './neighbours.js';
 import { simulationLoop, onSimulationTimeUpdate } from './simulation.js';
-import { setMaxTime, syncTimelineUI, minutesToHHMM, datetimeToSimMinutes } from './regulation.js';
+import { setMaxTime, syncTimelineUI, syncPlayPauseUI, minutesToHHMM, datetimeToSimMinutes, getCurrentTime, getMaxTime, getIsPlaying, setCurrentTime, setIsPlaying } from './regulation.js';
 
-document.addEventListener("DOMContentLoaded", () => {
+const SIM_STATE_KEY = 'metropolis_simulation_state';
+
+function initGridPage() {
+    if (!document.querySelector('.city-grid')) {
+        return;
+    }
+
+    const gridRoot = document.querySelector('.city-grid');
+    if (gridRoot.dataset.gridInitialized === 'true') {
+        return;
+    }
+    gridRoot.dataset.gridInitialized = 'true';
 
     // =========================================================
     // VARIABELEN
@@ -15,15 +26,57 @@ document.addEventListener("DOMContentLoaded", () => {
     let old_score;
     let lastAction = null;
 
-    // Alle events van de server — manuallyEnabled = door planner aan/uit gezet
+    // activatedEarly = cycle-event vroegtijdig geactiveerd
+    // activatedForCycle = lang event handmatig actief voor rest van simulatiedag
     let allEvents = [];
+    let simulationReferenceDate = null;
 
     const HOVER_DELAY_MS = 300;
     let hoverTimer = null;
+    let qolUpdateTimer = null;
+    let qolFetchInFlight = false;
+    let qolFetchPending = false;
+    let qolFetchGeneration = 0;
+    let lastQoLEventIdsKey = null;
+    let saveStateTimer = null;
     let lastActiveEventSignature = '';
 
-    const popup        = document.getElementById('qol-popup');
-    const neighborsList = document.getElementById('popup-neighbors-list');
+    function loadSimulationState() {
+        try {
+            const raw = sessionStorage.getItem(SIM_STATE_KEY);
+            return raw ? JSON.parse(raw) : null;
+        } catch {
+            return null;
+        }
+    }
+
+    function saveSimulationState() {
+        if (!allEvents.length) {
+            return;
+        }
+
+        sessionStorage.setItem(SIM_STATE_KEY, JSON.stringify({
+            currentTime: getCurrentTime(),
+            isPlaying: getIsPlaying(),
+            events: allEvents.map(e => ({
+                id: e.id,
+                activatedEarly: Boolean(e.activatedEarly),
+                activatedForCycle: Boolean(e.activatedForCycle),
+                cycleActivationStart: e.cycleActivationStart ?? null,
+            })),
+        }));
+    }
+
+    function scheduleSaveSimulationState() {
+        if (saveStateTimer) {
+            clearTimeout(saveStateTimer);
+        }
+        saveStateTimer = setTimeout(saveSimulationState, 300);
+    }
+
+    function clearSimulationState() {
+        sessionStorage.removeItem(SIM_STATE_KEY);
+    }
 
     // =========================================================
     // HULPFUNCTIES
@@ -46,10 +99,262 @@ document.addEventListener("DOMContentLoaded", () => {
         return `<ul class="text-[11px] text-gray-400 mt-1 space-y-0.5 list-none pl-0">${items.join('')}</ul>`;
     }
 
-    function buildEventSignature(events) {
+    function buildEventSignature(events, simTime = getCurrentTime()) {
         return JSON.stringify(
-            (events || []).map(e => ({ id: e.id, active: e.isActive ?? false }))
+            (events || []).map(e => ({
+                id: e.id,
+                active: e.isActive ?? false,
+                contributing: isEventContributingToQoL(e, simTime),
+                early: e.activatedEarly ?? false,
+                cycle: e.activatedForCycle ?? false,
+            }))
         );
+    }
+
+    function cycleEvents() {
+        return allEvents.filter(e => e.fitsInCycle || e.activatedForCycle);
+    }
+
+    function longEvents() {
+        return allEvents.filter(e => !e.fitsInCycle && !e.activatedForCycle);
+    }
+
+    function isSimulationAtDayStart(simTime) {
+        return simTime === 0 && !getIsPlaying();
+    }
+
+    function resetLongEventCycleActivation(event) {
+        event.activatedForCycle = false;
+        event.cycleActivationStart = null;
+        event.isActive = false;
+    }
+
+    function matchesRecurringSchedule(event, referenceDate) {
+        if (event.type !== 'recurring') {
+            return true;
+        }
+
+        // Simulation runs one 24h cycle — match recurring events by time window only.
+        if (event.recurringStartDate && referenceDate && referenceDate < event.recurringStartDate) {
+            return false;
+        }
+        if (event.recurringEndDate && referenceDate && referenceDate > event.recurringEndDate) {
+            return false;
+        }
+
+        return true;
+    }
+
+    function isScheduledEventActive(event, simTime) {
+        if (event.type === 'recurring' && !matchesRecurringSchedule(event, simulationReferenceDate)) {
+            return false;
+        }
+
+        return isEventActiveAtSimTime(event, simTime);
+    }
+
+    function isEventContributingToQoL(event, simTime) {
+        if (isSimulationAtDayStart(simTime)) {
+            return false;
+        }
+
+        if (!event.fitsInCycle) {
+            if (!event.activatedForCycle) {
+                return false;
+            }
+
+            const activationStart = Number(event.cycleActivationStart);
+            if (Number.isNaN(activationStart) || simTime < activationStart || simTime >= getMaxTime()) {
+                return false;
+            }
+
+            return true;
+        }
+
+        if (hasEventEnded(event, simTime)) {
+            return false;
+        }
+
+        const scheduledActive = isScheduledEventActive(event, simTime);
+        const earlyActive = event.activatedEarly && isBeforeEventStart(event, simTime);
+
+        return scheduledActive || earlyActive;
+    }
+
+    function getActiveEventIdsForQoL(simTime = getCurrentTime()) {
+        return allEvents.filter(e => isEventContributingToQoL(e, simTime)).map(e => e.id);
+    }
+
+    function buildQoLActiveIdsKey(simTime = getCurrentTime()) {
+        return getActiveEventIdsForQoL(simTime).slice().sort((a, b) => a - b).join(',');
+    }
+
+    function buildQoLQueryString() {
+        return `?active_event_ids=${getActiveEventIdsForQoL().join(',')}`;
+    }
+
+    function isEventActiveAtSimTime(event, simTime) {
+        const start = Number(event.start_minutes);
+        const end = Number(event.end_minutes);
+
+        if (Number.isNaN(start) || Number.isNaN(end)) {
+            return false;
+        }
+
+        // Simulation timeline runs 06:00 → 06:00 (0–1440). Events that cross midnight
+        // only run from their start time until the end of this cycle.
+        if (end > 1440) {
+            return simTime >= start;
+        }
+
+        return simTime >= start && simTime <= end;
+    }
+
+    function isBeforeEventStart(event, simTime) {
+        return simTime < Number(event.start_minutes);
+    }
+
+    function hasEventEnded(event, simTime) {
+        const end = Number(event.end_minutes);
+        if (Number.isNaN(end)) {
+            return false;
+        }
+        if (end > 1440) {
+            return false;
+        }
+        return simTime > end;
+    }
+
+    function syncEventActiveStates(simTime) {
+        if (!allEvents.length) return false;
+
+        let changed = false;
+
+        allEvents.forEach(event => {
+            if (!event.fitsInCycle) {
+                if (!event.activatedForCycle) {
+                    if (event.isActive) {
+                        event.isActive = false;
+                        changed = true;
+                    }
+                    return;
+                }
+
+                const activationStart = Number(event.cycleActivationStart);
+                const cycleEnd = getMaxTime();
+                if (simTime >= cycleEnd || Number.isNaN(activationStart)) {
+                    if (simTime >= cycleEnd) {
+                        resetLongEventCycleActivation(event);
+                        changed = true;
+                    } else if (event.isActive) {
+                        event.isActive = false;
+                        changed = true;
+                    }
+                    return;
+                }
+
+                const shouldBeActive = isSimulationAtDayStart(simTime)
+                    ? false
+                    : simTime >= activationStart;
+                if (event.isActive !== shouldBeActive) {
+                    event.isActive = shouldBeActive;
+                    changed = true;
+                }
+                return;
+            }
+
+            if (hasEventEnded(event, simTime)) {
+                if (event.activatedEarly) {
+                    event.activatedEarly = false;
+                    changed = true;
+                }
+                if (event.isActive) {
+                    event.isActive = false;
+                    changed = true;
+                }
+                return;
+            }
+
+            const scheduledActive = isScheduledEventActive(event, simTime);
+            const earlyActive = event.activatedEarly && isBeforeEventStart(event, simTime);
+            const shouldBeActive = !isSimulationAtDayStart(simTime) && (scheduledActive || earlyActive);
+
+            if (event.isActive !== shouldBeActive) {
+                event.isActive = shouldBeActive;
+                changed = true;
+            }
+        });
+
+        return changed;
+    }
+
+    function toggleEventEarlyActivation(event, simTime) {
+        if (hasEventEnded(event, simTime) || !isBeforeEventStart(event, simTime)) {
+            return;
+        }
+
+        if (event.activatedEarly) {
+            event.activatedEarly = false;
+            event.isActive = false;
+            return;
+        }
+
+        event.activatedEarly = true;
+    }
+
+    function toggleLongEventCycleActivation(event, simTime) {
+        if (event.fitsInCycle || simTime >= getMaxTime()) {
+            return;
+        }
+
+        if (event.activatedForCycle) {
+            resetLongEventCycleActivation(event);
+            return;
+        }
+
+        event.activatedForCycle = true;
+        event.cycleActivationStart = simTime;
+    }
+
+    function refreshEventPanelsAndGrid() {
+        const simTime = getCurrentTime();
+        syncEventActiveStates(simTime);
+        lastActiveEventSignature = buildEventSignature(allEvents, simTime);
+        lastQoLEventIdsKey = null;
+        renderActiveEventsPanel();
+        renderAllEventsPanel();
+        updateCellHighlights();
+        updateQoL({ immediate: true });
+        scheduleSaveSimulationState();
+    }
+
+    function applySimulationTime(simTime) {
+        if (!allEvents.length) return;
+
+        syncEventActiveStates(simTime);
+
+        const signature = buildEventSignature(allEvents, simTime);
+        const idsKey = buildQoLActiveIdsKey(simTime);
+        const uiChanged = signature !== lastActiveEventSignature;
+        const qolChanged = lastQoLEventIdsKey === null || idsKey !== lastQoLEventIdsKey;
+
+        if (!uiChanged && !qolChanged) {
+            return;
+        }
+
+        if (uiChanged) {
+            lastActiveEventSignature = signature;
+            renderActiveEventsPanel();
+            renderAllEventsPanel();
+            updateCellHighlights();
+        }
+
+        if (qolChanged) {
+            lastQoLEventIdsKey = idsKey;
+            updateQoL();
+        }
+
+        scheduleSaveSimulationState();
     }
 
     function compareScores(data) {
@@ -60,7 +365,7 @@ document.addEventListener("DOMContentLoaded", () => {
                 ${delta >= 0 ? '+' : ''}${delta}
             </span>`;
         }
-        if (data.total_score !== 0) old_score = data.total_score;
+        old_score = data.total_score;
         return html;
     }
 
@@ -82,61 +387,103 @@ document.addEventListener("DOMContentLoaded", () => {
     }
 
     function positionPopup(x, y) {
-        popup.style.left = `${x + 15}px`;
-        popup.style.top  = `${y + 15}px`;
+        const popupEl = document.getElementById('qol-popup');
+        if (!popupEl) return;
+        popupEl.style.left = `${x + 15}px`;
+        popupEl.style.top  = `${y + 15}px`;
     }
 
     function renderNeighborsList(data) {
-        neighborsList.innerHTML = '';
-        if (!data.categories || Object.keys(data.categories).length === 0) {
-            neighborsList.innerHTML = '<li class="text-slate-400 text-sm">No active QoL influences on this cell</li>';
-            return;
-        }
+        const listEl = document.getElementById('popup-neighbors-list');
+        if (!listEl) return;
+
+        listEl.innerHTML = '';
+
+        const categories = data?.categories ?? {};
         const categoryKeys = {
             Safety: 'safety', Recreation: 'recreation', Environment: 'environment',
             Amenities: 'amenities', Mobility: 'mobility',
         };
+        const eventModifiers = data?.event_modifiers ?? {};
+        const entries = Object.entries(categories);
+
+        if (!entries.length) {
+            listEl.innerHTML = '<li class="text-slate-400 text-sm">No active QoL influences on this cell</li>';
+            return;
+        }
+
         let html = '';
-        const eventModifiers = data.event_modifiers || {};
-        for (const [categoryName, info] of Object.entries(data.categories)) {
-            const cellScore    = Number(info.total);
-            const eventScore   = Number(eventModifiers[categoryKeys[categoryName]] || 0);
+        let hasInfluence = false;
+
+        for (const [categoryName, info] of entries) {
+            const cellScore  = Number(info?.total ?? 0);
+            const eventScore = Number(eventModifiers[categoryKeys[categoryName]] ?? 0);
             const displayScore = cellScore + eventScore;
+
+            if (displayScore === 0 && eventScore === 0 && cellScore === 0) {
+                continue;
+            }
+
+            hasInfluence = true;
             const cls  = displayScore > 0 ? 'text-green-600' : displayScore < 0 ? 'text-red-600' : 'text-slate-400';
             const sign = displayScore > 0 ? '+' : '';
+
             html += `<div class="mb-2 last:mb-0 w-full">
                 <div class="flex justify-between items-center gap-8">
-                    <span class="text-slate-200 font-medium text-sm">${categoryName}</span>
+                    <span class="text-white font-medium text-sm">${categoryName}</span>
                     <span class="${cls} font-bold text-sm">${sign}${displayScore}</span>
-                </div>
-            </div>`;
+                </div>`;
+
+            if (cellScore !== 0) {
+                const cellCls = cellScore > 0 ? 'text-green-500' : 'text-red-500';
+                const cellSign = cellScore > 0 ? '+' : '';
+                html += `<div class="text-[10px] text-slate-400 mt-0.5">Base: <span class="${cellCls}">${cellSign}${cellScore}</span></div>`;
+            }
+
+            if (eventScore !== 0) {
+                const eventCls = eventScore > 0 ? 'text-amber-400' : 'text-red-400';
+                const eventSign = eventScore > 0 ? '+' : '';
+                html += `<div class="text-[10px] text-slate-400 mt-0.5">Event: <span class="${eventCls}">${eventSign}${eventScore}</span></div>`;
+            }
+
+            html += '</div>';
         }
-        const cellTotal = Number(data.total_score);
+
+        if (!hasInfluence) {
+            listEl.innerHTML = '<li class="text-slate-400 text-sm">No active QoL influences on this cell</li>';
+            return;
+        }
+
+        const cellTotal = Number(data?.total_score ?? 0);
         const tcls  = cellTotal > 0 ? 'text-green-600' : cellTotal < 0 ? 'text-red-600' : 'text-slate-400';
         const tsign = cellTotal > 0 ? '+' : '';
         html += `<div class="flex justify-between items-center mt-3 pt-2 border-t border-slate-600/50 w-full">
             <span class="text-slate-300 font-bold text-xs uppercase tracking-wider">Total QoL:</span>
             <span class="${tcls} font-extrabold text-base">${tsign}${cellTotal}</span>
         </div>`;
-        neighborsList.innerHTML = html;
+        listEl.innerHTML = html;
     }
 
     function showPopup() {
-        popup.classList.remove('hidden');
-        void popup.offsetWidth;
-        popup.classList.remove('opacity-0', 'scale-95');
-        popup.classList.add('opacity-100', 'scale-100');
+        const popupEl = document.getElementById('qol-popup');
+        if (!popupEl) return;
+        popupEl.classList.remove('hidden');
+        void popupEl.offsetWidth;
+        popupEl.classList.remove('opacity-0', 'scale-95');
+        popupEl.classList.add('opacity-100', 'scale-100');
     }
 
     function hidePopup() {
-        popup.classList.add('opacity-0', 'scale-95');
-        popup.classList.remove('opacity-100', 'scale-100');
-        setTimeout(() => popup.classList.add('hidden'), 150);
+        const popupEl = document.getElementById('qol-popup');
+        if (!popupEl) return;
+        popupEl.classList.add('opacity-0', 'scale-95');
+        popupEl.classList.remove('opacity-100', 'scale-100');
+        setTimeout(() => popupEl.classList.add('hidden'), 150);
     }
 
     async function handleTileHover(row, col, event) {
         positionPopup(event.pageX, event.pageY);
-        const data = await getNeighborsWithQoL(row, col);
+        const data = await getNeighborsWithQoL(row, col, getActiveEventIdsForQoL());
         renderNeighborsList(data);
         showPopup();
     }
@@ -145,36 +492,88 @@ document.addEventListener("DOMContentLoaded", () => {
     // QOL UPDATE
     // =========================================================
 
-    async function updateQoL() {
-        try {
-            const scoreEl     = document.getElementById('qol-score-value');
-            const breakdownEl = document.getElementById('breakdown-qol-score');
-            const oldScoreEl  = document.getElementById('old-qol-score');
-            const response    = await fetch('/qol/details');
-            const data        = await response.json();
-            if (scoreEl)     { scoreEl.textContent = data.total_score; oldScoreEl.innerHTML = compareScores(data); }
-            if (breakdownEl) { breakdownEl.innerHTML = renderQoLBreakdown(data); }
-        } catch (err) {
-            console.error("Fout bij ophalen QoL:", err);
+    async function updateQoL({ immediate = false } = {}) {
+        if (qolUpdateTimer) {
+            clearTimeout(qolUpdateTimer);
+            qolUpdateTimer = null;
         }
+
+        const executeFetch = async () => {
+            qolFetchGeneration += 1;
+            const generation = qolFetchGeneration;
+            const queryString = `?active_event_ids=${getActiveEventIdsForQoL().join(',')}`;
+
+            qolFetchInFlight = true;
+            try {
+                const scoreEl     = document.getElementById('qol-score-value');
+                const breakdownEl = document.getElementById('breakdown-qol-score');
+                const oldScoreEl  = document.getElementById('old-qol-score');
+                const response    = await fetch(`/qol/details${queryString}`, {
+                    credentials: 'same-origin',
+                    headers: { 'Accept': 'application/json' },
+                });
+                if (!response.ok || generation !== qolFetchGeneration) {
+                    return;
+                }
+
+                const data = await response.json();
+                if (generation !== qolFetchGeneration) {
+                    return;
+                }
+
+                if (scoreEl) scoreEl.textContent = data.total_score;
+                if (oldScoreEl) oldScoreEl.innerHTML = compareScores(data);
+                if (breakdownEl) breakdownEl.innerHTML = renderQoLBreakdown(data);
+            } catch (err) {
+                console.error("Fout bij ophalen QoL:", err);
+            } finally {
+                qolFetchInFlight = false;
+                if (qolFetchPending) {
+                    qolFetchPending = false;
+                    executeFetch();
+                }
+            }
+        };
+
+        const scheduleFetch = () => {
+            if (qolFetchInFlight) {
+                qolFetchPending = true;
+                return;
+            }
+            return executeFetch();
+        };
+
+        if (immediate) {
+            await scheduleFetch();
+            return;
+        }
+
+        qolUpdateTimer = setTimeout(() => { scheduleFetch(); }, 250);
     }
 
     // =========================================================
     // HIGHLIGHT LOGICA
-    // Cellen die beïnvloed worden door een actief event krijgen
-    // een gele rand. We bepalen welke cellen beïnvloed zijn op
-    // basis van de categorieën van het event die matchen met
-    // de functie-categorieën in de grid.
+    // Cellen die beïnvloed worden door een actief event krijgen een gele rand.
+    // Events met specifieke city_functions → alleen die functies highlighten.
+    // Events zonder functie-target → fallback op categorie-match.
     // =========================================================
 
     function updateCellHighlights() {
-        const activeEvents = allEvents.filter(e => e.isActive && e.manuallyEnabled);
+        const activeEvents = allEvents.filter(e => e.isActive);
 
-        // Verzamel alle categorieën van actieve events.
-        // Gebruik affected_categories van de server als die beschikbaar is,
-        // anders fallback naar de keys van modifiers.
         const activeCategories = new Set();
+        const activeFunctionIds = new Set();
+
         activeEvents.forEach(event => {
+            const functionIds = (event.affectedFunctionIds || [])
+                .map(id => Number(id))
+                .filter(id => !Number.isNaN(id) && id > 0);
+
+            if (functionIds.length > 0) {
+                functionIds.forEach(id => activeFunctionIds.add(id));
+                return;
+            }
+
             if (Array.isArray(event.affected_categories) && event.affected_categories.length) {
                 event.affected_categories.forEach(cat => activeCategories.add(cat.toLowerCase()));
             } else if (event.modifiers && typeof event.modifiers === 'object') {
@@ -189,12 +588,10 @@ document.addEventListener("DOMContentLoaded", () => {
                 return;
             }
 
-            // Cel heeft een functie — check of die functie een categorie
-            // heeft die overlapt met de actieve event modifiers.
-            // data-categories wordt als kommalijst op het img-element gezet
-            // vanuit de blade (bijv. data-categories="amenities,recreation").
+            const functionId = Number(functionImg.dataset.functionId);
             const cellCategories = (functionImg.dataset.categories || '').toLowerCase().split(',').filter(Boolean);
-            const isAffected = cellCategories.some(cat => activeCategories.has(cat));
+            const isAffected = activeFunctionIds.has(functionId)
+                || cellCategories.some(cat => activeCategories.has(cat));
 
             cell.classList.toggle('event-highlight', isAffected);
         });
@@ -205,121 +602,115 @@ document.addEventListener("DOMContentLoaded", () => {
     // =========================================================
 
     function onSimulationTick(simTime) {
-        if (!allEvents.length) return;
-
-        let changed = false;
-
-        allEvents.forEach(event => {
-            // Alleen als de planner het event handmatig heeft ingeschakeld
-            if (!event.manuallyEnabled) {
-                if (event.isActive) { event.isActive = false; changed = true; }
-                return;
-            }
-
-            const inWindow     = simTime >= event.start_minutes && simTime <= event.end_minutes;
-            const shouldBeActive = inWindow;
-
-            if (event.isActive !== shouldBeActive) {
-                event.isActive = shouldBeActive;
-                changed = true;
-            }
-        });
-
-        if (changed) {
-            renderActiveEventsPanel();
-            updateCellHighlights();
-            updateQoL();
-        }
+        applySimulationTime(simTime);
     }
 
     onSimulationTimeUpdate(onSimulationTick);
 
     // =========================================================
-    // EVENTS PANEL — rechts in de blade
-    // Toont ALLE events met een Activate/Deactivate knop.
+    // EVENTS PANEL
+    // Cycle-events: auto op starttijd; Activate = vroegtijdig.
+    // Lang events (>24u): alleen handmatig via Activate in All Events.
     // =========================================================
+
+    function renderToggleButton(event, { panel, simTime, showDeactivate }) {
+        return `
+                <button
+                    type="button"
+                    class="event-toggle-btn flex-shrink-0 px-2 py-1 text-xs font-semibold rounded transition
+                        ${showDeactivate
+                            ? 'bg-amber-500 hover:bg-amber-600 text-white'
+                            : 'bg-slate-600 hover:bg-teal-600 hover:text-white text-slate-200'}"
+                    data-event-id="${event.id}">
+                    ${showDeactivate ? 'Deactivate' : 'Activate'}
+                </button>`;
+    }
+
+    function renderEventListItem(event, { panel }) {
+        const li = document.createElement('li');
+        li.className = 'p-3 bg-slate-800 border border-slate-600 rounded mb-2 text-sm';
+        li.dataset.eventId = event.id;
+
+        const modifiersHtml = formatModifiers(event.modifiers);
+        const simTime = getCurrentTime();
+        const isActive = event.isActive;
+        const isWaiting = event.activatedEarly && isBeforeEventStart(event, simTime);
+        const isLongEvent = !event.fitsInCycle;
+        const startLabel = minutesToHHMM(event.start_minutes);
+        const endLabel = minutesToHHMM(event.end_minutes);
+
+        let toggleButton = '';
+        if (isLongEvent && panel === 'active' && event.activatedForCycle) {
+            toggleButton = renderToggleButton(event, { panel, simTime, showDeactivate: true });
+        } else if (isLongEvent && panel === 'all') {
+            toggleButton = renderToggleButton(event, { panel, simTime, showDeactivate: false });
+        } else if (!isLongEvent) {
+            const canToggleEarly = isBeforeEventStart(event, simTime) && !hasEventEnded(event, simTime);
+            const showDeactivate = event.activatedEarly && isBeforeEventStart(event, simTime);
+            if (canToggleEarly) {
+                toggleButton = renderToggleButton(event, { panel, simTime, showDeactivate });
+            }
+        }
+
+        if (panel === 'active') {
+            li.className = isActive
+                ? 'p-3 bg-slate-800 border-l-4 border-amber-500 rounded shadow-sm mb-2 text-sm'
+                : 'p-3 bg-slate-800/60 border border-slate-700 rounded mb-2 text-sm opacity-80';
+        }
+
+        const durationLabel = event.fitsInCycle
+            ? `${startLabel} – ${endLabel}`
+            : `${startLabel} – ${endLabel} · ${Math.round((event.calendarDurationMinutes ?? event.durationMinutes) / 60)}h total`;
+
+        li.innerHTML = `
+            <div class="flex items-start justify-between gap-2">
+                <div class="flex-1 min-w-0">
+                    <div class="font-semibold text-slate-200 truncate">${event.name || 'Nameless Event'}</div>
+                    <div class="text-[11px] text-gray-400 mt-0.5">${durationLabel}</div>
+                    ${isActive && !isWaiting ? '<div class="text-[10px] text-amber-400 mt-1 font-semibold uppercase tracking-wide">Active now</div>' : ''}
+                    ${isWaiting && isActive ? '<div class="text-[10px] text-sky-400 mt-1 font-semibold uppercase tracking-wide">Started by triggering activation</div>' : ''}
+                    ${isWaiting && !isActive ? '<div class="text-[10px] text-sky-400 mt-1 font-semibold uppercase tracking-wide">Starts at ' + startLabel + '</div>' : ''}
+                    ${isLongEvent && event.activatedForCycle && !isActive && isSimulationAtDayStart(simTime) ? '<div class="text-[10px] text-sky-400 mt-1 font-semibold uppercase tracking-wide">Starts on play</div>' : ''}
+                    ${isLongEvent && event.activatedForCycle && isActive ? '<div class="text-[10px] text-sky-400 mt-1 font-semibold uppercase tracking-wide">Active until end of cycle</div>' : ''}
+                    ${modifiersHtml}
+                </div>
+                ${toggleButton}
+            </div>`;
+
+        return li;
+    }
 
     function renderAllEventsPanel() {
         const listEl = document.getElementById('all-events-detail-list');
         if (!listEl) return;
 
         listEl.innerHTML = '';
+        const events = longEvents();
 
-        if (!allEvents.length) {
-            listEl.innerHTML = '<li class="text-sm text-gray-500">No events available.</li>';
+        if (!events.length) {
+            listEl.innerHTML = '<li class="text-sm text-gray-500">No events longer than 24 hours.</li>';
             return;
         }
 
-        allEvents.forEach(event => {
-            const li = document.createElement('li');
-            li.className = "p-3 bg-slate-800 border border-slate-600 rounded mb-2 text-sm";
-            li.dataset.eventId = event.id;
-
-            const modifiersHtml = formatModifiers(event.modifiers);
-            const startLabel    = minutesToHHMM(event.start_minutes);
-            const endLabel      = minutesToHHMM(event.end_minutes);
-            const isEnabled     = event.manuallyEnabled;
-
-            li.innerHTML = `
-                <div class="flex items-start justify-between gap-2">
-                    <div class="flex-1 min-w-0">
-                        <div class="font-semibold text-slate-200 truncate">${event.name || 'Nameless Event'}</div>
-                        <div class="text-[11px] text-gray-400 mt-0.5">${startLabel} – ${endLabel}</div>
-                        ${modifiersHtml}
-                    </div>
-                    <button
-                        class="event-toggle-btn flex-shrink-0 px-2 py-1 text-xs font-semibold rounded transition
-                            ${isEnabled
-                                ? 'bg-amber-500 hover:bg-amber-600 text-black'
-                                : 'bg-slate-600 hover:bg-teal-600 hover:text-white text-slate-200'}"
-                        data-event-id="${event.id}">
-                        ${isEnabled ? 'Deactivate' : 'Activate'}
-                    </button>
-                </div>`;
-
-            listEl.appendChild(li);
+        events.forEach(event => {
+            listEl.appendChild(renderEventListItem(event, { panel: 'all' }));
         });
     }
 
     function renderActiveEventsPanel() {
-        const listEl  = document.getElementById('active-events-list');
-        const emptyEl = document.getElementById('active-events-empty');
+        const listEl = document.getElementById('active-events-list');
         if (!listEl) return;
 
-        const active = allEvents.filter(e => e.isActive && e.manuallyEnabled);
+        listEl.innerHTML = '';
+        const events = cycleEvents();
 
-        if (active.length === 0) {
-            if (emptyEl) emptyEl.classList.remove('hidden');
-            listEl.innerHTML = '';
+        if (!events.length) {
+            listEl.innerHTML = '<li class="text-sm text-gray-500">No events within the 24-hour cycle.</li>';
             return;
         }
 
-        if (emptyEl) emptyEl.classList.add('hidden');
-        listEl.innerHTML = '';
-
-        active.forEach(event => {
-            const li = document.createElement('li');
-            li.className = "p-3 bg-slate-800 border-l-4 border-amber-500 rounded shadow-sm mb-2 text-sm";
-
-            const modifiersHtml = formatModifiers(event.modifiers);
-            const startLabel    = minutesToHHMM(event.start_minutes);
-            const endLabel      = minutesToHHMM(event.end_minutes);
-
-            li.innerHTML = `
-                <div class="flex items-start justify-between gap-2">
-                    <div>
-                        <div class="font-semibold text-slate-200">${event.name || 'Nameless Event'}</div>
-                        <div class="text-[11px] text-gray-500 mt-0.5">${startLabel} – ${endLabel}</div>
-                        ${modifiersHtml}
-                    </div>
-                    <button
-                        class="event-toggle-btn flex-shrink-0 px-2 py-1 text-xs font-semibold rounded bg-amber-500 hover:bg-amber-600 text-black transition"
-                        data-event-id="${event.id}">
-                        Deactivate
-                    </button>
-                </div>`;
-
-            listEl.appendChild(li);
+        events.forEach(event => {
+            listEl.appendChild(renderEventListItem(event, { panel: 'active' }));
         });
     }
 
@@ -328,20 +719,54 @@ document.addEventListener("DOMContentLoaded", () => {
         const btn = e.target.closest('.event-toggle-btn');
         if (!btn) return;
 
-        const eventId = parseInt(btn.dataset.eventId);
-        const event   = allEvents.find(ev => ev.id === eventId);
+        e.preventDefault();
+        e.stopPropagation();
+
+        const eventId = Number(btn.dataset.eventId);
+        const event   = allEvents.find(ev => Number(ev.id) === eventId);
         if (!event) return;
 
-        event.manuallyEnabled = !event.manuallyEnabled;
+        const simTime = getCurrentTime();
+        if (event.fitsInCycle) {
+            toggleEventEarlyActivation(event, simTime);
+        } else {
+            toggleLongEventCycleActivation(event, simTime);
+        }
+        refreshEventPanelsAndGrid();
+    });
 
-        // Als deactivated: ook isActive uitzetten
-        if (!event.manuallyEnabled) event.isActive = false;
+    // Timeline scrub / skip: update highlights even when not playing
+    const simulationTimeline = document.getElementById('simulation-timeline');
+    if (simulationTimeline) {
+        simulationTimeline.addEventListener('input', (e) => {
+            applySimulationTime(parseInt(e.target.value, 10));
+        });
+    }
 
-        // Herrender beide panels + highlights
-        renderAllEventsPanel();
-        renderActiveEventsPanel();
-        updateCellHighlights();
-        updateQoL();
+    ['forwardBtn', 'reverseBtn'].forEach((id) => {
+        document.getElementById(id)?.addEventListener('click', () => {
+            applySimulationTime(getCurrentTime());
+        });
+    });
+
+    document.getElementById('playPauseBtn')?.addEventListener('click', () => {
+        requestAnimationFrame(() => {
+            applySimulationTime(getCurrentTime());
+            scheduleSaveSimulationState();
+        });
+    });
+
+    document.getElementById('replayBtn')?.addEventListener('click', () => {
+        allEvents.forEach(event => {
+            event.activatedEarly = false;
+            if (event.activatedForCycle) {
+                resetLongEventCycleActivation(event);
+            }
+        });
+        clearSimulationState();
+        lastQoLEventIdsKey = null;
+        applySimulationTime(getCurrentTime());
+        updateQoL({ immediate: true });
     });
 
     // =========================================================
@@ -350,7 +775,7 @@ document.addEventListener("DOMContentLoaded", () => {
     //   id, name, modifiers (object), start_at (datetime), end_at (datetime)
     // =========================================================
 
-    async function fetchAllEvents({ forceQolRefresh = false } = {}) {
+    async function fetchAllEvents() {
         try {
             const response = await fetch('/events/simulation', {
                 credentials: 'same-origin',
@@ -361,32 +786,74 @@ document.addEventListener("DOMContentLoaded", () => {
             const data = await response.json();
             if (!data || !data.events) return;
 
-            // Bewaar manuallyEnabled state voor events die al bekend zijn
-            const prevState = {};
-            allEvents.forEach(e => { prevState[e.id] = e.manuallyEnabled; });
+            simulationReferenceDate = data.simulation_reference_date ?? null;
+            const persisted = loadSimulationState();
+            const storedById = {};
+            (persisted?.events ?? []).forEach(e => {
+                storedById[e.id] = e;
+            });
 
-            allEvents = data.events.map(e => ({
-                id:             e.id,
-                name:           e.name,
-                modifiers:      e.modifiers ?? {},
-                // Server levert start_at / end_at als datetime string
-                // of start_minutes / end_minutes als integers — beide ondersteund
-                start_minutes:  e.start_minutes ?? datetimeToSimMinutes(e.start_at),
-                end_minutes:    e.end_minutes   ?? datetimeToSimMinutes(e.end_at),
-                // Behoudt vorige toggle-staat van de planner, default = ingeschakeld
-                manuallyEnabled: prevState[e.id] ?? true,
+            // Bewaar toggle-state per event (in-memory + sessionStorage)
+            const prevState = {};
+            allEvents.forEach(e => {
+                prevState[e.id] = {
+                    activatedEarly: e.activatedEarly,
+                    activatedForCycle: e.activatedForCycle,
+                    cycleActivationStart: e.cycleActivationStart,
+                };
+            });
+
+            allEvents = data.events.map(e => {
+                const stored = storedById[e.id];
+                const memory = prevState[e.id];
+
+                return {
+                id:              e.id,
+                name:            e.name,
+                type:            e.type ?? 'one-off',
+                recurringSchedule: e.recurring_schedule ?? null,
+                recurringStartDate: e.recurring_start_date ?? null,
+                recurringEndDate: e.recurring_end_date ?? null,
+                modifiers:       e.modifiers ?? {},
+                affected_categories: e.affected_categories ?? [],
+                affectedFunctionIds: e.affected_function_ids ?? [],
+                start_minutes:   e.start_minutes ?? datetimeToSimMinutes(e.start_at),
+                end_minutes:     e.end_minutes   ?? datetimeToSimMinutes(e.end_at),
+                durationMinutes: e.duration_minutes ?? Math.max(0, (e.end_minutes ?? 0) - (e.start_minutes ?? 0)),
+                calendarDurationMinutes: e.calendar_duration_minutes ?? e.duration_minutes ?? 0,
+                fitsInCycle:     e.fits_in_cycle ?? ((e.calendar_duration_minutes ?? e.duration_minutes ?? 1440) <= 1440),
+                activatedEarly:  stored?.activatedEarly ?? memory?.activatedEarly ?? false,
+                activatedForCycle: stored?.activatedForCycle ?? memory?.activatedForCycle ?? false,
+                cycleActivationStart: stored?.cycleActivationStart ?? memory?.cycleActivationStart ?? null,
                 isActive:        false,
-            }));
+            };
+            });
+
+            if (persisted?.currentTime != null) {
+                setCurrentTime(Number(persisted.currentTime));
+            }
+
+            const simTime = getCurrentTime();
+            allEvents.forEach(event => {
+                if (hasEventEnded(event, simTime)) {
+                    event.activatedEarly = false;
+                    if (event.activatedForCycle) {
+                        resetLongEventCycleActivation(event);
+                    }
+                }
+            });
 
             setMaxTime();
             syncTimelineUI();
-            renderAllEventsPanel();
 
-            const signature = buildEventSignature(allEvents);
-            if (signature !== lastActiveEventSignature || forceQolRefresh) {
-                lastActiveEventSignature = signature;
-                updateQoL();
+            if (persisted?.isPlaying) {
+                setIsPlaying(true);
+                syncPlayPauseUI();
             }
+
+            applySimulationTime(getCurrentTime());
+            updateQoL({ immediate: true });
+            saveSimulationState();
 
         } catch (err) {
             console.error("Fout bij ophalen events:", err);
@@ -641,9 +1108,10 @@ document.addEventListener("DOMContentLoaded", () => {
     // =========================================================
 
     fetchAllEvents();
-    updateQoL();
     requestAnimationFrame(simulationLoop);
+    window.addEventListener('beforeunload', saveSimulationState);
+}
 
-    setInterval(() => fetchAllEvents(), 30000);
-
-});
+document.addEventListener('DOMContentLoaded', initGridPage);
+document.addEventListener('turbo:load', initGridPage);
+document.addEventListener('turbo:render', initGridPage);

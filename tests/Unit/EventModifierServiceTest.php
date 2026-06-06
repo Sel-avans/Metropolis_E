@@ -96,4 +96,57 @@ class EventModifierServiceTest extends TestCase
 
         $this->assertEquals(0.0, $modifiers['recreation']);
     }
+
+    public function test_fits_in_simulation_cycle_for_short_and_long_events(): void
+    {
+        $short = SimulationEvent::create([
+            'name' => 'Morning market',
+            'type' => 'one-off',
+            'start_moment' => now(),
+            'end_moment' => now()->addHours(8),
+        ]);
+
+        $dailySlot = SimulationEvent::create([
+            'name' => 'WK',
+            'type' => 'one-off',
+            'start_moment' => '2026-06-12 21:00:00',
+            'end_moment' => '2026-06-19 21:00:00',
+        ]);
+
+        $continuous = SimulationEvent::create([
+            'name' => 'Summer festival',
+            'type' => 'one-off',
+            'start_moment' => '2026-06-12 08:00:00',
+            'end_moment' => '2026-06-19 20:00:00',
+        ]);
+
+        $recurring = SimulationEvent::create([
+            'name' => 'Weekly market',
+            'type' => 'recurring',
+            'recurring_schedule' => 'weekly',
+            'recurring_start_date' => now()->format('Y-m-d'),
+            'recurring_start_time' => '09:00',
+            'recurring_end_time' => '17:00',
+        ]);
+
+        $this->assertTrue(EventModifierService::fitsInSimulationCycle($short));
+        $this->assertFalse(EventModifierService::fitsInSimulationCycle($dailySlot));
+        $this->assertFalse(EventModifierService::fitsInSimulationCycle($continuous));
+        $this->assertTrue(EventModifierService::fitsInSimulationCycle($recurring));
+        $this->assertSame(480, EventModifierService::eventDurationMinutes($short));
+        $this->assertSame(1440, EventModifierService::eventDurationMinutes($dailySlot));
+        $this->assertSame(10080, EventModifierService::calendarDurationMinutes($dailySlot));
+
+        $wkDay = SimulationEvent::create([
+            'name' => 'WK day',
+            'type' => 'one-off',
+            'start_moment' => '2026-06-13 20:00:00',
+            'end_moment' => '2026-06-14 20:00:00',
+        ]);
+        [$start, $end, $window] = EventModifierService::resolveSimulationWindow($wkDay);
+        $this->assertSame(840, $start);
+        $this->assertSame(2280, $end);
+        $this->assertSame(1440, $window);
+        $this->assertTrue(EventModifierService::fitsInSimulationCycle($wkDay));
+    }
 }

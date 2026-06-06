@@ -207,4 +207,46 @@ class QoLWithActiveEventTest extends TestCase
         $this->assertSame(2, $storeHover['total_score']);
         $this->assertEquals(0, $storeHover['event_modifiers']['recreation'] ?? 0);
     }
+
+    public function test_qol_details_uses_simulation_active_event_ids(): void
+    {
+        $user = User::factory()->create(['role' => UserRole::Administrator]);
+
+        $store = CityFunction::factory()->create(['name' => 'Store', 'category' => 'amenities']);
+        Effect::factory()->create([
+            'function_id' => $store->id,
+            'category' => 'amenities',
+            'value' => 3,
+        ]);
+
+        GridCell::factory()->create(['row' => 1, 'col' => 1, 'function_id' => $store->id]);
+
+        $event = SimulationEvent::create([
+            'name' => 'Koopavond',
+            'type' => 'one-off',
+            'start_moment' => now()->subHour(),
+            'end_moment' => now()->addHour(),
+        ]);
+
+        Effect::create([
+            'function_id' => null,
+            'simulation_event_id' => $event->id,
+            'category' => 'amenities',
+            'value' => 2,
+        ]);
+
+        EventEffect::create([
+            'simulation_event_id' => $event->id,
+            'city_function_id' => $store->id,
+            'modifier' => 0,
+        ]);
+
+        $inactive = $this->actingAs($user)->getJson('/qol/details?active_event_ids=')->assertOk()->json();
+        $this->assertSame(3, $inactive['categories']['Amenities']['total']);
+        $this->assertSame(3, $inactive['total_score']);
+
+        $active = $this->actingAs($user)->getJson('/qol/details?active_event_ids=' . $event->id)->assertOk()->json();
+        $this->assertSame(5, $active['categories']['Amenities']['total']);
+        $this->assertSame(5, $active['total_score']);
+    }
 }

@@ -6,11 +6,13 @@ use App\Models\GridCell;
 use App\Models\Condition;
 use App\Models\AdjacencyRule;
 use App\Services\EventModifierService;
+use Illuminate\Http\Request;
 
 class QoLController extends Controller
 {
-    public function details()
+    public function details(Request $request)
     {
+        $activeEventIds = $this->simulationActiveEventIds($request);
         $cells = GridCell::with('function.effects')->get();
         $occupiedCells = $cells->filter(fn ($cell) => $cell->function_id && $cell->function);
 
@@ -55,7 +57,7 @@ class QoLController extends Controller
                 $totals[$catKey] += $value;
             }
 
-            foreach (EventModifierService::getModifiersByCategoryForFunction((int) $cell->function_id) as $catKey => $value) {
+            foreach (EventModifierService::getModifiersByCategoryForFunction((int) $cell->function_id, $activeEventIds) as $catKey => $value) {
                 if ($value != 0 && isset($totals[$catKey])) {
                     $totals[$catKey] += $value;
                 }
@@ -85,7 +87,7 @@ class QoLController extends Controller
         $eventBreakdownTotals = [];
 
         foreach ($occupiedCells as $cell) {
-            foreach (EventModifierService::getModifierBreakdownForFunction((int) $cell->function_id) as $modifier) {
+            foreach (EventModifierService::getModifierBreakdownForFunction((int) $cell->function_id, $activeEventIds) as $modifier) {
                 $key = $modifier['event_name'] . '|' . $modifier['category'];
                 $eventBreakdownTotals[$key] = [
                     'event_name' => $modifier['event_name'],
@@ -121,8 +123,9 @@ class QoLController extends Controller
         ]);
     }
 
-    public function cellHoverDetails($row, $col)
+    public function cellHoverDetails(Request $request, $row, $col)
     {
+        $activeEventIds = $this->simulationActiveEventIds($request);
         $cells = GridCell::with('function.effects')->get();
         $conditions = Condition::with(['functionA', 'functionB'])->get();
 
@@ -135,7 +138,7 @@ class QoLController extends Controller
         $discard = [];
         $totals = $this->computeCellTotals($targetCell, $cells, $conditions, $discard);
 
-        $eventModifiers = EventModifierService::getModifiersByCategoryForFunction((int) $targetCell->function_id);
+        $eventModifiers = EventModifierService::getModifiersByCategoryForFunction((int) $targetCell->function_id, $activeEventIds);
         $perCellTotal = array_sum($totals) + array_sum($eventModifiers);
 
         return response()->json([
@@ -313,7 +316,25 @@ class QoLController extends Controller
         return $neighbors;
     }
 
-    public static function recalculateQoL() 
+    /** @return list<int>|null null = legacy wall-clock active events */
+    private function simulationActiveEventIds(Request $request): ?array
+    {
+        if (!$request->has('active_event_ids')) {
+            return null;
+        }
+
+        $raw = $request->query('active_event_ids');
+        if ($raw === null || $raw === '') {
+            return [];
+        }
+
+        return array_values(array_unique(array_filter(array_map(
+            'intval',
+            is_array($raw) ? $raw : explode(',', (string) $raw)
+        ))));
+    }
+
+    public static function recalculateQoL()
     {
         $controller = new self();
         $response = $controller->details()->getData(true);
