@@ -38,9 +38,7 @@
                 <ul class="space-y-2 dark:text-white">
                     @foreach($items as $function)
                         <li class="library-item flex items-center gap-3 px-4 py-3 border border-gray-400 dark:border-gray-600 rounded cursor-pointer hover:border-blue-500 transition focus:outline-none focus:ring-2 focus:ring-blue-500"
-                            draggable="true"
-                            data-function-id="{{ $function->id }}"
-                            data-function-name="{{ $function->name }}"
+                            draggable="true" data-function-id="{{ $function->id }}" data-function-name="{{ $function->name }}"
                             data-image="{{ asset($function->image) }}">
                             <img src="{{ asset($function->image) }}" alt="{{ $function->name }}"
                                 class="w-8 h-8 object-contain pointer-events-none">
@@ -79,25 +77,20 @@
                         @for($row = 1; $row <= 3; $row++)
                             @php
                                 $cell = $grid->first(fn($c) => $c->row == $row && $c->col == $col);
-                                $fn   = $cell?->function ?? null;
+                                $fn = $cell?->function ?? null;
                                 // Categorieën als kommalijst op het img-element zetten
                                 // zodat de highlight-logica in grid.js ze kan lezen.
                                 // Pas dit aan als jouw model een andere relatie heeft.
                                 $categories = $fn ? collect($fn->effects)->pluck('category')->unique()->implode(',') : '';
                             @endphp
                             <div class="grid-cell relative border-2 bg-gray-200 border-gray-400 dark:bg-blue-950 dark:border-gray-600 w-32 h-32 flex items-center justify-center cursor-pointer transition hover:bg-gray-300 dark:hover:bg-blue-900 focus:outline-none focus:ring-2 focus:ring-blue-500"
-                                data-row="{{ $row }}"
-                                data-col="{{ $col }}"
-                                data-id="{{ $cell->id ?? '' }}"
-                                draggable="{{ $fn ? 'true' : 'false' }}"
-                                role="button"
+                                data-row="{{ $row }}" data-col="{{ $col }}" data-id="{{ $cell->id ?? '' }}"
+                                draggable="{{ $fn ? 'true' : 'false' }}" role="button"
                                 aria-label="{{ $fn ? 'Cell ' . $row . ',' . $col . ' with ' . $fn->name : 'Empty cell ' . $row . ',' . $col }}">
 
                                 @if($fn)
-                                    <img src="{{ asset($fn->image) }}"
-                                        alt="{{ $fn->name }}"
-                                        class="grid-function-icon object-contain"
-                                        data-function-id="{{ $fn->id }}"
+                                    <img src="{{ asset($fn->image) }}" alt="{{ $fn->name }}"
+                                        class="grid-function-icon object-contain" data-function-id="{{ $fn->id }}"
                                         data-categories="{{ $categories }}">
 
                                     <button type="button"
@@ -123,10 +116,14 @@
                     <input type="range" id="simulation-timeline" class="w-full" min="0" max="1440" value="0">
                     <div class="flex justify-between items-center mt-2 text-xs text-gray-500 dark:text-gray-400">
                         <span class="font-mono">06:00</span>
-                        <span id="simulation-time-display"
-                            class="font-bold font-mono text-sky-600 dark:text-teal-400 text-base tabular-nums">
-                            06:00
-                        </span>
+                        <div class="flex flex-col items-center gap-1">
+                            <span id="simulation-time-display"
+                                class="font-bold font-mono text-sky-600 dark:text-teal-400 text-base tabular-nums">
+                                06:00
+                            </span>
+                            <div id="day-night-indicator">
+                            </div>
+                        </div>
                         <span class="font-mono">06:00</span>
                     </div>
                 </div>
@@ -139,7 +136,8 @@
                         <span class="text-xs font-bold text-gray-500 uppercase tracking-wider dark:text-gray-400">
                             Simulation Speed
                         </span>
-                        <div class="flex gap-2 bg-gray-100 dark:bg-gray-800 p-2 rounded-lg border border-gray-200 dark:border-gray-700">
+                        <div
+                            class="flex gap-2 bg-gray-100 dark:bg-gray-800 p-2 rounded-lg border border-gray-200 dark:border-gray-700">
                             @foreach([1, 2, 5] as $speed)
                                 <button type="button" onclick="setSimulationSpeed({{ $speed }})"
                                     class="speed-btn px-4 py-2 bg-white dark:bg-gray-700 hover:bg-sky-600 hover:text-white text-gray-700 dark:text-gray-200 shadow-sm border border-gray-300 dark:border-gray-600 font-medium rounded transition"
@@ -147,7 +145,8 @@
                             @endforeach
                         </div>
                         <p class="text-xs text-gray-600 dark:text-gray-400">
-                            Current: <span id="active-speed-display" class="font-bold text-sky-600 dark:text-teal-500">1×</span>
+                            Current: <span id="active-speed-display"
+                                class="font-bold text-sky-600 dark:text-teal-500">1×</span>
                         </p>
                     </div>
 
@@ -156,7 +155,8 @@
                         <span class="text-xs font-bold text-gray-500 uppercase tracking-wider dark:text-gray-400">
                             Animation Play
                         </span>
-                        <div class="flex gap-2 bg-gray-100 dark:bg-gray-800 p-2 rounded-lg border border-gray-200 dark:border-gray-700">
+                        <div
+                            class="flex gap-2 bg-gray-100 dark:bg-gray-800 p-2 rounded-lg border border-gray-200 dark:border-gray-700">
                             <button type="button" id="reverseBtn" title="Rewind"
                                 class="px-4 py-2 bg-white dark:bg-gray-700 hover:bg-sky-600 hover:text-white text-gray-700 dark:text-gray-200 shadow-sm border border-gray-300 dark:border-gray-600 font-medium rounded transition">
                                 &#x23EA;
@@ -177,7 +177,8 @@
                     </div>
 
                     {{-- Active Events (≤24h cycle) --}}
-                    <div class="flex-1 min-w-[200px] bg-gray-50 dark:bg-gray-800 p-4 rounded-md border border-gray-200 dark:border-gray-600">
+                    <div
+                        class="flex-1 min-w-[200px] bg-gray-50 dark:bg-gray-800 p-4 rounded-md border border-gray-200 dark:border-gray-600">
                         <h4 class="text-sm font-semibold text-sky-500 dark:text-teal-500 mb-2">Active Events</h4>
                         <ul id="active-events-list" class="text-xs text-gray-700 dark:text-gray-300 space-y-1">
                             <li class="text-gray-500">Loading events...</li>
@@ -190,7 +191,8 @@
         {{-- END MIDDLE --}}
 
         {{-- RIGHT: QoL Breakdown + Events panel --}}
-        <div class="border-l border-gray-400 dark:border-gray-700 w-64 flex-shrink-0 p-3 flex flex-col gap-4 max-h-[73vh] overflow-y-auto">
+        <div
+            class="border-l border-gray-400 dark:border-gray-700 w-64 flex-shrink-0 p-3 flex flex-col gap-4 max-h-[73vh] overflow-y-auto">
 
             {{-- QoL Breakdown --}}
             <div id="breakdown-qol-score"></div>
