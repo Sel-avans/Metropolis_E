@@ -14,20 +14,8 @@ class GridController extends Controller
 {
     public function index()
     {
-        // 1. Fetch grid data including functions
         $grid = GridCell::with('function.effects')->get();
-
-        // 2. Filter: If a cell is NOT approved, remove the function data
-        // This ensures the view treats these cells as empty upon loading.
-        foreach ($grid as $cell) {
-            if (!$cell->is_approved) {
-                $cell->function_id = null;
-                $cell->function = null;
-            }
-        }
-
-        $items = CityFunction::all();
-        $functions = $items->groupBy('category');
+        $functions = CityFunction::orderBy('name')->get()->groupBy('category')->sortKeys();
 
         return response()->view('gridView', ['functions' => $functions, 'grid' => $grid]);
     }
