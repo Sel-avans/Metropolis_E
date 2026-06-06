@@ -52,16 +52,18 @@
                                 $cell = $grid->first(fn($c) => $c->row == $row && $c->col == $col);
                                 $isApproved = $cell && $cell->is_approved;
                                 $isCityPlanner = auth()->user() && auth()->user()->role->name === 'City_planner';
-                                // Lock klasse alleen als het APPROVED is EN gebruiker GEEN city planner is
-                                $lockClasses = ($isApproved && !$isCityPlanner) ? 'pointer-events-none' : '';
+                                $lockedClasses = $isApproved
+                                    ? 'is-locked bg-stripes opacity-60 border-red-600 '
+                                        . ($isCityPlanner ? 'cursor-pointer' : 'cursor-not-allowed')
+                                    : 'bg-gray-300 border-gray-800 dark:bg-blue-950 dark:border-gray-300 hover:bg-gray-400 hover:dark:bg-gray-100 cursor-pointer';
                             @endphp
                             
-                            <div class="grid-cell relative border-2 w-32 h-32 items-center justify-center cursor-pointer transition focus:outline-none focus:ring-2 focus:ring-blue-500
-                                       {{ $isApproved ? 'is-locked bg-stripes opacity-60 border-red-600 ' . $lockClasses : 'bg-gray-300 border-gray-800 dark:bg-blue-950 dark:border-gray-300 hover:bg-gray-400 hover:dark:bg-gray-100' }}"
+                            <div class="grid-cell relative border-2 w-32 h-32 items-center justify-center transition focus:outline-none focus:ring-2 focus:ring-blue-500 {{ $lockedClasses }}"
                                 data-row="{{ $row }}"
                                 data-col="{{ $col }}"
                                 data-id="{{ $cell ? $cell->id : '' }}"
-                                draggable="{{ $cell && !$isApproved ? 'true' : 'false' }}"
+                                data-allow-lock-select="{{ ($isCityPlanner && $isApproved) ? 'true' : 'false' }}"
+                                draggable="{{ $cell && $cell->function && !$isApproved ? 'true' : 'false' }}"
                                 role="button">
                                 
                                 <div class="lock-indicator absolute top-1 left-1 bg-red-600 text-white text-[10px] font-bold px-1 rounded flex items-center gap-0.5 shadow {{ $isApproved ? '' : 'hidden' }}">

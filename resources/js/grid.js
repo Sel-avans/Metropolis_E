@@ -24,7 +24,15 @@ document.addEventListener("DOMContentLoaded", () => {
         return cell.querySelector('.grid-function-icon') !== null;
     }
 
-    function showLockedCellMessage(cell) {
+    function isLockedCell(cell) {
+        return cell?.classList.contains('is-locked');
+    }
+
+    function canSelectLockedCell(cell) {
+        return cell?.dataset.allowLockSelect === 'true';
+    }
+
+    function showLockedPlacementMessage(cell) {
         const message = isCellOccupied(cell)
             ? "You can't replace the function in this area"
             : "You can't add a function in this area";
@@ -72,7 +80,13 @@ document.addEventListener("DOMContentLoaded", () => {
                         // Apply locked styling
                         if (updatedData.is_approved) {
                             cell.classList.add("is-locked", "bg-stripes", "opacity-60", "border-red-600");
-                            cell.classList.remove("bg-gray-300", "border-gray-800", "dark:bg-blue-950", "dark:border-gray-300", "hover:bg-gray-400", "hover:dark:bg-gray-100");
+                            cell.classList.remove("bg-gray-300", "border-gray-800", "dark:bg-blue-950", "dark:border-gray-300", "hover:bg-gray-400", "hover:dark:bg-gray-100", "cursor-pointer");
+                            cell.classList.add(document.getElementById("approve-btn") ? "cursor-pointer" : "cursor-not-allowed");
+                            if (document.getElementById("approve-btn")) {
+                                cell.dataset.allowLockSelect = "true";
+                            } else {
+                                cell.dataset.allowLockSelect = "false";
+                            }
                             cell.setAttribute("draggable", "false");
                             
                             if (lockIndicator) lockIndicator.classList.remove('hidden');
@@ -82,8 +96,9 @@ document.addEventListener("DOMContentLoaded", () => {
                         } 
                         // Apply unlocked styling
                         else {
-                            cell.classList.remove("is-locked", "bg-stripes", "opacity-60", "border-red-600");
-                            cell.classList.add("bg-gray-300", "border-gray-800", "dark:bg-blue-950", "dark:border-gray-300", "hover:bg-gray-400", "hover:dark:bg-gray-100");
+                            cell.classList.remove("is-locked", "bg-stripes", "opacity-60", "border-red-600", "cursor-not-allowed");
+                            cell.classList.add("bg-gray-300", "border-gray-800", "dark:bg-blue-950", "dark:border-gray-300", "hover:bg-gray-400", "hover:dark:bg-gray-100", "cursor-pointer");
+                            cell.dataset.allowLockSelect = "false";
                             
                             if (cell.querySelector("img")) {
                                 cell.setAttribute("draggable", "true");
@@ -114,8 +129,7 @@ document.addEventListener("DOMContentLoaded", () => {
         const cell = e.target.closest(".grid-cell");
         if (!cell) return;
 
-        if (cell.classList.contains("is-locked")) {
-            alert("You can't delete a function in this area. It is locked.");
+        if (isLockedCell(cell)) {
             return;
         }
 
@@ -278,9 +292,8 @@ document.addEventListener("DOMContentLoaded", () => {
 
     cells.forEach(cell => {
         cell.addEventListener("dragstart", e => {
-            if (cell.classList.contains("is-locked")) {
+            if (isLockedCell(cell)) {
                 e.preventDefault();
-                showLockedCellMessage(cell);
                 return;
             }
             const img = cell.querySelector(".grid-function-icon");
@@ -294,7 +307,7 @@ document.addEventListener("DOMContentLoaded", () => {
 
         cell.addEventListener("dragover", e => {
             e.preventDefault();
-            if (cell.classList.contains("is-locked")) {
+            if (isLockedCell(cell)) {
                 return;
             }
             cell.classList.add("drag-over");
@@ -305,10 +318,10 @@ document.addEventListener("DOMContentLoaded", () => {
             e.preventDefault();
             cell.classList.remove("drag-over");
 
-            if (cell.classList.contains("is-locked")) {
+            if (isLockedCell(cell)) {
                 isDragging = false;
                 dropOccurred = true;
-                showLockedCellMessage(cell);
+                showLockedPlacementMessage(cell);
                 if (sourceCell) sourceCell.classList.remove("drag-source");
                 return;
             }
@@ -348,7 +361,14 @@ document.addEventListener("DOMContentLoaded", () => {
             updateQoL();
         });
 
-        cell.addEventListener("click", () => { if (!isDragging) activateCell(cell); });
+        cell.addEventListener("click", (e) => {
+            if (isDragging) return;
+            if (isLockedCell(cell) && !canSelectLockedCell(cell)) {
+                e.preventDefault();
+                return;
+            }
+            activateCell(cell);
+        });
         cell.addEventListener('mouseenter', (event) => { hoverTimer = setTimeout(() => handleTileHover(parseInt(cell.dataset.row), parseInt(cell.dataset.col), event), HOVER_DELAY_MS); });
         cell.addEventListener('mouseleave', () => { clearTimeout(hoverTimer); hidePopup(); });
     });
