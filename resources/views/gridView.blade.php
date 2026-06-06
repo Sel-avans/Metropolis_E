@@ -30,7 +30,7 @@
                 </div>
             </div>
 
-            <section id="library-filters" class="shrink-0 mb-3" aria-label="Search destinations">
+            <section id="library-filters" class="shrink-0 mb-3" >
                 <label for="library-search" class="sr-only">Search destinations by name</label>
                 <input
                     type="search"
