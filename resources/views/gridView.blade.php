@@ -176,9 +176,9 @@
                     </div>
 
                     {{-- Active Events (≤24h cycle) --}}
-                    <div class="flex-1 min-w-[200px] bg-gray-50 dark:bg-gray-800 p-4 rounded-md border border-gray-200 dark:border-gray-600">
+                    <div class="min-w-[200px] max-h-[160px] flex flex-col bg-gray-50 dark:bg-gray-800 p-4 rounded-md border border-gray-200 dark:border-gray-600">
                         <h4 class="text-sm font-semibold text-sky-500 dark:text-teal-500 mb-2">Active Events</h4>
-                        <ul id="active-events-list" class="text-xs text-gray-700 dark:text-gray-300 space-y-1">
+                        <ul id="active-events-list" class="flex-1 overflow-y-auto text-xs text-gray-700 dark:text-gray-300 space-y-1">
                             <li class="text-gray-500">Loading events...</li>
                         </ul>
                     </div>
