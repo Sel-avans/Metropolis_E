@@ -1,6 +1,6 @@
 import { registerActiveEventIdsProvider, getNeighborsWithQoL } from './neighbours.js';
 import { simulationLoop, onSimulationTimeUpdate } from './simulation.js';
-import { setMaxTime, syncTimelineUI, syncPlayPauseUI, minutesToHHMM, datetimeToSimMinutes, getCurrentTime, getMaxTime, getIsPlaying, setCurrentTime, setIsPlaying } from './regulation.js';
+import { setMaxTime, syncTimelineUI, syncPlayPauseUI, minutesToHHMM, datetimeToSimMinutes, getCurrentTime, getMaxTime, getIsPlaying, setCurrentTime, setIsPlaying, TOTAL_MINUTES } from './regulation.js';
 
 const SIM_STATE_KEY = 'metropolis_simulation_state';
 
@@ -56,6 +56,7 @@ function initGridPage() {
                 activatedEarly: Boolean(e.activatedEarly),
                 activatedForCycle: Boolean(e.activatedForCycle),
                 cycleActivationStart: e.cycleActivationStart ?? null,
+                deactivatedForCycle: Boolean(e.deactivatedForCycle),
             })),
         }));
     }
@@ -98,16 +99,39 @@ function initGridPage() {
                 contributing: isEventContributingToQoL(e, simTime),
                 early: e.activatedEarly ?? false,
                 cycle: e.activatedForCycle ?? false,
+                deactivated: e.deactivatedForCycle ?? false,
             }))
         );
     }
 
-    function cycleEvents() {
-        return allEvents.filter(e => e.fitsInCycle || e.activatedForCycle);
+    function isEventDeactivated(event) {
+        return Boolean(event.deactivatedForCycle);
     }
 
-    function longEvents() {
-        return allEvents.filter(e => !e.fitsInCycle && !e.activatedForCycle);
+    function isEventInActivePanel(event, simTime = getCurrentTime()) {
+        if (hasEventEnded(event, simTime) || isEventDeactivated(event)) {
+            return false;
+        }
+
+        if (!event.fitsInCycle) {
+            return event.activatedForCycle || isEventContributingToQoL(event, simTime);
+        }
+
+        return event.activatedEarly
+            || event.isActive
+            || (!isSimulationAtDayStart(simTime) && isScheduledEventActive(event, simTime));
+    }
+
+    function isEventInAllPanel(event, simTime = getCurrentTime()) {
+        return !hasEventEnded(event, simTime) && !isEventInActivePanel(event, simTime);
+    }
+
+    function activePanelEvents(simTime = getCurrentTime()) {
+        return allEvents.filter(e => isEventInActivePanel(e, simTime));
+    }
+
+    function allPanelEvents(simTime = getCurrentTime()) {
+        return allEvents.filter(e => isEventInAllPanel(e, simTime));
     }
 
     function isSimulationAtDayStart(simTime) {
@@ -120,11 +144,51 @@ function initGridPage() {
         event.isActive = false;
     }
 
+    function deactivateEvent(event) {
+        event.deactivatedForCycle = true;
+        event.activatedEarly = false;
+        resetLongEventCycleActivation(event);
+    }
+
+    function activateEvent(event, simTime) {
+        event.deactivatedForCycle = false;
+
+        if (hasEventEnded(event, simTime)) {
+            return;
+        }
+
+        if (!event.fitsInCycle) {
+            if (!event.activatedForCycle) {
+                event.activatedForCycle = true;
+                event.cycleActivationStart = simTime;
+            }
+            return;
+        }
+
+        if (isBeforeEventStart(event, simTime)) {
+            event.activatedEarly = true;
+        }
+    }
+
     function matchesRecurringSchedule(event, referenceDate) {
-        if (event.type !== 'recurring') return true;
-        if (event.recurringStartDate && referenceDate && referenceDate < event.recurringStartDate) return false;
-        if (event.recurringEndDate && referenceDate && referenceDate > event.recurringEndDate) return false;
+        if (event.type !== 'recurring') {
+            return true;
+        }
+
+        // Simulatie = één 24u-cyclus; recurring events activeren op tijdvenster, niet op weekdag/datum.
         return true;
+    }
+
+    function isLongEventScheduledActive(event, simTime) {
+        if (event.fitsInCycle || isSimulationAtDayStart(simTime)) {
+            return false;
+        }
+
+        if (event.activatedForCycle) {
+            return false;
+        }
+
+        return isEventActiveAtSimTime(event, simTime);
     }
 
     function isScheduledEventActive(event, simTime) {
@@ -133,13 +197,19 @@ function initGridPage() {
     }
 
     function isEventContributingToQoL(event, simTime) {
-        if (isSimulationAtDayStart(simTime)) return false;
+        if (isSimulationAtDayStart(simTime) || isEventDeactivated(event)) return false;
 
         if (!event.fitsInCycle) {
-            if (!event.activatedForCycle) return false;
-            const activationStart = Number(event.cycleActivationStart);
-            if (Number.isNaN(activationStart) || simTime < activationStart || simTime >= getMaxTime()) return false;
-            return true;
+            if (event.activatedForCycle) {
+                const activationStart = Number(event.cycleActivationStart);
+                if (Number.isNaN(activationStart) || simTime < activationStart || simTime >= getMaxTime()) {
+                    return false;
+                }
+
+                return true;
+            }
+
+            return isLongEventScheduledActive(event, simTime);
         }
 
         if (hasEventEnded(event, simTime)) return false;
@@ -162,7 +232,14 @@ function initGridPage() {
         const start = Number(event.start_minutes);
         const end   = Number(event.end_minutes);
         if (Number.isNaN(start) || Number.isNaN(end)) return false;
-        if (end > 1440) return simTime >= start;
+
+        if (end > TOTAL_MINUTES) {
+            // Overnight event (e.g. 20:00–19:00 next day). Do not treat early morning
+            // before start as active — simTime 0 is 06:00, not midnight.
+            const effectiveEndSim = Math.min(end, TOTAL_MINUTES);
+            return simTime >= start && simTime <= effectiveEndSim;
+        }
+
         return simTime >= start && simTime <= end;
     }
 
@@ -182,19 +259,26 @@ function initGridPage() {
         let changed = false;
 
         allEvents.forEach(event => {
+            if (isEventDeactivated(event)) {
+                if (event.isActive) { event.isActive = false; changed = true; }
+                return;
+            }
+
             if (!event.fitsInCycle) {
-                if (!event.activatedForCycle) {
-                    if (event.isActive) { event.isActive = false; changed = true; }
+                if (event.activatedForCycle) {
+                    const activationStart = Number(event.cycleActivationStart);
+                    const cycleEnd = getMaxTime();
+                    if (simTime >= cycleEnd || Number.isNaN(activationStart)) {
+                        if (simTime >= cycleEnd) { resetLongEventCycleActivation(event); changed = true; }
+                        else if (event.isActive) { event.isActive = false; changed = true; }
+                        return;
+                    }
+                    const shouldBeActive = isSimulationAtDayStart(simTime) ? false : simTime >= activationStart;
+                    if (event.isActive !== shouldBeActive) { event.isActive = shouldBeActive; changed = true; }
                     return;
                 }
-                const activationStart = Number(event.cycleActivationStart);
-                const cycleEnd = getMaxTime();
-                if (simTime >= cycleEnd || Number.isNaN(activationStart)) {
-                    if (simTime >= cycleEnd) { resetLongEventCycleActivation(event); changed = true; }
-                    else if (event.isActive) { event.isActive = false; changed = true; }
-                    return;
-                }
-                const shouldBeActive = isSimulationAtDayStart(simTime) ? false : simTime >= activationStart;
+
+                const shouldBeActive = isLongEventScheduledActive(event, simTime);
                 if (event.isActive !== shouldBeActive) { event.isActive = shouldBeActive; changed = true; }
                 return;
             }
@@ -213,23 +297,6 @@ function initGridPage() {
         });
 
         return changed;
-    }
-
-    function toggleEventEarlyActivation(event, simTime) {
-        if (hasEventEnded(event, simTime) || !isBeforeEventStart(event, simTime)) return;
-        if (event.activatedEarly) {
-            event.activatedEarly = false;
-            event.isActive = false;
-            return;
-        }
-        event.activatedEarly = true;
-    }
-
-    function toggleLongEventCycleActivation(event, simTime) {
-        if (event.fitsInCycle || simTime >= getMaxTime()) return;
-        if (event.activatedForCycle) { resetLongEventCycleActivation(event); return; }
-        event.activatedForCycle = true;
-        event.cycleActivationStart = simTime;
     }
 
     function refreshEventPanelsAndGrid() {
@@ -453,6 +520,8 @@ function initGridPage() {
     // =========================================================
 
     function updateCellHighlights() {
+        const simTime = getCurrentTime();
+
         document.querySelectorAll('.grid-cell').forEach(cell => {
             const functionImg = cell.querySelector('.grid-function-icon');
             if (!functionImg) { cell.classList.remove('event-highlight'); return; }
@@ -464,9 +533,8 @@ function initGridPage() {
                 .map(s => s.trim())
                 .filter(Boolean);
 
-            // Per event checken: actief ÉN raakt deze cel
             const isHighlighted = allEvents.some(event => {
-                if (!event.isActive) return false;
+                if (!isEventContributingToQoL(event, simTime)) return false;
 
                 const functionIds = (event.affectedFunctionIds || [])
                     .map(Number)
@@ -502,13 +570,15 @@ function initGridPage() {
     // =========================================================
 
     function renderToggleButton(event, { showDeactivate }) {
+        const action = showDeactivate ? 'deactivate' : 'activate';
         return `<button
             type="button"
             class="event-toggle-btn flex-shrink-0 px-2 py-1 text-xs font-semibold rounded transition
                 ${showDeactivate
                     ? 'bg-amber-500 hover:bg-amber-600 text-white'
                     : 'bg-slate-600 hover:bg-teal-600 hover:text-white text-slate-200'}"
-            data-event-id="${event.id}">
+            data-event-id="${event.id}"
+            data-action="${action}">
             ${showDeactivate ? 'Deactivate' : 'Activate'}
         </button>`;
     }
@@ -527,16 +597,10 @@ function initGridPage() {
         const endLabel   = minutesToHHMM(event.end_minutes);
 
         let toggleButton = '';
-        if (isLongEvent && panel === 'active' && event.activatedForCycle) {
-            toggleButton = renderToggleButton(event, { showDeactivate: true });
-        } else if (isLongEvent && panel === 'all') {
+        if (panel === 'all') {
             toggleButton = renderToggleButton(event, { showDeactivate: false });
-        } else if (!isLongEvent) {
-            const canToggleEarly = isBeforeEventStart(event, simTime) && !hasEventEnded(event, simTime);
-            const showDeactivate = event.activatedEarly && isBeforeEventStart(event, simTime);
-            if (canToggleEarly) {
-                toggleButton = renderToggleButton(event, { showDeactivate });
-            }
+        } else if (panel === 'active') {
+            toggleButton = renderToggleButton(event, { showDeactivate: true });
         }
 
         if (panel === 'active') {
@@ -570,9 +634,9 @@ function initGridPage() {
         const listEl = document.getElementById('all-events-detail-list');
         if (!listEl) return;
         listEl.innerHTML = '';
-        const events = longEvents();
+        const events = allPanelEvents();
         if (!events.length) {
-            listEl.innerHTML = '<li class="text-sm text-gray-500">No events longer than 24 hours.</li>';
+            listEl.innerHTML = '<li class="text-sm text-gray-500">No inactive events.</li>';
             return;
         }
         events.forEach(event => listEl.appendChild(renderEventListItem(event, { panel: 'all' })));
@@ -582,9 +646,9 @@ function initGridPage() {
         const listEl = document.getElementById('active-events-list');
         if (!listEl) return;
         listEl.innerHTML = '';
-        const events = cycleEvents();
+        const events = activePanelEvents();
         if (!events.length) {
-            listEl.innerHTML = '<li class="text-sm text-gray-500">No events within the 24-hour cycle.</li>';
+            listEl.innerHTML = '<li class="text-sm text-gray-500">No active events.</li>';
             return;
         }
         events.forEach(event => listEl.appendChild(renderEventListItem(event, { panel: 'active' })));
@@ -602,10 +666,10 @@ function initGridPage() {
         if (!event) return;
 
         const simTime = getCurrentTime();
-        if (event.fitsInCycle) {
-            toggleEventEarlyActivation(event, simTime);
+        if (btn.dataset.action === 'deactivate') {
+            deactivateEvent(event);
         } else {
-            toggleLongEventCycleActivation(event, simTime);
+            activateEvent(event, simTime);
         }
         refreshEventPanelsAndGrid();
     });
@@ -634,6 +698,7 @@ function initGridPage() {
     document.getElementById('replayBtn')?.addEventListener('click', () => {
         allEvents.forEach(event => {
             event.activatedEarly = false;
+            event.deactivatedForCycle = false;
             if (event.activatedForCycle) resetLongEventCycleActivation(event);
         });
         clearSimulationState();
@@ -668,6 +733,7 @@ function initGridPage() {
                     activatedEarly: e.activatedEarly,
                     activatedForCycle: e.activatedForCycle,
                     cycleActivationStart: e.cycleActivationStart,
+                    deactivatedForCycle: e.deactivatedForCycle,
                 };
             });
 
@@ -692,6 +758,7 @@ function initGridPage() {
                     activatedEarly:        stored?.activatedEarly        ?? memory?.activatedEarly        ?? false,
                     activatedForCycle:     stored?.activatedForCycle     ?? memory?.activatedForCycle     ?? false,
                     cycleActivationStart:  stored?.cycleActivationStart  ?? memory?.cycleActivationStart  ?? null,
+                    deactivatedForCycle:   stored?.deactivatedForCycle   ?? memory?.deactivatedForCycle   ?? false,
                     isActive:              false,
                 };
             });

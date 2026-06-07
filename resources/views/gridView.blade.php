@@ -195,7 +195,7 @@
             {{-- QoL Breakdown --}}
             <div id="breakdown-qol-score"></div>
 
-            {{-- All Events: >24h --}}
+            {{-- All Events: inactive until activate or scheduled start --}}
             <div id="all-events-panel">
                 <h3 class="text-lg font-semibold mb-2 dark:text-teal-500">All Events</h3>
                 <ul id="all-events-detail-list" class="space-y-1 text-sm dark:text-white">
