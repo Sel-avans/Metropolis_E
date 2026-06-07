@@ -1,6 +1,10 @@
 {
   "resources/css/app.css": {
+<<<<<<< HEAD
     "file": "assets/app-B2gicRnm.css",
+=======
+    "file": "assets/app-Bvfid_Ab.css",
+>>>>>>> SIM.8-Automatically-Switch-Between-Day-and-Night
     "src": "resources/css/app.css"
   },
   "resources/css/grid.css": {
@@ -20,7 +24,11 @@
     "isEntry": true
   },
   "resources/js/grid.js": {
+<<<<<<< HEAD
     "file": "assets/grid-CcP9Hf1X.js",
+=======
+    "file": "assets/grid-DYuz7c12.js",
+>>>>>>> SIM.8-Automatically-Switch-Between-Day-and-Night
     "name": "grid",
     "src": "resources/js/grid.js",
     "isEntry": true

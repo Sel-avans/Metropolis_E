@@ -113,6 +113,43 @@ function initGridPage() {
     }
 
     // =========================================================
+    // DAY / NIGHT INDICATOR
+    // =========================================================
+
+    const NIGHT_START_MINUTES = 720; // 18:00
+    let _lastWasDay = null;
+
+    function updateDayNightIndicator(simTime) {
+        const indicator = document.getElementById('day-night-indicator');
+        if (!indicator) return;
+
+        const isDay = simTime < NIGHT_START_MINUTES;
+        if (_lastWasDay === isDay) return;
+        _lastWasDay = isDay;
+
+        // Reset alle klassen en zet nieuwe Tailwind classes
+        indicator.className = [
+            'flex items-center gap-2 px-3 py-1 rounded-full border text-xs font-semibold select-none',
+            'transition-all duration-500',
+            isDay
+                ? 'bg-amber-100 border-amber-400 text-amber-800 dark:bg-amber-900/40 dark:border-amber-500 dark:text-amber-300'
+                : 'bg-indigo-950 border-indigo-500 text-indigo-200 dark:bg-indigo-950 dark:border-indigo-400 dark:text-indigo-200',
+        ].join(' ');
+
+        indicator.innerHTML = isDay
+            ? `<span class="text-base leading-none">☀️</span>
+               <span class="font-bold tracking-wide">Day</span>
+               <span class="opacity-60 font-normal">(06:00 – 18:00)</span>`
+            : `<span class="text-base leading-none">🌙</span>
+               <span class="font-bold tracking-wide">Night</span>
+               <span class="opacity-60 font-normal">(18:00 – 06:00)</span>`;
+
+        // Pulse-effect bij overgang via tijdelijke ring
+        indicator.classList.add('scale-110');
+        setTimeout(() => indicator.classList.remove('scale-110'), 300);
+    }
+
+    // =========================================================
     // HULPFUNCTIES
     // =========================================================
 
@@ -362,6 +399,7 @@ function initGridPage() {
         if (!allEvents.length) return;
 
         syncEventActiveStates(simTime);
+        updateDayNightIndicator(simTime);
 
         const signature = buildEventSignature(allEvents, simTime);
         const idsKey    = buildQoLActiveIdsKey(simTime);
@@ -745,6 +783,7 @@ function initGridPage() {
         });
         clearSimulationState();
         lastQoLEventIdsKey = null;
+        _lastWasDay = null; // forceer indicator reset naar dag
         applySimulationTime(getCurrentTime());
         updateQoL({ immediate: true });
     });

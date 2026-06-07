@@ -41,9 +41,7 @@
                 <ul class="space-y-2 dark:text-white" role="list">
                     @foreach($items as $function)
                         <li class="library-item flex items-center gap-3 px-4 py-3 border border-gray-400 dark:border-gray-600 rounded cursor-pointer hover:border-blue-500 transition focus:outline-none focus:ring-2 focus:ring-blue-500"
-                            draggable="true"
-                            data-function-id="{{ $function->id }}"
-                            data-function-name="{{ $function->name }}"
+                            draggable="true" data-function-id="{{ $function->id }}" data-function-name="{{ $function->name }}"
                             data-image="{{ asset($function->image) }}">
                             <img src="{{ asset($function->image) }}" alt="{{ $function->name }}"
                                 class="w-8 h-8 object-contain pointer-events-none">
@@ -99,10 +97,8 @@
                                 aria-label="{{ $fn ? 'Cell ' . $row . ',' . $col . ' contains ' . $fn->name . '. Press Enter to select.' : 'Empty cell ' . $row . ',' . $col . '. Press Enter to select.' }}">
 
                                 @if($fn)
-                                    <img src="{{ asset($fn->image) }}"
-                                        alt="{{ $fn->name }}"
-                                        class="grid-function-icon object-contain"
-                                        data-function-id="{{ $fn->id }}"
+                                    <img src="{{ asset($fn->image) }}" alt="{{ $fn->name }}"
+                                        class="grid-function-icon object-contain" data-function-id="{{ $fn->id }}"
                                         data-categories="{{ $categories }}">
 
                                     <button type="button"
@@ -131,10 +127,14 @@
                         aria-valuetext="06:00">
                     <div class="flex justify-between items-center mt-2 text-xs text-gray-500 dark:text-gray-400" aria-hidden="true">
                         <span class="font-mono">06:00</span>
-                        <span id="simulation-time-display"
-                            class="font-bold font-mono text-sky-600 dark:text-teal-400 text-base tabular-nums">
-                            06:00
-                        </span>
+                        <div class="flex flex-col items-center gap-1">
+                            <span id="simulation-time-display"
+                                class="font-bold font-mono text-sky-600 dark:text-teal-400 text-base tabular-nums">
+                                06:00
+                            </span>
+                            <div id="day-night-indicator">
+                            </div>
+                        </div>
                         <span class="font-mono">06:00</span>
                     </div>
                 </div>
@@ -213,7 +213,8 @@
         {{-- END MIDDLE --}}
 
         {{-- RIGHT: QoL Breakdown + Events panel --}}
-        <div class="border-l border-gray-400 dark:border-gray-700 w-64 flex-shrink-0 p-3 flex flex-col gap-4 max-h-[73vh] overflow-y-auto">
+        <div
+            class="border-l border-gray-400 dark:border-gray-700 w-64 flex-shrink-0 p-3 flex flex-col gap-4 max-h-[73vh] overflow-y-auto">
 
             {{-- QoL Breakdown --}}
             <div id="breakdown-qol-score" aria-live="polite" aria-atomic="true"></div>

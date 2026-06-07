@@ -165,3 +165,12 @@ export const updateEventsUI = (activeEvents) => {
         list.appendChild(li);
     });
 };
+
+// --- Day / Night ---
+export const DAY_START_MINUTES  = 0;    // 06:00
+export const NIGHT_START_MINUTES = 1080; // 24:00
+
+export const getIsDay = (simTime = null) => {
+    const t = simTime ?? getCurrentTime();
+    return t < NIGHT_START_MINUTES;
+};
