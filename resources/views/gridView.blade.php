@@ -8,22 +8,22 @@
                 <a href="{{ route('functions.index') }}"
                    class="px-3 py-2 bg-blue-600 text-white rounded hover:bg-blue-700 text-sm shadow text-center focus:outline-none focus:ring-2 focus:ring-blue-500"
                    aria-label="Navigate to Function Management page">
-                    Function Management
+                     Function Management
                 </a>
                 <a href="{{ route('effects.index') }}"
                    class="px-3 py-2 bg-green-600 text-white rounded hover:bg-green-700 text-sm shadow text-center focus:outline-none focus:ring-2 focus:ring-green-500"
                    aria-label="Navigate to Effect Management page">
-                    Effect Management
+                     Effect Management
                 </a>
                 <a href="{{ route('conditions.index') }}"
                    class="px-3 py-2 bg-blue-600 text-white rounded hover:bg-blue-700 text-sm shadow text-center focus:outline-none focus:ring-2 focus:ring-blue-500"
                    aria-label="Navigate to Condition Management page">
-                    Condition Management
+                     Condition Management
                 </a>
                 <a href="{{ route('events.index') }}"
                    class="px-3 py-2 bg-purple-600 text-white rounded hover:bg-purple-700 text-sm shadow text-center focus:outline-none focus:ring-2 focus:ring-purple-500"
                    aria-label="Navigate to Events page">
-                    Events
+                     Events
                 </a>
             </div>
         </div>
@@ -48,13 +48,13 @@
             No destinations match your search.
         </p>
 
-        {{-- Preview paneel — Nu aangepast naar een zwevende fixed popup om layout shifts te voorkomen --}}
+        {{-- Preview paneel — Zwevende fixed popup --}}
         <div id="library-preview"
             class="hidden fixed z-50 pointer-events-none p-4 bg-white dark:bg-gray-800 border border-gray-300 dark:border-gray-600 rounded-lg text-sm shadow-xl max-w-xs transition-opacity duration-150 opacity-0">
             <div class="flex justify-between items-center mb-2">
                 <span id="preview-title" class="font-bold dark:text-white"></span>
                 <button id="preview-close"
-                    class="text-gray-400 hover:text-gray-600 dark:hover:text-white text-xs"> </button>
+                    class="text-gray-400 hover:text-gray-600 dark:hover:text-white text-xs cursor-pointer">✕ sluiten</button>
             </div>
             <div id="preview-body" class="dark:text-gray-300">
                 <p class="text-gray-400 text-xs">Laden...</p>
@@ -67,12 +67,16 @@
                     <h2 class="text-xl dark:text-teal-600 font-semibold mt-2 mb-2">{{ ucfirst($category) }}</h2>
                     <ul class="space-y-2 dark:text-white" role="list">
                         @foreach($items as $function)
+                            {{-- HERSTELD: 'tabindex="0"' en 'role="button"' toegevoegd voor Keyboard Toegankelijkheid --}}
                             <li class="library-item flex items-center gap-3 px-4 py-3 border border-gray-400 dark:border-gray-600 rounded cursor-pointer hover:border-blue-500 transition focus:outline-none focus:ring-2 focus:ring-blue-500"
                                 draggable="true"
+                                tabindex="0"
+                                role="button"
                                 data-function-id="{{ $function->id }}"
                                 data-function-name="{{ $function->name }}"
                                 data-category="{{ $function->category }}"
-                                data-image="{{ asset($function->image) }}">
+                                data-image="{{ asset($function->image) }}"
+                                aria-label="{{ $function->name }}">
                                 <img src="{{ asset($function->image) }}" alt="{{ $function->name }}"
                                      class="w-8 h-8 object-contain pointer-events-none">
                                 <span class="text-sm font-medium">{{ $function->name }}</span>
@@ -215,20 +219,13 @@
     {{-- END RIGHT --}}
 </div>
 
-{{-- QoL popups --}}
+{{-- HERSTELD: De dubbele #qol-popup wegehaald, dit is de enige overgebleven, schone popup container --}}
 <div id="qol-popup"
-     class="hidden fixed z-50 bg-slate-900 border border-slate-600 rounded-lg shadow-xl p-3 w-56 pointer-events-none opacity-0 scale-95 transition-all duration-150">
-    <h4 class="text-xs font-bold text-slate-400 uppercase tracking-wider mb-2">Cell QoL Influence</h4>
-    <ul id="popup-neighbors-list" class="space-y-1"></ul>
-</div>
-
-<div id="qol-popup" class="absolute z-50 bg-slate-800/95 text-slate-50 border border-slate-600 rounded-lg p-3 shadow-lg min-w-[200px] pointer-events-none opacity-0 scale-95 transition-all duration-150 hidden">
-    <div class="font-bold border-b border-slate-600 pb-1.5 mb-2 text-[10px] uppercase tracking-wider text-slate-300">
+     class="hidden fixed z-50 bg-slate-900 text-slate-50 border border-slate-600 rounded-lg shadow-xl p-3 w-56 pointer-events-none opacity-0 scale-95 transition-all duration-150">
+    <div class="font-bold border-b border-slate-600 pb-1.5 mb-2 text-[10px] uppercase tracking-wider text-slate-400">
         Quality of Life Impact
     </div>
-    <div>
-        <ul id="popup-neighbors-list" class="space-y-1 text-xs"></ul>
-    </div>
+    <ul id="popup-neighbors-list" class="space-y-1 text-xs"></ul>
 </div>
 
 @vite(['resources/js/grid.js'])

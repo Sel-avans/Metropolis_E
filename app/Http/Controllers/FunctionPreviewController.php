@@ -10,12 +10,15 @@ class FunctionPreviewController extends Controller
     // Geeft effects en conditions terug van een destination als JSON
     public function show($id)
     {
+        // 'effects' direct laden voorkomt een extra database query.
         $function = CityFunction::with('effects')->findOrFail($id);
 
-        // Haal alle conditions op waar deze destination in voorkomt
+        // De where en orWhere zijn gegroepeerd om database-indexen optimaal te gebruiken.
         $conditions = Condition::with(['functionA', 'functionB'])
-            ->where('function_a', $id)
-            ->orWhere('function_b', $id)
+            ->where(function ($query) use ($id) {
+                $query->where('function_a', $id)
+                      ->orWhere('function_b', $id);
+            })
             ->get();
 
         // Groepeer effects per categorie
@@ -28,9 +31,10 @@ class FunctionPreviewController extends Controller
 
         // Maak conditions leesbaar
         $conditionList = $conditions->map(function ($condition) use ($id) {
+            //  ?-> gebruikt voor extra veiligheid, mocht een gerelateerd model null zijn
             $other = ($condition->function_a == $id)
-                ? $condition->functionB->name
-                : $condition->functionA->name;
+                ? ($condition->functionB?->name ?? 'Onbekende functie')
+                : ($condition->functionA?->name ?? 'Onbekende functie');
 
             return [
                 'type'  => $condition->type,

@@ -2,7 +2,7 @@ import { getNeighborsWithQoL } from './neighbours.js';
 import { simulationLoop } from './simulation.js';
 import { setMaxTime, syncTimelineUI } from './regulation.js';
 import { initLibraryFilter } from './library-filter.js';  // Import van de library preview functionaliteit
-import { initLibraryPreview } from './library-preview.js';
+import { initLibraryPreview, closePreview } from './library-preview.js';
 
 
 document.addEventListener("DOMContentLoaded", () => {
@@ -524,6 +524,12 @@ document.addEventListener("DOMContentLoaded", () => {
                 name: item.dataset.functionName,
                 image: item.dataset.image
             };
+            
+            // Sluit de preview direct zodra je begint met slepen
+            if (typeof closePreview === 'function') {
+                closePreview(true);
+            }
+            
             e.dataTransfer.setDragImage(item.querySelector("img"), 16, 16);
         });
     });

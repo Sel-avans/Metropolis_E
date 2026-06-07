@@ -1,8 +1,21 @@
-// Haalt preview data op van de server voor een destination
+// Houdt bij of de preview vergrendeld is door een klik of toetsenbord-focus
+let isLocked = false;
+
+// Haalt preview data op van de server met een harde limiet van 1 seconde
 async function fetchPreview(functionId) {
-    const response = await fetch(`/functions/${functionId}/preview`);
-    if (!response.ok) return null;
-    return response.json();
+    //  een simpele 1-seconde timeout controller
+    const controller = new AbortController();
+    const timeoutId = setTimeout(() => controller.abort(), 1000);
+
+    try {
+        const response = await fetch(`/functions/${functionId}/preview`, { signal: controller.signal });
+        clearTimeout(timeoutId);
+        if (!response.ok) return null;
+        return await response.json();
+    } catch (error) {
+        clearTimeout(timeoutId);
+        return { error: true, message: error.name === 'AbortError' ? 'Preview took too long.' : 'Kon data niet laden.' };
+    }
 }
 
 // de HTML voor effects en conditions
@@ -47,7 +60,7 @@ function renderPreview(data) {
 // Hulpfunctie om de popup te positioneren ten opzichte van de muis en schermranden
 function positionPreview(event) {
     const panel = document.getElementById('library-preview');
-    if (!panel) return;
+    if (!panel || !event) return;
     
     const offsetMouseX = 20; // Aantal pixels rechts van de muis
     const offsetMouseY = 10; // Standaard aantal pixels onder de muis
@@ -82,16 +95,28 @@ function positionPreview(event) {
 }
 
 //  het preview paneel met de opgehaalde data
-async function openPreview(functionId, event) {
+async function openPreview(functionId, event, shouldLock = false) {
     const panel = document.getElementById('library-preview');
     const title = document.getElementById('preview-title');
     const body  = document.getElementById('preview-body');
 
     if (!panel) return;
 
+    // Bij een click of keyboard focus activeren de interactie-modus
+    if (shouldLock) {
+        isLocked = true;
+        panel.classList.remove('pointer-events-none');
+    } else if (!isLocked) {
+        panel.classList.add('pointer-events-none');
+    }
+
     // Als er een muis-event is meegegeven, positioneer de popup direct
-    if (event) {
+    if (event) { //  Volg altijd de muis als er een event is (voorkomt wegschieten bij click lock)
         positionPreview(event);
+    } else if (shouldLock) {
+        // Vaste fallback positie in het midden-links van het scherm bij keyboard focus/click lock
+        panel.style.left = '320px';
+        panel.style.top = '150px';
     }
 
     // Toon het paneel en start de fade-in transitie
@@ -105,25 +130,30 @@ async function openPreview(functionId, event) {
 
     const data = await fetchPreview(functionId);
 
-    if (!data) {
-        body.innerHTML = '<p class="text-red-400 text-xs">Kon data niet laden.</p>';
+    // Toon een foutmelding bij netwerkfouten of als de server er langer dan 1 seconde over deed
+    if (!data || data.error) {
+        body.innerHTML = `<p class="text-red-400 text-xs">${data?.message || 'Kon data niet laden.'}</p>`;
         return;
     }
 
     title.textContent = data.name;
     body.innerHTML = renderPreview(data);
     
-    // Omdat de content (en dus de hoogte) van de popup zojuist is veranderd na het laden,
-    // herberekenen we de positie nogmaals voor het geval hij nu wél buiten het scherm valt.
-    if (event) {
+    
+    if (event) { // Herbereken positie op basis van muis na laden om verspringen te voorkomen
         positionPreview(event);
     }
 }
 
 // Verbergt het preview paneel met een soepele fade-out
-function closePreview() {
+export function closePreview(force = false) {
     const panel = document.getElementById('library-preview');
     if (!panel) return;
+
+    // Voorkom sluiten bij mouseleave als de preview vergrendeld is door een klik
+    if (isLocked && !force) return;
+
+    if (force) isLocked = false;
 
     panel.classList.remove('opacity-100');
     panel.classList.add('opacity-0');
@@ -132,6 +162,7 @@ function closePreview() {
     setTimeout(() => {
         if (panel.classList.contains('opacity-0')) {
             panel.classList.add('hidden');
+            panel.classList.add('pointer-events-none');
         }
     }, 150);
 }
@@ -141,40 +172,56 @@ export function initLibraryPreview() {
     const panel   = document.getElementById('library-preview');
     const closeBtn = document.getElementById('preview-close');
 
-    if (!panel || !closeBtn) return;
+    if (!panel) return;
 
-    // Sluit knop
-    closeBtn.addEventListener('click', closePreview);
+    // Sluit knop activeert een harde forceer-sluiting
+    if (closeBtn) {
+        closeBtn.addEventListener('click', () => closePreview(true));
+    }
 
     // Listeners op elk library item
     document.querySelectorAll('.library-item').forEach(item => {
         const id = item.dataset.functionId;
         let hoverTimer = null;
 
-        // Click opent de preview direct op de muispositie
+        // Maak items bereikbaar met het toetsenbord (Tab-key)
+        item.setAttribute('tabindex', '0');
+
+        // Click opent de preview permanent (isLocked = true)
         item.addEventListener('click', (event) => {
             clearTimeout(hoverTimer);
-            openPreview(id, event);
+            openPreview(id, event, true);
         });
 
         // Hover opent de preview na korte vertraging
         item.addEventListener('mouseenter', (event) => {
+            if (isLocked) return;
             hoverTimer = setTimeout(() => {
-                openPreview(id, event);
+                openPreview(id, event, false);
             }, 300);
         });
 
         // Volg de muis zolang de gebruiker over het item beweegt (zorgt voor realtime updates bij scrollen/bewegen)
         item.addEventListener('mousemove', (event) => {
-            if (!panel.classList.contains('hidden')) {
+            if (!panel.classList.contains('hidden') && !isLocked) {
                 positionPreview(event);
             }
         });
 
-        // Verlaat het item: stop de timer en sluit de preview
+        // Verlaat het item: stop de timer en sluit de preview (behalve bij click-lock)
         item.addEventListener('mouseleave', () => {
             clearTimeout(hoverTimer);
-            closePreview();
+            closePreview(false);
+        });
+
+        // Toetsenbord focus (toegankelijkheid)
+        item.addEventListener('focus', () => {
+            openPreview(id, null, true);
+        });
+
+        // Toetsenbord verlies van focus
+        item.addEventListener('blur', () => {
+            closePreview(true);
         });
     });
 }
