@@ -144,8 +144,8 @@ class EventModifierServiceTest extends TestCase
             'end_moment' => '2026-06-14 20:00:00',
         ]);
         [$start, $end, $window] = EventModifierService::resolveSimulationWindow($wkDay);
-        $this->assertSame(840, $start);
-        $this->assertSame(2280, $end);
+        $this->assertSame(960, $start);
+        $this->assertSame(2400, $end);
         $this->assertSame(1440, $window);
         $this->assertTrue(EventModifierService::fitsInSimulationCycle($wkDay));
     }
