@@ -4,6 +4,48 @@ import { setMaxTime, syncTimelineUI, syncPlayPauseUI, minutesToHHMM, datetimeToS
 
 const SIM_STATE_KEY = 'metropolis_simulation_state';
 
+// =========================================================
+// HULPFUNCTIE: maak een toegankelijke delete-knop
+// WCAG 4.1.2: altijd aria-label meegeven zodat screen readers de knop kunnen benoemen,
+// ook als de knop dynamisch aangemaakt wordt via JavaScript.
+// =========================================================
+function createDeleteBtn(functionName, row = '', col = '') {
+    const btn = document.createElement('button');
+    btn.type = 'button';
+    btn.className = 'delete-btn absolute top-[2px] right-[2px] bg-red-600/80 text-white w-5 h-5 text-[14px] rounded cursor-pointer flex items-center justify-center focus:outline-none focus:ring-2 focus:ring-red-400';
+    const locationLabel = row && col ? ` in grid cell ${row},${col}` : ' from grid cell';
+    btn.setAttribute('aria-label', `Remove ${functionName}${locationLabel}`);
+    const icon = document.createElement('span');
+    icon.setAttribute('aria-hidden', 'true');
+    icon.textContent = '✖';
+    btn.appendChild(icon);
+    return btn;
+}
+
+// =========================================================
+// HULPFUNCTIE: herstel een cel met functie-inhoud
+// Gecentraliseerd zodat alle restore-paden (undo, conflict-fallback)
+// altijd dezelfde toegankelijke markup genereren.
+// =========================================================
+function restoreCellContent(cell, functionId, functionName, functionImage) {
+    cell.innerHTML = '';
+
+    const img = document.createElement('img');
+    img.src = functionImage;
+    img.alt = functionName;
+    img.dataset.functionId = functionId;
+    img.classList.add('grid-function-icon', 'object-contain');
+    cell.appendChild(img);
+
+    const row = cell.dataset.row ?? '';
+    const col = cell.dataset.col ?? '';
+    cell.appendChild(createDeleteBtn(functionName, row, col));
+    cell.setAttribute('draggable', 'true');
+
+    // WCAG 4.1.2: aria-label bijwerken na restore
+    cell.setAttribute('aria-label', `Cell ${row},${col} contains ${functionName}. Press Enter to select.`);
+}
+
 function initGridPage() {
     if (!document.querySelector('.city-grid')) return;
 
@@ -75,8 +117,13 @@ function initGridPage() {
     // =========================================================
 
     function activateCell(cell) {
-        document.querySelectorAll(".grid-cell").forEach(c => c.classList.remove("selected"));
+        document.querySelectorAll(".grid-cell").forEach(c => {
+            c.classList.remove("selected");
+            // WCAG 4.1.2: aria-selected bijhouden op alle cellen
+            c.setAttribute('aria-selected', 'false');
+        });
         cell.classList.add("selected");
+        cell.setAttribute('aria-selected', 'true');
     }
 
     function formatModifiers(modifiers) {
@@ -174,8 +221,6 @@ function initGridPage() {
         if (event.type !== 'recurring') {
             return true;
         }
-
-        // Simulatie = één 24u-cyclus; recurring events activeren op tijdvenster, niet op weekdag/datum.
         return true;
     }
 
@@ -234,8 +279,6 @@ function initGridPage() {
         if (Number.isNaN(start) || Number.isNaN(end)) return false;
 
         if (end > TOTAL_MINUTES) {
-            // Overnight event (e.g. 20:00–19:00 next day). Do not treat early morning
-            // before start as active — simTime 0 is 06:00, not midnight.
             const effectiveEndSim = Math.min(end, TOTAL_MINUTES);
             return simTime >= start && simTime <= effectiveEndSim;
         }
@@ -304,7 +347,7 @@ function initGridPage() {
         syncEventActiveStates(simTime);
 
         lastActiveEventSignature = buildEventSignature(allEvents, simTime);
-        lastQoLEventIdsKey = null; // forceer QoL refresh
+        lastQoLEventIdsKey = null;
 
         renderActiveEventsPanel();
         renderAllEventsPanel();
@@ -346,7 +389,7 @@ function initGridPage() {
         let html = '';
         if (old_score !== undefined) {
             const delta = data.total_score - old_score;
-            html += `<span class="text-xl float-right ${delta < 0 ? 'text-red-600' : 'text-green-600'}">
+            html += `<span class="text-xl float-right ${delta < 0 ? 'text-red-600' : 'text-green-600'}" aria-hidden="true">
                 ${delta >= 0 ? '+' : ''}${delta}
             </span>`;
         }
@@ -514,9 +557,6 @@ function initGridPage() {
 
     // =========================================================
     // HIGHLIGHT LOGICA
-    // Per cel wordt per event gecheckt of het (1) actief is op dit tijdstip
-    // EN (2) deze specifieke cel/functie beïnvloedt.
-    // Zo worden nooit functies van event B gehighlight als alleen event A actief is.
     // =========================================================
 
     function updateCellHighlights() {
@@ -541,12 +581,9 @@ function initGridPage() {
                     .filter(id => !Number.isNaN(id) && id > 0);
 
                 if (functionIds.length > 0) {
-                    // Event heeft specifieke functies → alleen die cellen highlighten,
-                    // NIET alle cellen in dezelfde categorie
                     return functionIds.includes(functionId);
                 }
 
-                // Event heeft geen specifieke functies → match op categorie
                 const eventCats = (event.affected_categories || []).map(c => c.toLowerCase());
                 return cellCategories.some(cat => eventCats.includes(cat));
             });
@@ -571,6 +608,10 @@ function initGridPage() {
 
     function renderToggleButton(event, { showDeactivate }) {
         const action = showDeactivate ? 'deactivate' : 'activate';
+        // WCAG 4.1.2: aria-label geeft volledige context; niet alleen "Activate" of "Deactivate"
+        const ariaLabel = showDeactivate
+            ? `Deactivate event ${event.name || 'Nameless Event'}`
+            : `Activate event ${event.name || 'Nameless Event'}`;
         return `<button
             type="button"
             class="event-toggle-btn flex-shrink-0 px-2 py-1 text-xs font-semibold rounded transition
@@ -578,7 +619,8 @@ function initGridPage() {
                     ? 'bg-amber-500 hover:bg-amber-600 text-white'
                     : 'bg-slate-600 hover:bg-teal-600 hover:text-white text-slate-200'}"
             data-event-id="${event.id}"
-            data-action="${action}">
+            data-action="${action}"
+            aria-label="${ariaLabel}">
             ${showDeactivate ? 'Deactivate' : 'Activate'}
         </button>`;
     }
@@ -851,24 +893,17 @@ function initGridPage() {
 
             if (sourceCell) {
                 oldRow = sourceCell.dataset.row; oldCol = sourceCell.dataset.col;
-                sourceCell.innerHTML = ""; sourceCell.removeAttribute("draggable");
+                sourceCell.innerHTML = "";
+                sourceCell.removeAttribute("draggable");
+                // WCAG 4.1.2: aria-label bijwerken naar lege cel na verplaatsing
+                sourceCell.setAttribute('aria-label', `Empty cell ${oldRow},${oldCol}. Press Enter to select.`);
                 sourceCell.classList.remove("drag-source");
             }
 
-            sourceCell = null; cell.innerHTML = "";
-            const img = document.createElement("img");
-            img.src = draggedItem.image; img.alt = draggedItem.name;
-            img.dataset.functionId = draggedItem.id;
-            img.classList.add("grid-function-icon", "object-contain");
-            cell.appendChild(img);
+            sourceCell = null;
 
-            const deleteBtn = document.createElement("button");
-            deleteBtn.type = "button";
-            deleteBtn.className = "delete-btn absolute top-[2px] right-[2px] bg-red-600/80 text-white w-5 h-5 text-[14px] rounded cursor-pointer flex items-center justify-center";
-            deleteBtn.setAttribute("aria-label", `Remove ${draggedItem.name} from grid cell`);
-            deleteBtn.append("✖");
-            cell.appendChild(deleteBtn);
-            cell.setAttribute("draggable", "true");
+            // Gebruik gecentraliseerde helper voor toegankelijke cel-opbouw
+            restoreCellContent(cell, draggedItem.id, draggedItem.name, draggedItem.image);
             activateCell(cell);
 
             lastAction = { oldRow, oldCol, newRow, newCol, functionId: draggedItem.id };
@@ -881,18 +916,26 @@ function initGridPage() {
                 if (window.confirm("Placement is forbidden by adjacency rules. Force placement anyway?")) {
                     const res2 = await saveMove(oldRow, oldCol, newRow, newCol, true);
                     if (!res2 || !res2.ok) {
+                        // Herstel broncel via toegankelijke helper
                         if (originalSourceCell) {
-                            originalSourceCell.innerHTML = `<img src="${draggedItem.image}" alt="${draggedItem.name}" data-function-id="${draggedItem.id}" class="grid-function-icon object-contain"><button class="delete-btn absolute top-[2px] right-[2px] bg-red-600/80 text-white w-5 h-5 text-[14px] rounded cursor-pointer flex items-center justify-center">✖</button>`;
-                            originalSourceCell.setAttribute('draggable', 'true');
+                            restoreCellContent(originalSourceCell, draggedItem.id, draggedItem.name, draggedItem.image);
                         }
-                        cell.innerHTML = ""; cell.removeAttribute('draggable'); updateQoL(); return;
+                        cell.innerHTML = "";
+                        cell.removeAttribute('draggable');
+                        cell.setAttribute('aria-label', `Empty cell ${newRow},${newCol}. Press Enter to select.`);
+                        updateQoL();
+                        return;
                     }
                 } else {
+                    // Herstel broncel via toegankelijke helper
                     if (originalSourceCell) {
-                        originalSourceCell.innerHTML = `<img src="${draggedItem.image}" alt="${draggedItem.name}" data-function-id="${draggedItem.id}" class="grid-function-icon object-contain"><button class="delete-btn absolute top-[2px] right-[2px] bg-red-600/80 text-white w-5 h-5 text-[14px] rounded cursor-pointer flex items-center justify-center">✖</button>`;
-                        originalSourceCell.setAttribute('draggable', 'true');
+                        restoreCellContent(originalSourceCell, draggedItem.id, draggedItem.name, draggedItem.image);
                     }
-                    cell.innerHTML = ""; cell.removeAttribute('draggable'); updateQoL(); return;
+                    cell.innerHTML = "";
+                    cell.removeAttribute('draggable');
+                    cell.setAttribute('aria-label', `Empty cell ${newRow},${newCol}. Press Enter to select.`);
+                    updateQoL();
+                    return;
                 }
             }
 
@@ -901,7 +944,7 @@ function initGridPage() {
         });
 
         cell.addEventListener("click",   () => { if (!isDragging) activateCell(cell); });
-        cell.addEventListener("keydown", e  => { if (!isDragging && (e.key === "Enter" || e.key === " ")) activateCell(cell); });
+        cell.addEventListener("keydown", e  => { if (!isDragging && (e.key === "Enter" || e.key === " ")) { e.preventDefault(); activateCell(cell); } });
         cell.addEventListener('mouseenter', (event) => {
             const row = parseInt(cell.dataset.row), col = parseInt(cell.dataset.col);
             clearTimeout(hoverTimer);
@@ -915,10 +958,19 @@ function initGridPage() {
     // =========================================================
 
     document.addEventListener("click", async (e) => {
-        if (!e.target.classList.contains("delete-btn")) return;
-        const cell = e.target.closest(".grid-cell");
+        const deleteBtn = e.target.closest('.delete-btn');
+        if (!deleteBtn) return;
+        const cell = deleteBtn.closest(".grid-cell");
         if (!cell) return;
-        cell.innerHTML = ""; cell.removeAttribute("draggable"); activateCell(cell);
+
+        const row = cell.dataset.row;
+        const col = cell.dataset.col;
+        cell.innerHTML = "";
+        cell.removeAttribute("draggable");
+        // WCAG 4.1.2: aria-label bijwerken naar lege cel na verwijdering
+        cell.setAttribute('aria-label', `Empty cell ${row},${col}. Press Enter to select.`);
+        activateCell(cell);
+
         try {
             await fetch(`/grid/cell/${cell.dataset.id}/function`, {
                 method: "DELETE",
@@ -938,7 +990,14 @@ function initGridPage() {
         if (dropOccurred) { dropOccurred = false; return; }
         const rect = document.querySelector(".city-grid").getBoundingClientRect();
         if (e.pageX >= rect.left && e.pageX <= rect.right && e.pageY >= rect.top && e.pageY <= rect.bottom) return;
-        sourceCell.innerHTML = ""; sourceCell.removeAttribute("draggable"); activateCell(sourceCell);
+
+        const row = sourceCell.dataset.row;
+        const col = sourceCell.dataset.col;
+        sourceCell.innerHTML = "";
+        sourceCell.removeAttribute("draggable");
+        sourceCell.setAttribute('aria-label', `Empty cell ${row},${col}. Press Enter to select.`);
+        activateCell(sourceCell);
+
         try {
             await fetch(`/grid/cell/${sourceCell.dataset.id}/function`, {
                 method: "DELETE",
@@ -979,14 +1038,24 @@ function initGridPage() {
                 const targetCell = document.querySelector(`[data-row="${data.cell.row}"][data-col="${data.cell.col}"]`);
                 if (targetCell) {
                     if (data.cell.function_id) {
-                        targetCell.innerHTML = `<img src="${data.cell.image}" class="grid-function-icon object-contain" data-function-id="${data.cell.function_id}"><button class="delete-btn absolute top-[2px] right-[2px] bg-red-600/80 text-white w-5 h-5 text-[14px] rounded cursor-pointer flex items-center justify-center">✖</button>`;
-                        targetCell.setAttribute("draggable", "true");
-                    } else { targetCell.innerHTML = ""; targetCell.removeAttribute("draggable"); }
+                        // WCAG 4.1.2: gebruik gecentraliseerde helper voor toegankelijke markup
+                        restoreCellContent(targetCell, data.cell.function_id, data.cell.name ?? 'Function', data.cell.image);
+                    } else {
+                        targetCell.innerHTML = "";
+                        targetCell.removeAttribute("draggable");
+                        targetCell.setAttribute('aria-label', `Empty cell ${data.cell.row},${data.cell.col}. Press Enter to select.`);
+                    }
                     activateCell(targetCell);
                 }
                 if (data.cleared) {
                     const clearedCell = document.querySelector(`[data-row="${data.cleared.row}"][data-col="${data.cleared.col}"]`);
-                    if (clearedCell) { clearedCell.innerHTML = ""; clearedCell.removeAttribute("draggable"); clearedCell.classList.remove("selected"); }
+                    if (clearedCell) {
+                        clearedCell.innerHTML = "";
+                        clearedCell.removeAttribute("draggable");
+                        clearedCell.classList.remove("selected");
+                        clearedCell.setAttribute('aria-selected', 'false');
+                        clearedCell.setAttribute('aria-label', `Empty cell ${data.cleared.row},${data.cleared.col}. Press Enter to select.`);
+                    }
                 }
                 updateCellHighlights(); setTimeout(() => updateQoL(), 50);
             });

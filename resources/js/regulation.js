@@ -1,8 +1,8 @@
 // --- Constanten ---
 export const TOTAL_MINUTES = 1440;
-export const SIMULATION_DURATION_S = 48; // 48 seconden = 24 uur
+export const SIMULATION_DURATION_S = 48; // 48 seconden = 24 hours
 export const MINUTES_PER_SECOND = TOTAL_MINUTES / SIMULATION_DURATION_S; // 30 min/sec
-export const START_OFFSET_MINUTES = 360; // Simulatie start om 06:00
+export const START_OFFSET_MINUTES = 360; // Simulatie starts at 06:00
 
 // --- State ---
 let isPlaying = false;
@@ -29,7 +29,13 @@ export const setCurrentTime = (time) => {
 export const syncPlayPauseUI = () => {
     const playPauseBtn = document.getElementById('playPauseBtn');
     if (playPauseBtn) {
-        playPauseBtn.innerHTML = isPlaying ? '&#x23F8;' : '&#x25B6;';
+        if (isPlaying) {
+            playPauseBtn.innerHTML = '<span aria-hidden="true">&#x23F8;</span>';
+            playPauseBtn.setAttribute('aria-label', 'Pause simulation');
+        } else {
+            playPauseBtn.innerHTML = '<span aria-hidden="true">&#x25B6;</span>';
+            playPauseBtn.setAttribute('aria-label', 'Play simulation');
+        }
     }
 };
 
@@ -58,12 +64,15 @@ const updateSpeedUI = (selectedSpeed) => {
     document.querySelectorAll('.speed-btn').forEach(btn => {
         const speed = parseInt(btn.getAttribute('data-speed'));
         const isSelected = speed === selectedSpeed;
-        btn.classList.toggle('bg-teal-600',    isSelected);
-        btn.classList.toggle('text-black',     isSelected);
-        btn.classList.toggle('bg-gray-200',    !isSelected);
-        btn.classList.toggle('dark:bg-gray-700', !isSelected);
-        btn.classList.toggle('text-gray-700',  !isSelected);
+
+        btn.classList.toggle('bg-teal-600',        isSelected);
+        btn.classList.toggle('text-black',         isSelected);
+        btn.classList.toggle('bg-gray-200',        !isSelected);
+        btn.classList.toggle('dark:bg-gray-700',   !isSelected);
+        btn.classList.toggle('text-gray-700',      !isSelected);
         btn.classList.toggle('dark:text-gray-200', !isSelected);
+
+        btn.setAttribute('aria-pressed', isSelected ? 'true' : 'false');
     });
 };
 
@@ -85,13 +94,13 @@ export const initSimulationControls = () => {
 
     playPauseBtn.addEventListener('click', () => {
         isPlaying = !isPlaying;
-        playPauseBtn.innerHTML = isPlaying ? '&#x23F8;' : '&#x25B6;';
+        syncPlayPauseUI();
     });
 
     replayBtn.addEventListener('click', () => {
         setCurrentTime(0);
         isPlaying = false;
-        playPauseBtn.innerHTML = '&#x25B6;';
+        syncPlayPauseUI();
         syncTimelineUI();
     });
 
@@ -124,14 +133,18 @@ export const initSimulationControls = () => {
 export const syncTimelineUI = () => {
     const timeline    = document.getElementById('simulation-timeline');
     const timeDisplay = document.getElementById('simulation-time-display');
+    const timeLabel   = minutesToHHMM(currentTime);
 
     if (timeline) {
         timeline.max   = TOTAL_MINUTES;
         timeline.value = currentTime;
+
+        timeline.setAttribute('aria-valuenow', Math.round(currentTime));
+        timeline.setAttribute('aria-valuetext', timeLabel);
     }
 
     if (timeDisplay) {
-        timeDisplay.textContent = minutesToHHMM(currentTime);
+        timeDisplay.textContent = timeLabel;
     }
 };
 
