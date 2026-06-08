@@ -11,22 +11,26 @@ export function getIsDay(simTime) {
 }
 
 let _lastWasDay = 'unset';
+let _lastFullCycle = null;
 
 /**
  * Update the day/night badge (single implementation for grid + simulation).
  * @param {number} simTime Simulation minutes (0 = 06:00)
+ * @param {boolean} fullCycle When true, night segment is shown; otherwise day-only (06:00–24:00)
  */
-export function updateDayNightIndicator(simTime) {
+export function updateDayNightIndicator(simTime, fullCycle = false) {
     const indicator = document.getElementById('day-night-indicator');
     if (!indicator) return;
 
-    const isDay = getIsDay(simTime);
-    if (_lastWasDay === isDay) return;
+    const isDay = fullCycle ? getIsDay(simTime) : true;
+    if (_lastWasDay === isDay && _lastFullCycle === fullCycle) return;
 
     const wasUnset = _lastWasDay === 'unset';
     _lastWasDay = isDay;
+    _lastFullCycle = fullCycle;
 
     indicator.dataset.state = isDay ? 'day' : 'night';
+    indicator.dataset.fullCycle = fullCycle ? 'true' : 'false';
 
     const dayEl   = indicator.querySelector('[data-day]');
     const nightEl = indicator.querySelector('[data-night]');
@@ -35,9 +39,13 @@ export function updateDayNightIndicator(simTime) {
 
     const liveEl = document.getElementById('day-night-live');
     if (liveEl) {
-        liveEl.textContent = isDay
-            ? 'Simulation cycle: Day (06:00 to 24:00)'
-            : 'Simulation cycle: Night (00:00 to 06:00)';
+        if (!fullCycle) {
+            liveEl.textContent = 'Simulation cycle: Day only (06:00 to 24:00)';
+        } else {
+            liveEl.textContent = isDay
+                ? 'Simulation cycle: Day (06:00 to 24:00)'
+                : 'Simulation cycle: Night (00:00 to 06:00)';
+        }
     }
 
     if (!wasUnset) {
@@ -49,4 +57,5 @@ export function updateDayNightIndicator(simTime) {
 /** Reset cached state (e.g. after full page re-init). */
 export function resetDayNightIndicatorState() {
     _lastWasDay = 'unset';
+    _lastFullCycle = null;
 }

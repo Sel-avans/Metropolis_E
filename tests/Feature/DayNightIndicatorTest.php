@@ -37,7 +37,9 @@ class DayNightIndicatorTest extends TestCase
         $response->assertSee('data-night', false);
         $response->assertSee('id="day-night-live"', false);
         $response->assertSee('Day', false);
-        $response->assertSee('Night', false);
+        $response->assertSee('id="full-cycle-toggle"', false);
+        $response->assertSee('Day Simulation', false);
+        $response->assertSee('id="timeline-end-label"', false);
     }
 
     public function test_night_cycle_boundary_matches_frontend_constant(): void

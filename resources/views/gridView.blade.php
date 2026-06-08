@@ -116,8 +116,8 @@
                 {{-- Timeline --}}
                 <div class="mb-6">
                     <label for="simulation-timeline" class="sr-only">Simulation timeline</label>
-                    <input type="range" id="simulation-timeline" class="w-full" min="0" max="1440" value="0"
-                        aria-valuemin="0" aria-valuemax="1440" aria-valuenow="0" aria-valuetext="06:00">
+                    <input type="range" id="simulation-timeline" class="w-full" min="0" max="1080" value="0"
+                        aria-valuemin="0" aria-valuemax="1080" aria-valuenow="0" aria-valuetext="06:00">
                     <div class="flex justify-between items-center mt-2 text-xs text-gray-500 dark:text-gray-400">
                         <span class="font-mono" aria-hidden="true">06:00</span>
                         <div class="flex flex-col items-center gap-1">
@@ -126,7 +126,8 @@
                                 aria-hidden="true">
                                 06:00
                             </span>
-                            <div id="day-night-indicator" data-state="day" role="status"
+                            <div class="flex items-center gap-2 flex-wrap justify-center">
+                            <div id="day-night-indicator" data-state="day" data-full-cycle="false" role="status"
                                 aria-live="polite"
                                 aria-atomic="true"
                                 class="flex items-center gap-2 px-3 py-1 rounded-full border text-xs font-semibold select-none transition-all duration-500
@@ -146,9 +147,20 @@
                                     <span class="opacity-60 font-normal">(00:00 – 06:00)</span>
                                 </span>
                             </div>
-                            <span id="day-night-live" class="sr-only">Simulation cycle: Day (06:00 to 24:00)</span>
+                            <button type="button" id="full-cycle-toggle" aria-pressed="false" data-active="false"
+                                aria-label="Day simulation only (06:00 to 24:00). Click to enable the full day/night cycle (06:00 to 06:00)."
+                                title="Day simulation (06:00 to 24:00). Click to enable the full day/night cycle (06:00 to 06:00)."
+                                class="px-3 py-1 rounded-full border text-xs font-semibold transition-all duration-200
+                                    border-gray-300 dark:border-gray-600 text-gray-600 dark:text-gray-300
+                                    hover:border-sky-400 hover:text-sky-600 dark:hover:border-teal-500 dark:hover:text-teal-400
+                                    data-[active=true]:bg-sky-100 data-[active=true]:border-sky-500 data-[active=true]:text-sky-800
+                                    dark:data-[active=true]:bg-teal-900/40 dark:data-[active=true]:border-teal-500 dark:data-[active=true]:text-teal-300">
+                                Day Simulation
+                            </button>
+                            </div>
+                            <span id="day-night-live" class="sr-only">Simulation cycle: Day only (06:00 to 24:00)</span>
                         </div>
-                        <span class="font-mono" aria-hidden="true">06:00</span>
+                        <span id="timeline-end-label" class="font-mono" aria-hidden="true">24:00</span>
                     </div>
                 </div>
 

@@ -1,6 +1,6 @@
 import { registerActiveEventIdsProvider, getNeighborsWithQoL } from './neighbours.js';
 import { simulationLoop, onSimulationTimeUpdate, onSimulationCycleComplete } from './simulation.js';
-import { setMaxTime, syncTimelineUI, syncPlayPauseUI, minutesToHHMM, datetimeToSimMinutes, getCurrentTime, getMaxTime, getIsPlaying, setCurrentTime, setIsPlaying } from './regulation.js';
+import { setMaxTime, setFullCycleMode, getFullCycleMode, syncTimelineUI, syncPlayPauseUI, minutesToHHMM, datetimeToSimMinutes, getCurrentTime, getMaxTime, getIsPlaying, setCurrentTime, setIsPlaying } from './regulation.js';
 import { resetDayNightIndicatorState } from './day-night-indicator.js';
 
 const SIM_STATE_KEY = 'metropolis_simulation_state';
@@ -52,6 +52,7 @@ function initGridPage() {
         sessionStorage.setItem(SIM_STATE_KEY, JSON.stringify({
             currentTime: getCurrentTime(),
             isPlaying: getIsPlaying(),
+            fullCycleMode: getFullCycleMode(),
             events: allEvents.map(e => ({
                 id: e.id,
                 activatedEarly: Boolean(e.activatedEarly),
@@ -617,11 +618,42 @@ function initGridPage() {
         refreshEventPanelsAndGrid();
     });
 
+    function syncFullCycleToggleUI() {
+        const btn = document.getElementById('full-cycle-toggle');
+        if (!btn) return;
+
+        const active = getFullCycleMode();
+        btn.setAttribute('aria-pressed', active ? 'true' : 'false');
+        btn.dataset.active = active ? 'true' : 'false';
+        btn.textContent = active ? 'Day/Night Cycle Enabled' : 'Day Simulation';
+        btn.setAttribute(
+            'aria-label',
+            active
+                ? 'Day/night cycle enabled. Click to switch to day-only simulation (06:00 to 24:00).'
+                : 'Day simulation only (06:00 to 24:00). Click to enable the full day/night cycle (06:00 to 06:00).'
+        );
+        btn.title = active
+            ? 'Day/night cycle is active (06:00 to 06:00). Click to show day only (06:00 to 24:00).'
+            : 'Day simulation (06:00 to 24:00). Click to enable the full day/night cycle (06:00 to 06:00).';
+    }
+
     // Timeline scrub
     const simulationTimeline = document.getElementById('simulation-timeline');
     if (simulationTimeline) {
         simulationTimeline.addEventListener('input', (e) => {
             applySimulationTime(parseInt(e.target.value, 10));
+        });
+    }
+
+    const fullCycleToggle = document.getElementById('full-cycle-toggle');
+    if (fullCycleToggle) {
+        fullCycleToggle.addEventListener('click', () => {
+            setFullCycleMode(!getFullCycleMode());
+            resetDayNightIndicatorState();
+            syncFullCycleToggleUI();
+            syncTimelineUI();
+            applySimulationTime(getCurrentTime());
+            scheduleSaveSimulationState();
         });
     }
 
@@ -706,6 +738,12 @@ function initGridPage() {
                 };
             });
 
+            if (persisted?.fullCycleMode != null) {
+                setFullCycleMode(Boolean(persisted.fullCycleMode));
+            } else {
+                setFullCycleMode(false);
+            }
+
             if (persisted?.currentTime != null) setCurrentTime(Number(persisted.currentTime));
 
             const simTime = getCurrentTime();
@@ -717,6 +755,7 @@ function initGridPage() {
             });
 
             setMaxTime();
+            syncFullCycleToggleUI();
             syncTimelineUI();
 
             if (persisted?.isPlaying) { setIsPlaying(true); syncPlayPauseUI(); }
@@ -941,6 +980,8 @@ function initGridPage() {
     // =========================================================
 
     resetDayNightIndicatorState();
+    setFullCycleMode(false);
+    syncFullCycleToggleUI();
     syncTimelineUI();
 
     fetchAllEvents();

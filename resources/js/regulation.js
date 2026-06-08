@@ -11,19 +11,30 @@ export const START_OFFSET_MINUTES = 360; // Simulatie starts at 06:00
 // --- State ---
 let isPlaying = false;
 let currentTime = 0;      // in minuten (0–1440), 0 = 06:00
-let maxTime = TOTAL_MINUTES;
+let maxTime = NIGHT_START_MINUTES;
+let fullCycleMode = false;
 
 // --- Getters & Setters ---
 export const getIsPlaying  = () => isPlaying;
 export const getCurrentTime = () => currentTime;
 export const getMaxTime     = () => maxTime;
+export const getFullCycleMode = () => fullCycleMode;
 
 export const setIsPlaying = (playing) => {
     isPlaying = Boolean(playing);
 };
 
+export const setFullCycleMode = (enabled) => {
+    fullCycleMode = Boolean(enabled);
+    maxTime = fullCycleMode ? TOTAL_MINUTES : NIGHT_START_MINUTES;
+
+    if (currentTime > maxTime) {
+        currentTime = maxTime;
+    }
+};
+
 export const setMaxTime = () => {
-    maxTime = TOTAL_MINUTES;
+    maxTime = fullCycleMode ? TOTAL_MINUTES : NIGHT_START_MINUTES;
 };
 
 export const setCurrentTime = (time) => {
@@ -93,7 +104,7 @@ export const initSimulationControls = () => {
         return;
     }
 
-    timeline.max   = TOTAL_MINUTES;
+    timeline.max   = maxTime;
     timeline.value = 0;
 
     playPauseBtn.addEventListener('click', () => {
@@ -137,12 +148,14 @@ export const initSimulationControls = () => {
 export const syncTimelineUI = () => {
     const timeline    = document.getElementById('simulation-timeline');
     const timeDisplay = document.getElementById('simulation-time-display');
+    const endLabel    = document.getElementById('timeline-end-label');
     const timeLabel   = minutesToHHMM(currentTime);
 
     if (timeline) {
-        timeline.max   = TOTAL_MINUTES;
+        timeline.max   = maxTime;
         timeline.value = currentTime;
 
+        timeline.setAttribute('aria-valuemax', String(maxTime));
         timeline.setAttribute('aria-valuenow', Math.round(currentTime));
         timeline.setAttribute('aria-valuetext', timeLabel);
     }
@@ -151,7 +164,11 @@ export const syncTimelineUI = () => {
         timeDisplay.textContent = timeLabel;
     }
 
-    updateDayNightIndicator(currentTime);
+    if (endLabel) {
+        endLabel.textContent = fullCycleMode ? '06:00' : '24:00';
+    }
+
+    updateDayNightIndicator(currentTime, fullCycleMode);
 };
 
 export const updateEventsUI = (activeEvents) => {

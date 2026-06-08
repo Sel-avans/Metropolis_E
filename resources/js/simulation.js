@@ -7,7 +7,6 @@ import {
     getMaxTime,
     MINUTES_PER_SECOND,
 } from './regulation.js';
-import { NIGHT_START_MINUTES } from './day-night-indicator.js';
 
 export const simulationState = { speed: 1 };
 
@@ -69,8 +68,6 @@ export function advanceSimulationTime(deltaTimeSeconds) {
     if (next >= maxTime) {
         next = next - maxTime;
         wrapped = true;
-    } else if (current < NIGHT_START_MINUTES && next >= NIGHT_START_MINUTES) {
-        next = NIGHT_START_MINUTES;
     }
 
     setCurrentTime(next);
