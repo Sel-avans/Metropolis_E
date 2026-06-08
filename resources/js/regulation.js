@@ -1,3 +1,7 @@
+import { getIsDay, NIGHT_START_MINUTES, updateDayNightIndicator } from './day-night-indicator.js';
+
+export { getIsDay, NIGHT_START_MINUTES };
+
 // --- Constanten ---
 export const TOTAL_MINUTES = 1440;
 export const SIMULATION_DURATION_S = 48; // 48 seconden = 24 hours
@@ -146,6 +150,8 @@ export const syncTimelineUI = () => {
     if (timeDisplay) {
         timeDisplay.textContent = timeLabel;
     }
+
+    updateDayNightIndicator(currentTime);
 };
 
 export const updateEventsUI = (activeEvents) => {
@@ -167,10 +173,4 @@ export const updateEventsUI = (activeEvents) => {
 };
 
 // --- Day / Night ---
-export const DAY_START_MINUTES  = 0;    // 06:00
-export const NIGHT_START_MINUTES = 1080; // 24:00
-
-export const getIsDay = (simTime = null) => {
-    const t = simTime ?? getCurrentTime();
-    return t < NIGHT_START_MINUTES;
-};
+export const DAY_START_MINUTES = 0; // 06:00

@@ -1,6 +1,7 @@
 import { registerActiveEventIdsProvider, getNeighborsWithQoL } from './neighbours.js';
-import { simulationLoop, onSimulationTimeUpdate } from './simulation.js';
+import { simulationLoop, onSimulationTimeUpdate, onSimulationCycleComplete } from './simulation.js';
 import { setMaxTime, syncTimelineUI, syncPlayPauseUI, minutesToHHMM, datetimeToSimMinutes, getCurrentTime, getMaxTime, getIsPlaying, setCurrentTime, setIsPlaying } from './regulation.js';
+import { resetDayNightIndicatorState } from './day-night-indicator.js';
 
 const SIM_STATE_KEY = 'metropolis_simulation_state';
 
@@ -67,41 +68,6 @@ function initGridPage() {
 
     function clearSimulationState() {
         sessionStorage.removeItem(SIM_STATE_KEY);
-    }
-
-    // =========================================================
-    // DAY / NIGHT INDICATOR
-    // =========================================================
-
-    const NIGHT_START_MINUTES = 1080; // 24:00
-    // Gebruik een sentinel die nooit gelijk is aan true/false,
-    // zodat de eerste aanroep altijd de indicator rendert.
-    let _lastWasDay = 'unset';
-
-    function updateDayNightIndicator(simTime) {
-        const indicator = document.getElementById('day-night-indicator');
-        if (!indicator) return;
-
-        const isDay = simTime < NIGHT_START_MINUTES;
-        if (_lastWasDay === isDay) return;
-
-        const wasUnset = _lastWasDay === 'unset';
-        _lastWasDay = isDay;
-
-        // Wissel data-state — stijlen staan als volledige klasse-strings
-        // in de Blade template zodat Tailwind ze altijd meeneemt in de build.
-        indicator.dataset.state = isDay ? 'day' : 'night';
-
-        const dayEl   = indicator.querySelector('[data-day]');
-        const nightEl = indicator.querySelector('[data-night]');
-        if (dayEl)   dayEl.classList.toggle('hidden', !isDay);
-        if (nightEl) nightEl.classList.toggle('hidden', isDay);
-
-        // Pulse alleen bij echte dag↔nacht overgang, niet bij initiële render
-        if (!wasUnset) {
-            indicator.classList.add('scale-110');
-            setTimeout(() => indicator.classList.remove('scale-110'), 300);
-        }
     }
 
     // =========================================================
@@ -284,10 +250,9 @@ function initGridPage() {
     }
 
     function applySimulationTime(simTime) {
-        if (!allEvents.length) return;
-
         syncEventActiveStates(simTime);
-        updateDayNightIndicator(simTime);
+
+        if (!allEvents.length) return;
 
         const signature = buildEventSignature(allEvents, simTime);
         const idsKey    = buildQoLActiveIdsKey(simTime);
@@ -524,7 +489,20 @@ function initGridPage() {
         applySimulationTime(simTime);
     }
 
+    function onSimulationCycleComplete() {
+        allEvents.forEach(event => {
+            event.activatedEarly = false;
+            if (event.activatedForCycle) resetLongEventCycleActivation(event);
+        });
+        lastQoLEventIdsKey = null;
+        lastActiveEventSignature = '';
+        applySimulationTime(getCurrentTime());
+        updateQoL({ immediate: true });
+        scheduleSaveSimulationState();
+    }
+
     onSimulationTimeUpdate(onSimulationTick);
+    onSimulationCycleComplete(onSimulationCycleComplete);
 
     // =========================================================
     // EVENTS PANEL RENDERING
@@ -667,7 +645,9 @@ function initGridPage() {
         });
         clearSimulationState();
         lastQoLEventIdsKey = null;
-        _lastWasDay = 'unset'; // forceer indicator re-render naar dag
+        lastActiveEventSignature = '';
+        resetDayNightIndicatorState();
+        syncTimelineUI();
         applySimulationTime(getCurrentTime());
         updateQoL({ immediate: true });
     });
@@ -959,6 +939,9 @@ function initGridPage() {
     // =========================================================
     // INIT
     // =========================================================
+
+    resetDayNightIndicatorState();
+    syncTimelineUI();
 
     fetchAllEvents();
     requestAnimationFrame(simulationLoop);

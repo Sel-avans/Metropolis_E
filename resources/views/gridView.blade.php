@@ -118,36 +118,37 @@
                     <label for="simulation-timeline" class="sr-only">Simulation timeline</label>
                     <input type="range" id="simulation-timeline" class="w-full" min="0" max="1440" value="0"
                         aria-valuemin="0" aria-valuemax="1440" aria-valuenow="0" aria-valuetext="06:00">
-                    <div class="flex justify-between items-center mt-2 text-xs text-gray-500 dark:text-gray-400"
-                        aria-hidden="true">
-                        <span class="font-mono">06:00</span>
+                    <div class="flex justify-between items-center mt-2 text-xs text-gray-500 dark:text-gray-400">
+                        <span class="font-mono" aria-hidden="true">06:00</span>
                         <div class="flex flex-col items-center gap-1">
                             <span id="simulation-time-display"
-                                class="font-bold font-mono text-sky-600 dark:text-teal-400 text-base tabular-nums">
+                                class="font-bold font-mono text-sky-600 dark:text-teal-400 text-base tabular-nums"
+                                aria-hidden="true">
                                 06:00
                             </span>
-                            <div id="day-night-indicator" data-state="day"
+                            <div id="day-night-indicator" data-state="day" role="status"
+                                aria-live="polite"
+                                aria-atomic="true"
                                 class="flex items-center gap-2 px-3 py-1 rounded-full border text-xs font-semibold select-none transition-all duration-500
            [&[data-state=day]]:bg-amber-100 [&[data-state=day]]:border-amber-400 [&[data-state=day]]:text-amber-800
            dark:[&[data-state=day]]:bg-amber-900/40 dark:[&[data-state=day]]:border-amber-500 dark:[&[data-state=day]]:text-amber-300
            [&[data-state=night]]:bg-indigo-900 [&[data-state=night]]:border-indigo-400 [&[data-state=night]]:text-indigo-200">
 
-                                {{-- Day-content --}}
                                 <span data-day class="flex items-center gap-2">
-                                    <span class="text-base leading-none">☀️</span>
+                                    <span class="text-base leading-none" aria-hidden="true">☀️</span>
                                     <span class="font-bold tracking-wide">Day</span>
                                     <span class="opacity-60 font-normal">(06:00 – 24:00)</span>
                                 </span>
 
-                                {{-- Night Content --}}
                                 <span data-night class="hidden flex items-center gap-2">
-                                    <span class="text-base leading-none">🌙</span>
+                                    <span class="text-base leading-none" aria-hidden="true">🌙</span>
                                     <span class="font-bold tracking-wide">Night</span>
                                     <span class="opacity-60 font-normal">(00:00 – 06:00)</span>
                                 </span>
                             </div>
+                            <span id="day-night-live" class="sr-only">Simulation cycle: Day (06:00 to 24:00)</span>
                         </div>
-                        <span class="font-mono">06:00</span>
+                        <span class="font-mono" aria-hidden="true">06:00</span>
                     </div>
                 </div>
 

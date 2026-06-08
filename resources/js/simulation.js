@@ -6,50 +6,26 @@ import {
     initSimulationControls,
     getMaxTime,
     MINUTES_PER_SECOND,
-    getIsDay,
 } from './regulation.js';
+import { NIGHT_START_MINUTES } from './day-night-indicator.js';
 
 export const simulationState = { speed: 1 };
 
-// ─── Day / Night indicator ────────────────────────────────────────────────────
-
-let _lastWasDay = null;
-
-function updateDayNightIndicator(simTime) {
-    const isDay = getIsDay(simTime);
-
-    // Alleen herrenderen bij overgang
-    if (_lastWasDay === isDay) return;
-    _lastWasDay = isDay;
-
-    const indicator = document.getElementById('day-night-indicator');
-    if (!indicator) return;
-
-    if (isDay) {
-        indicator.innerHTML = `
-            <span class="dn-icon">☀️</span>
-            <span class="dn-label">Day</span>
-            <span class="dn-badge">06:00 – 24:00</span>`;
-        indicator.className = 'dn-indicator dn-day';
-    } else {
-        indicator.innerHTML = `
-            <span class="dn-icon">🌙</span>
-            <span class="dn-label">Night</span>
-            <span class="dn-badge">00:00 – 06:00</span>`;
-        indicator.className = 'dn-indicator dn-night';
-    }
-
-    // Flash-animatie bij wisseling
-    indicator.classList.add('dn-transition');
-    setTimeout(() => indicator.classList.remove('dn-transition'), 600);
-}
-
-// ─── Speed ───────────────────────────────────────────────────────────────────
+/** Full simulation cycle length in minutes (06:00 → next 06:00). */
+export const CYCLE_LENGTH_MINUTES = 1440;
 
 export const setSimulationSpeed = async (speed) => {
-    simulationState.speed = parseInt(speed);
+    simulationState.speed = parseInt(speed, 10);
     const display = document.getElementById('active-speed-display');
     if (display) display.innerText = speed + '×';
+
+    document.querySelectorAll('.speed-btn').forEach(btn => {
+        const selected = parseInt(btn.getAttribute('data-speed'), 10) === simulationState.speed;
+        btn.setAttribute('aria-pressed', selected ? 'true' : 'false');
+    });
+
+    syncTimelineUI();
+
     try {
         const response = await fetch('/api/simulation/speed', {
             method: 'POST',
@@ -72,35 +48,51 @@ if (!window.__simControlsInitialized) {
     initSimulationControls();
 }
 
-// ─── Loop ────────────────────────────────────────────────────────────────────
-
 let lastTimestamp = 0;
 let onTimeUpdateCallback = null;
+let onCycleCompleteCallback = null;
+
 export const onSimulationTimeUpdate = (cb) => { onTimeUpdateCallback = cb; };
+export const onSimulationCycleComplete = (cb) => { onCycleCompleteCallback = cb; };
+
+/**
+ * Advance simulation time, snap to day/night boundary when crossing, wrap at cycle end.
+ * @returns {{ wrapped: boolean }}
+ */
+export function advanceSimulationTime(deltaTimeSeconds) {
+    const maxTime   = getMaxTime();
+    const current   = getCurrentTime();
+    const increment = MINUTES_PER_SECOND * simulationState.speed * deltaTimeSeconds;
+    let next        = current + increment;
+    let wrapped     = false;
+
+    if (next >= maxTime) {
+        next = next - maxTime;
+        wrapped = true;
+    } else if (current < NIGHT_START_MINUTES && next >= NIGHT_START_MINUTES) {
+        next = NIGHT_START_MINUTES;
+    }
+
+    setCurrentTime(next);
+    syncTimelineUI();
+
+    if (onTimeUpdateCallback) {
+        onTimeUpdateCallback(getCurrentTime());
+    }
+
+    if (wrapped && onCycleCompleteCallback) {
+        onCycleCompleteCallback();
+    }
+
+    return { wrapped };
+}
 
 export function simulationLoop(timestamp) {
     if (getIsPlaying()) {
         if (!lastTimestamp) lastTimestamp = timestamp;
 
         const deltaTime = (timestamp - lastTimestamp) / 1000;
-        const maxTime   = getMaxTime();
-        const current   = getCurrentTime();
-
-        if (current < maxTime) {
-            const increment = MINUTES_PER_SECOND * simulationState.speed * deltaTime;
-            setCurrentTime(current + increment);
-            syncTimelineUI();
-            updateDayNightIndicator(getCurrentTime());
-            if (onTimeUpdateCallback) onTimeUpdateCallback(getCurrentTime());
-        } else {
-            setCurrentTime(maxTime);
-            syncTimelineUI();
-            updateDayNightIndicator(getCurrentTime());
-            if (onTimeUpdateCallback) onTimeUpdateCallback(getCurrentTime());
-
-            const playPauseBtn = document.getElementById('playPauseBtn');
-            if (playPauseBtn && getIsPlaying()) playPauseBtn.click();
-        }
+        advanceSimulationTime(deltaTime);
 
         lastTimestamp = timestamp;
     } else {
