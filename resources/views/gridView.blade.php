@@ -37,7 +37,6 @@
 
             @forelse($functions as $category => $items)
                 <h2 class="text-xl dark:text-teal-600 font-semibold mt-6 mb-2">{{ ucfirst($category) }}</h2>
-                {{-- WCAG 1.3.1: role="list" explicieter; items krijgen tabindex zodra toetsenbord-feature klaar is --}}
                 <ul class="space-y-2 dark:text-white" role="list">
                     @foreach($items as $function)
                         <li class="library-item flex items-center gap-3 px-4 py-3 border border-gray-400 dark:border-gray-600 rounded cursor-pointer hover:border-blue-500 transition focus:outline-none focus:ring-2 focus:ring-blue-500"
@@ -127,36 +126,54 @@
                                 06:00
                             </span>
                             <div class="flex items-center gap-2 flex-wrap justify-center">
-                            <div id="day-night-indicator" data-state="day" data-full-cycle="false" role="status"
-                                aria-live="polite"
-                                aria-atomic="true"
-                                class="flex items-center gap-2 px-3 py-1 rounded-full border text-xs font-semibold select-none transition-all duration-500
+                                <div id="day-night-indicator" data-state="day" data-full-cycle="false" role="status"
+                                    aria-live="polite" aria-atomic="true"
+                                    class="flex items-center gap-2 px-3 py-1 rounded-full border text-xs font-semibold select-none transition-all duration-500
            [&[data-state=day]]:bg-amber-100 [&[data-state=day]]:border-amber-400 [&[data-state=day]]:text-amber-800
            dark:[&[data-state=day]]:bg-amber-900/40 dark:[&[data-state=day]]:border-amber-500 dark:[&[data-state=day]]:text-amber-300
            [&[data-state=night]]:bg-indigo-900 [&[data-state=night]]:border-indigo-400 [&[data-state=night]]:text-indigo-200">
 
-                                <span data-day class="flex items-center gap-2">
-                                    <span class="text-base leading-none" aria-hidden="true">☀️</span>
-                                    <span class="font-bold tracking-wide">Day</span>
-                                    <span class="opacity-60 font-normal">(06:00 – 24:00)</span>
-                                </span>
+                                    <span data-day class="flex items-center gap-2">
+                                        <span class="text-base leading-none" aria-hidden="true">☀️</span>
+                                        <span class="font-bold tracking-wide">Day</span>
+                                        <span class="opacity-60 font-normal">(06:00 – 24:00)</span>
+                                    </span>
 
-                                <span data-night class="hidden flex items-center gap-2">
-                                    <span class="text-base leading-none" aria-hidden="true">🌙</span>
-                                    <span class="font-bold tracking-wide">Night</span>
-                                    <span class="opacity-60 font-normal">(00:00 – 06:00)</span>
-                                </span>
-                            </div>
-                            <button type="button" id="full-cycle-toggle" aria-pressed="false" data-active="false"
-                                aria-label="Day simulation only (06:00 to 24:00). Click to enable the full day/night cycle (06:00 to 06:00)."
-                                title="Day simulation (06:00 to 24:00). Click to enable the full day/night cycle (06:00 to 06:00)."
-                                class="px-3 py-1 rounded-full border text-xs font-semibold transition-all duration-200
+                                    <span data-night class="hidden flex items-center gap-2">
+                                        <span class="text-base leading-none" aria-hidden="true">🌙</span>
+                                        <span class="font-bold tracking-wide">Night</span>
+                                        <span class="opacity-60 font-normal">(00:00 – 06:00)</span>
+                                    </span>
+                                </div>
+                                <button type="button" id="full-cycle-toggle" aria-pressed="false" data-active="false"
+                                    aria-label="Day simulation only (06:00 to 24:00). Click to enable the full day/night cycle (06:00 to 06:00)."
+                                    title="Day simulation (06:00 to 24:00). Click to enable the full day/night cycle (06:00 to 06:00)."
+                                    class="px-3 py-1 rounded-full border text-xs font-semibold transition-all duration-200
                                     border-gray-300 dark:border-gray-600 text-gray-600 dark:text-gray-300
                                     hover:border-sky-400 hover:text-sky-600 dark:hover:border-teal-500 dark:hover:text-teal-400
                                     data-[active=true]:bg-sky-100 data-[active=true]:border-sky-500 data-[active=true]:text-sky-800
                                     dark:data-[active=true]:bg-teal-900/40 dark:data-[active=true]:border-teal-500 dark:data-[active=true]:text-teal-300">
-                                Day Simulation
-                            </button>
+                                    Day Simulation
+                                </button>
+
+                                {{-- Cycle Duration inline --}}
+                                <div class="flex items-center gap-2 bg-gray-100 dark:bg-gray-800 px-3 py-1 rounded-lg border border-gray-200 dark:border-gray-700">
+                                    <span class="text-xs font-semibold text-gray-500 dark:text-gray-400 uppercase tracking-wider">Cycle</span>
+                                    <span class="text-sm leading-none" aria-hidden="true">☀️</span>
+                                    <input type="number" id="day-hours-input" min="1" max="23" value="18" step="1"
+                                        class="w-11 text-center border border-gray-300 dark:border-gray-600 rounded px-1 py-0.5 text-sm dark:bg-gray-700 dark:text-white"
+                                        aria-label="Day duration in hours (1–23)">
+                                    <span class="text-xs text-gray-500 dark:text-gray-400">h</span>
+                                    <span class="text-gray-300 dark:text-gray-600 select-none">|</span>
+                                    <span class="text-sm leading-none" aria-hidden="true">🌙</span>
+                                    <input type="number" id="night-hours-input" min="1" max="23" value="6" step="1"
+                                        class="w-11 text-center border border-gray-300 dark:border-gray-600 rounded px-1 py-0.5 text-sm dark:bg-gray-700 dark:text-white"
+                                        aria-label="Night duration in hours (1–23)">
+                                    <span class="text-xs text-gray-500 dark:text-gray-400">h</span>
+                                </div>
+                                <p id="duration-validation-msg" class="hidden text-xs text-red-500 dark:text-red-400">
+                                    Day + night must total 24 h
+                                </p>
                             </div>
                             <span id="day-night-live" class="sr-only">Simulation cycle: Day only (06:00 to 24:00)</span>
                         </div>

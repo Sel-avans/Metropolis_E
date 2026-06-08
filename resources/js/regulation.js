@@ -1,6 +1,6 @@
-import { getIsDay, NIGHT_START_MINUTES, updateDayNightIndicator } from './day-night-indicator.js';
+import { getIsDay, updateDayNightIndicator, resetDayNightIndicatorState } from './day-night-indicator.js';
 
-export { getIsDay, NIGHT_START_MINUTES };
+export { getIsDay, resetDayNightIndicatorState };
 
 // --- Constanten ---
 export const TOTAL_MINUTES = 1440;
@@ -8,14 +8,44 @@ export const SIMULATION_DURATION_S = 48; // 48 seconden = 24 hours
 export const MINUTES_PER_SECOND = TOTAL_MINUTES / SIMULATION_DURATION_S; // 30 min/sec
 export const START_OFFSET_MINUTES = 360; // Simulatie starts at 06:00
 
+// --- Dag/Nacht duur configuratie ---
+export const DEFAULT_DAY_HOURS  = 18; // 06:00 – 24:00
+export const DEFAULT_NIGHT_HOURS = 6; // 00:00 – 06:00
+export const HOURS_MIN = 1;
+export const HOURS_MAX = 23;
+
+// Laad opgeslagen dag-uren uit localStorage (of gebruik default)
+const _storedDay = parseInt(localStorage.getItem('sim_day_hours'), 10);
+let _dayHours = (!isNaN(_storedDay) && _storedDay >= HOURS_MIN && _storedDay <= HOURS_MAX)
+    ? _storedDay
+    : DEFAULT_DAY_HOURS;
+
+export const getDayHours        = () => _dayHours;
+export const getNightHours      = () => 24 - _dayHours;
+export const getNightStartMinutes = () => _dayHours * 60;
+
+/**
+ * Stel de dag-duur in (1–23 uur). Nacht wordt automatisch 24 - dagHours.
+ * Slaat de waarde op in localStorage en past maxTime direct aan.
+ */
+export const setDayNightDuration = (dayHours) => {
+    const clamped = Math.max(HOURS_MIN, Math.min(HOURS_MAX, Math.round(dayHours)));
+    _dayHours = clamped;
+    localStorage.setItem('sim_day_hours', String(clamped));
+    maxTime = fullCycleMode ? TOTAL_MINUTES : getNightStartMinutes();
+    if (currentTime > maxTime) {
+        currentTime = maxTime;
+    }
+};
+
 // --- State ---
 let isPlaying = false;
 let currentTime = 0;      // in minuten (0–1440), 0 = 06:00
-let maxTime = NIGHT_START_MINUTES;
+let maxTime = getNightStartMinutes();
 let fullCycleMode = false;
 
 // --- Getters & Setters ---
-export const getIsPlaying  = () => isPlaying;
+export const getIsPlaying   = () => isPlaying;
 export const getCurrentTime = () => currentTime;
 export const getMaxTime     = () => maxTime;
 export const getFullCycleMode = () => fullCycleMode;
@@ -26,15 +56,14 @@ export const setIsPlaying = (playing) => {
 
 export const setFullCycleMode = (enabled) => {
     fullCycleMode = Boolean(enabled);
-    maxTime = fullCycleMode ? TOTAL_MINUTES : NIGHT_START_MINUTES;
-
+    maxTime = fullCycleMode ? TOTAL_MINUTES : getNightStartMinutes();
     if (currentTime > maxTime) {
         currentTime = maxTime;
     }
 };
 
 export const setMaxTime = () => {
-    maxTime = fullCycleMode ? TOTAL_MINUTES : NIGHT_START_MINUTES;
+    maxTime = fullCycleMode ? TOTAL_MINUTES : getNightStartMinutes();
 };
 
 export const setCurrentTime = (time) => {
@@ -70,7 +99,6 @@ export const datetimeToSimMinutes = (datetimeStr) => {
     const h = date.getHours();
     const m = date.getMinutes();
     const totalMinutes = h * 60 + m;
-    // Trek START_OFFSET af zodat 06:00 = 0, 07:00 = 60, etc.
     return ((totalMinutes - START_OFFSET_MINUTES) + TOTAL_MINUTES) % TOTAL_MINUTES;
 };
 
@@ -165,7 +193,8 @@ export const syncTimelineUI = () => {
     }
 
     if (endLabel) {
-        endLabel.textContent = fullCycleMode ? '06:00' : '24:00';
+        // Eindlabel toont de dynamische nacht-starttijd of 06:00 bij full cycle
+        endLabel.textContent = fullCycleMode ? '06:00' : minutesToHHMM(getNightStartMinutes());
     }
 
     updateDayNightIndicator(currentTime, fullCycleMode);

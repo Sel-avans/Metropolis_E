@@ -1,6 +1,24 @@
 import { registerActiveEventIdsProvider, getNeighborsWithQoL } from './neighbours.js';
 import { simulationLoop, onSimulationTimeUpdate, onSimulationCycleComplete } from './simulation.js';
-import { setMaxTime, setFullCycleMode, getFullCycleMode, syncTimelineUI, syncPlayPauseUI, minutesToHHMM, datetimeToSimMinutes, getCurrentTime, getMaxTime, getIsPlaying, setCurrentTime, setIsPlaying } from './regulation.js';
+import {
+    setMaxTime,
+    setFullCycleMode,
+    getFullCycleMode,
+    syncTimelineUI,
+    syncPlayPauseUI,
+    minutesToHHMM,
+    datetimeToSimMinutes,
+    getCurrentTime,
+    getMaxTime,
+    getIsPlaying,
+    setCurrentTime,
+    setIsPlaying,
+    setDayNightDuration,
+    getDayHours,
+    getNightHours,
+    HOURS_MIN,
+    HOURS_MAX,
+} from './regulation.js';
 import { resetDayNightIndicatorState } from './day-night-indicator.js';
 
 const SIM_STATE_KEY = 'metropolis_simulation_state';
@@ -683,6 +701,84 @@ function initGridPage() {
         applySimulationTime(getCurrentTime());
         updateQoL({ immediate: true });
     });
+
+    // =========================================================
+    // DAG / NACHT DUUR INPUTS
+    // =========================================================
+
+    const dayInput   = document.getElementById('day-hours-input');
+    const nightInput = document.getElementById('night-hours-input');
+    const validMsg   = document.getElementById('duration-validation-msg');
+
+    /**
+     * Pas duur aan, update gekoppeld veld, herbereken timeline en simulatie.
+     * Wordt maximaal 1x per animatieframe uitgevoerd (debounce via rAF).
+     */
+    let _durationRafPending = false;
+    function _applyDurationChange(dayHours) {
+        if (_durationRafPending) return;
+        _durationRafPending = true;
+        requestAnimationFrame(() => {
+            _durationRafPending = false;
+            setDayNightDuration(dayHours);
+            resetDayNightIndicatorState();
+            syncTimelineUI();
+            applySimulationTime(getCurrentTime());
+            scheduleSaveSimulationState();
+        });
+    }
+
+    if (dayInput) {
+        // Zet initiële waarde vanuit localStorage
+        dayInput.value = getDayHours();
+
+        dayInput.addEventListener('input', () => {
+            const d = parseInt(dayInput.value, 10);
+            if (!d || d < HOURS_MIN || d > HOURS_MAX) {
+                validMsg?.classList.remove('hidden');
+                return;
+            }
+            validMsg?.classList.add('hidden');
+            if (nightInput) nightInput.value = 24 - d;
+            _applyDurationChange(d);
+        });
+
+        // Klem waarde bij verlaten van het veld
+        dayInput.addEventListener('blur', () => {
+            const d = parseInt(dayInput.value, 10);
+            const clamped = isNaN(d) ? getDayHours() : Math.max(HOURS_MIN, Math.min(HOURS_MAX, d));
+            dayInput.value = clamped;
+            if (nightInput) nightInput.value = 24 - clamped;
+            validMsg?.classList.add('hidden');
+            _applyDurationChange(clamped);
+        });
+    }
+
+    if (nightInput) {
+        nightInput.value = getNightHours();
+
+        nightInput.addEventListener('input', () => {
+            const n = parseInt(nightInput.value, 10);
+            if (!n || n < HOURS_MIN || n > HOURS_MAX) {
+                validMsg?.classList.remove('hidden');
+                return;
+            }
+            validMsg?.classList.add('hidden');
+            const d = 24 - n;
+            if (dayInput) dayInput.value = d;
+            _applyDurationChange(d);
+        });
+
+        nightInput.addEventListener('blur', () => {
+            const n = parseInt(nightInput.value, 10);
+            const clamped = isNaN(n) ? getNightHours() : Math.max(HOURS_MIN, Math.min(HOURS_MAX, n));
+            nightInput.value = clamped;
+            const d = 24 - clamped;
+            if (dayInput) dayInput.value = d;
+            validMsg?.classList.add('hidden');
+            _applyDurationChange(d);
+        });
+    }
 
     // =========================================================
     // FETCH EVENTS

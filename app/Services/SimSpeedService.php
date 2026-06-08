@@ -7,7 +7,7 @@ use Illuminate\Support\Carbon;
 
 class SimSpeedService
 {
-    public function calculateEffectiveDuration(int $baseDuration, float $simulationSpeed): float 
+    public function calculateEffectiveDuration(int $baseDuration, float $simulationSpeed): float
     {
         if ($simulationSpeed <= 0) {
             return (float) $baseDuration;
@@ -17,29 +17,33 @@ class SimSpeedService
 
     public function updateSpeedChange(SimulationEvent $activeEvent, float $oldSpeed, float $newSpeed): array
     {
-        $now = now();
+        $now         = now();
         $lastUpdated = Carbon::parse($activeEvent->last_updated_at);
-        
-        $realSecondsPassed = $now->diffInSeconds($lastUpdated);
+
+        // floatDiff geeft altijd een positief getal: hoeveel echte seconden
+        // zijn verstreken sinds last_updated_at.
+        $realSecondsPassed      = (float) $lastUpdated->floatDiffInSeconds($now);
         $simulatedSecondsPassed = $realSecondsPassed * $oldSpeed;
 
-        $newRemainingBaseDuration = max(0, $activeEvent->remaining_base_duration - $simulatedSecondsPassed);
-        
-        $newRealSecondsRemaining = ($newSpeed > 0) ? ($newRemainingBaseDuration / $newSpeed) : 0;
+        $newRemainingBaseDuration = max(0.0, $activeEvent->remaining_base_duration - $simulatedSecondsPassed);
+
+        $newRealSecondsRemaining = ($newSpeed > 0)
+            ? ($newRemainingBaseDuration / $newSpeed)
+            : 0;
 
         return [
             'remaining_base_duration' => (float) $newRemainingBaseDuration,
             'real_seconds_remaining'  => (int) round($newRealSecondsRemaining),
-            'last_updated_at'         => $now->toDateTimeString()
+            'last_updated_at'         => $now->toDateTimeString(),
         ];
     }
 
     public function isEventFinished(SimulationEvent $activeEvent, float $currentSpeed): bool
     {
-        $now = now();
+        $now         = now();
         $lastUpdated = Carbon::parse($activeEvent->last_updated_at);
-        
-        $realSecondsPassed = $now->diffInSeconds($lastUpdated);
+
+        $realSecondsPassed      = (float) $lastUpdated->floatDiffInSeconds($now);
         $simulatedSecondsPassed = $realSecondsPassed * $currentSpeed;
 
         $timeLeft = $activeEvent->remaining_base_duration - $simulatedSecondsPassed;
