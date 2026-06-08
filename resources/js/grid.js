@@ -1,4 +1,5 @@
 import { getNeighborsWithQoL } from './neighbours.js';
+import '../css/grid.css';
 let draggedItem = null;
     let isDragging = false;
     let sourceCell = null;
@@ -20,6 +21,11 @@ document.addEventListener("DOMContentLoaded", () => {
     const popup = document.getElementById('qol-popup');
     const neighborsList = document.getElementById('popup-neighbors-list');
 
+    function flashLockExplanation(cell) {
+        cell.classList.add('show-lock-explanation');
+        window.setTimeout(() => cell.classList.remove('show-lock-explanation'), 2500);
+    }
+
     function isCellOccupied(cell) {
         return cell.querySelector('.grid-function-icon') !== null;
     }
@@ -37,6 +43,115 @@ document.addEventListener("DOMContentLoaded", () => {
             ? "You can't replace the function in this area"
             : "You can't add a function in this area";
         alert(message);
+    }
+
+    const LOCK_MESSAGE = 'This area is approved and cannot be changed.';
+
+    function ensureLockUi(cell) {
+        let lockIndicator = cell.querySelector('.lock-indicator');
+        if (!lockIndicator) {
+            lockIndicator = document.createElement('div');
+            lockIndicator.className = 'lock-indicator absolute z-50 top-1 left-1 bg-red-600 text-white text-[10px] font-bold px-1 rounded flex items-center gap-0.5 shadow hidden';
+            lockIndicator.setAttribute('aria-hidden', 'true');
+            lockIndicator.innerHTML = '🔒 <span class="uppercase text-[9px]">Locked</span>';
+            cell.prepend(lockIndicator);
+        }
+
+        let lockExplanation = cell.querySelector('.area-lock-explanation');
+        if (!lockExplanation) {
+            lockExplanation = document.createElement('div');
+            lockExplanation.className = 'area-lock-explanation hidden';
+            lockExplanation.setAttribute('role', 'tooltip');
+            lockExplanation.setAttribute('aria-live', 'polite');
+            lockExplanation.textContent = LOCK_MESSAGE;
+            lockIndicator.insertAdjacentElement('afterend', lockExplanation);
+        }
+
+        return { lockIndicator, lockExplanation };
+    }
+
+    function clearCellFunction(cell) {
+        cell.querySelectorAll('.grid-function-icon, .delete-btn').forEach((element) => element.remove());
+    }
+
+    function appendCellFunction(cell, functionData) {
+        const img = document.createElement('img');
+        img.src = functionData.image;
+        img.alt = functionData.name;
+        img.className = 'grid-function-icon object-contain w-full h-full p-4 relative z-0';
+        img.dataset.functionId = functionData.id;
+
+        if (isLockedCell(cell)) {
+            img.setAttribute('draggable', 'false');
+            img.setAttribute('ondragstart', 'return false;');
+            img.classList.add('pointer-events-none', 'select-none');
+        } else {
+            img.setAttribute('draggable', 'true');
+            cell.setAttribute('draggable', 'true');
+
+            const deleteBtn = document.createElement('button');
+            deleteBtn.type = 'button';
+            deleteBtn.className = 'delete-btn absolute z-10 top-[2px] right-[2px] bg-red-600/80 text-white w-5 h-5 text-[14px] rounded cursor-pointer flex items-center justify-center';
+            deleteBtn.innerHTML = '✖';
+            cell.appendChild(deleteBtn);
+        }
+
+        cell.appendChild(img);
+    }
+
+    function applyLockedCellState(cell) {
+        ensureLockUi(cell);
+
+        cell.classList.add('is-locked', 'bg-stripes', 'opacity-60', 'border-red-600');
+        cell.classList.remove('bg-gray-300', 'border-gray-800', 'dark:bg-blue-950', 'dark:border-gray-300', 'hover:bg-gray-400', 'hover:dark:bg-gray-100', 'cursor-pointer');
+        cell.classList.add(document.getElementById('approve-btn') ? 'cursor-pointer' : 'cursor-not-allowed');
+        cell.dataset.allowLockSelect = document.getElementById('approve-btn') ? 'true' : 'false';
+        cell.setAttribute('draggable', 'false');
+        cell.setAttribute('aria-label', `Approved area row ${cell.dataset.row}, column ${cell.dataset.col}`);
+
+        const img = cell.querySelector('.grid-function-icon');
+        if (img) {
+            img.setAttribute('draggable', 'false');
+            img.setAttribute('ondragstart', 'return false;');
+            img.classList.add('pointer-events-none', 'select-none');
+        }
+
+        const { lockIndicator, lockExplanation } = ensureLockUi(cell);
+        lockIndicator.classList.remove('hidden');
+        lockIndicator.setAttribute('aria-hidden', 'false');
+        lockExplanation.classList.remove('hidden');
+
+        const deleteBtn = cell.querySelector('.delete-btn');
+        if (deleteBtn) deleteBtn.remove();
+    }
+
+    function applyUnlockedCellState(cell) {
+        cell.classList.remove('is-locked', 'bg-stripes', 'opacity-60', 'border-red-600', 'cursor-not-allowed');
+        cell.classList.add('bg-gray-300', 'border-gray-800', 'dark:bg-blue-950', 'dark:border-gray-300', 'hover:bg-gray-400', 'hover:dark:bg-gray-100', 'cursor-pointer');
+        cell.dataset.allowLockSelect = 'false';
+        cell.setAttribute('draggable', 'true');
+        cell.removeAttribute('aria-label');
+        cell.classList.remove('show-lock-explanation');
+
+        const img = cell.querySelector('.grid-function-icon');
+        if (img) {
+            img.setAttribute('draggable', 'true');
+            img.removeAttribute('ondragstart');
+            img.classList.remove('pointer-events-none', 'select-none');
+        }
+
+        const { lockIndicator, lockExplanation } = ensureLockUi(cell);
+        lockIndicator.classList.add('hidden');
+        lockIndicator.setAttribute('aria-hidden', 'true');
+        lockExplanation.classList.add('hidden');
+
+        if (img && !cell.querySelector('.delete-btn')) {
+            const deleteBtn = document.createElement('button');
+            deleteBtn.type = 'button';
+            deleteBtn.className = 'delete-btn absolute z-10 top-[2px] right-[2px] bg-red-600/80 text-white w-5 h-5 text-[14px] rounded cursor-pointer flex items-center justify-center';
+            deleteBtn.innerHTML = '✖';
+            cell.appendChild(deleteBtn);
+        }
     }
 
 // --- APPROVE / LOCK LOGIC ---
@@ -76,65 +191,11 @@ if (approveBtn) {
                     const cell = document.querySelector(`.grid-cell[data-row="${updatedData.row}"][data-col="${updatedData.col}"]`);
                     if (!cell) return;
 
-                    const lockIndicator = cell.querySelector('.lock-indicator');
-                    console.log("Searching for lock indicator in HTML...", lockIndicator); // THIS IS IMPORTANT
-                    
-                    // Apply locked styling
                     if (updatedData.is_approved) {
-                        cell.classList.add("is-locked", "bg-stripes", "opacity-60", "border-red-600");
-                        cell.classList.remove("bg-gray-300", "border-gray-800", "dark:bg-blue-950", "dark:border-gray-300", "hover:bg-gray-400", "hover:dark:bg-gray-100", "cursor-pointer");
-                        cell.classList.add(document.getElementById("approve-btn") ? "cursor-pointer" : "cursor-not-allowed");
-                        
-                        if (document.getElementById("approve-btn")) {
-                            cell.dataset.allowLockSelect = "true";
-                        } else {
-                            cell.dataset.allowLockSelect = "false";
-                        }
-                        
-                        cell.setAttribute("draggable", "false");
-                        
-                        // COMPLETELY BLOCK THE IMAGE
-                        const img = cell.querySelector("img");
-                        if (img) {
-                            img.setAttribute("draggable", "false");
-                            img.setAttribute("ondragstart", "return false;");
-                            img.classList.add("pointer-events-none", "select-none");
-                        }
-                        
-                        cell.setAttribute("title", "This area is approved and cannot be changed.");
-                        
-                        if (lockIndicator) {
-                            lockIndicator.classList.remove('hidden');
-                            console.log("Lock indicator is now visible!");
-                        } else {
-                            console.error("Could not find the lock indicator in the HTML of this cell!");
-                        }
-                        
-                        const deleteBtn = cell.querySelector(".delete-btn");
-                        if (deleteBtn) deleteBtn.classList.add("hidden");
-                    } 
-                    // Apply unlocked styling
-                    else {
-                        cell.classList.remove("is-locked", "bg-stripes", "opacity-60", "border-red-600", "cursor-not-allowed");
-                        cell.classList.add("bg-gray-300", "border-gray-800", "dark:bg-blue-950", "dark:border-gray-300", "hover:bg-gray-400", "hover:dark:bg-gray-100", "cursor-pointer");
-                        cell.dataset.allowLockSelect = "false";
-                        
-                        cell.setAttribute("draggable", "true");
-                        
-                        // RELEASE THE IMAGE
-                        const img = cell.querySelector("img");
-                        if (img) {
-                            img.setAttribute("draggable", "true");
-                            img.removeAttribute("ondragstart");
-                            img.classList.remove("pointer-events-none", "select-none");
-                        }
-                        
-                        cell.removeAttribute("title");
-                        
-                        if (lockIndicator) lockIndicator.classList.add('hidden');
-                        
-                        const deleteBtn = cell.querySelector(".delete-btn");
-                        if (deleteBtn) deleteBtn.classList.remove("hidden");
+                        applyLockedCellState(cell);
+                        flashLockExplanation(cell);
+                    } else {
+                        applyUnlockedCellState(cell);
                     }
                 });
                 
@@ -159,7 +220,7 @@ if (approveBtn) {
             return;
         }
 
-        cell.innerHTML = "";
+        clearCellFunction(cell);
         cell.removeAttribute("draggable");
         activateCell(cell);
 
@@ -179,6 +240,13 @@ if (approveBtn) {
 
     const cells = document.querySelectorAll(".grid-cell");
     const items = document.querySelectorAll(".library-item");
+
+    cells.forEach((cell) => {
+        ensureLockUi(cell);
+        if (isLockedCell(cell)) {
+            applyLockedCellState(cell);
+        }
+    });
 
     async function saveMove(oldRow, oldCol, newRow, newCol, force = false) {
         try {
@@ -255,13 +323,21 @@ if (approveBtn) {
     }
 
     async function handleTileHover(row, col, event) {
-        positionPopup(event.pageX, event.pageY);
+        const cell = document.querySelector(`.grid-cell[data-row="${row}"][data-col="${col}"]`);
+        positionPopup(event.pageX, event.pageY, cell);
         const data = await getNeighborsWithQoL(row, col);
         renderNeighborsList(data);
         showPopup();
     }
 
-    function positionPopup(x, y) {
+    function positionPopup(x, y, cell) {
+        if (cell && isLockedCell(cell)) {
+            const rect = cell.getBoundingClientRect();
+            popup.style.left = `${rect.right + window.scrollX + 12}px`;
+            popup.style.top = `${rect.top + window.scrollY + 8}px`;
+            return;
+        }
+
         const offset = 15;
         popup.style.left = `${x + offset}px`;
         popup.style.top = `${y + offset}px`;
@@ -361,18 +437,13 @@ if (approveBtn) {
 
             const oldRow = sourceCell?.dataset.row;
             const oldCol = sourceCell?.dataset.col;
-            if (sourceCell) { sourceCell.innerHTML = ""; sourceCell.classList.remove("drag-source"); }
-            
-            cell.innerHTML = "";
-            const img = document.createElement("img");
-            img.src = draggedItem.image;
-            img.classList.add("grid-function-icon");
-            cell.appendChild(img);
-            
-            const deleteBtn = document.createElement("button");
-            deleteBtn.className = "delete-btn absolute top-[2px] right-[2px] bg-red-600/80 text-white w-5 h-5 rounded";
-            deleteBtn.innerHTML = "✖";
-            cell.appendChild(deleteBtn);
+            if (sourceCell) {
+                clearCellFunction(sourceCell);
+                sourceCell.classList.remove("drag-source");
+            }
+
+            clearCellFunction(cell);
+            appendCellFunction(cell, draggedItem);
 
             const res = await saveMove(oldRow, oldCol, cell.dataset.row, cell.dataset.col, false);
             if (res && res.status === 403) {
@@ -391,6 +462,7 @@ if (approveBtn) {
             if (isDragging) return;
             if (isLockedCell(cell) && !canSelectLockedCell(cell)) {
                 e.preventDefault();
+                flashLockExplanation(cell);
                 return;
             }
             activateCell(cell);

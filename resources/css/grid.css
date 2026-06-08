@@ -38,3 +38,27 @@
     outline-offset: 2px;
 }
 /* --- EINDE AANPASSINGEN --- */
+
+.grid-cell.is-locked .area-lock-explanation {
+    position: absolute;
+    z-index: 40;
+    inset-inline: 0.25rem;
+    bottom: 0.25rem;
+    border-radius: 0.25rem;
+    border: 1px solid rgba(239, 68, 68, 0.6);
+    background: rgba(69, 10, 10, 0.92);
+    padding: 0.35rem 0.4rem;
+    font-size: 0.5625rem;
+    line-height: 1.25;
+    color: #fff;
+    text-align: center;
+    pointer-events: none;
+    opacity: 0;
+    transition: opacity 150ms ease;
+}
+
+.grid-cell.is-locked:hover .area-lock-explanation,
+.grid-cell.is-locked:focus-within .area-lock-explanation,
+.grid-cell.is-locked.show-lock-explanation .area-lock-explanation {
+    opacity: 1;
+}

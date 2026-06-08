@@ -65,4 +65,24 @@ class GridLockedCellTest extends TestCase
             'message' => "You can't replace the function in this area",
         ]);
     }
+
+    public function test_grid_page_shows_locked_area_indicators_and_explanation(): void
+    {
+        GridCell::factory()->create([
+            'row' => 1,
+            'col' => 1,
+            'function_id' => CityFunction::factory()->create()->id,
+            'is_approved' => true,
+        ]);
+
+        $response = $this->actingAs(User::factory()->create([
+            'role' => UserRole::City_planner,
+        ]))->get('/grid');
+
+        $response->assertOk();
+        $response->assertSee('lock-indicator', false);
+        $response->assertSee('area-lock-explanation', false);
+        $response->assertSee('This area is approved and cannot be changed.', false);
+        $response->assertSee('Locked', false);
+    }
 }

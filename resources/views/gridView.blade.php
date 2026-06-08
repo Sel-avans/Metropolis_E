@@ -3,7 +3,7 @@
         
         {{-- Library Sidebar --}}
         <div class="w-auto p-6 max-h-[93vh] overflow-y-auto">
-            <div class="flex flex-col margin-bottom-4 gap-3">    
+            <div class="flex flex-col margin-bottom-4 gap-3">
                 <h1 class="text-2xl dark:text-teal-500 font-bold mb-4">Function Library</h1>
                 <a href="{{ route('effects.index') }}" class="px-3 py-1.5 bg-teal-600 text-white rounded hover:bg-teal-700 text-xs shadow focus:outline-none focus:ring-2 focus:ring-teal-500">Effect Functions</a>
                 <a href="{{ route('functions.index') }}" class="px-3 py-1.5 bg-blue-600 text-white rounded hover:bg-blue-700 text-xs shadow focus:outline-none focus:ring-2 focus:ring-blue-500">Function Management</a>
@@ -58,17 +58,25 @@
                                     ? 'is-locked bg-stripes opacity-60 border-red-600 ' . ($isCityPlanner ? 'cursor-pointer' : 'cursor-not-allowed')
                                     : 'bg-gray-300 border-gray-800 dark:bg-blue-950 dark:border-gray-300 hover:bg-gray-400 hover:dark:bg-gray-100 cursor-pointer';
                             @endphp
-                            
+            
                             <div class="grid-cell relative flex border-2 w-32 h-32 items-center justify-center transition focus:outline-none focus:ring-2 focus:ring-blue-500 {{ $cellClasses }}"
                                 data-row="{{ $row }}"
                                 data-col="{{ $col }}"
                                 data-id="{{ $cell ? $cell->id : '' }}"
                                 draggable="{{ $cell && !$isApproved ? 'true' : 'false' }}"
                                 role="button"
-                                title="{{ $isApproved ? 'This area is approved and cannot be changed.' : '' }}">
+                                tabindex="0"
+                                @if($isApproved) aria-label="Approved area row {{ $row }}, column {{ $col }}" @endif>
                                 
-                                <div class="lock-indicator absolute z-50 top-1 left-1 bg-red-600 text-white text-[10px] font-bold px-1 rounded flex items-center gap-0.5 shadow {{ $isApproved ? '' : 'hidden' }}">
+                                <div class="lock-indicator absolute z-50 top-1 left-1 bg-red-600 text-white text-[10px] font-bold px-1 rounded flex items-center gap-0.5 shadow {{ $isApproved ? '' : 'hidden' }}"
+                                    aria-hidden="{{ $isApproved ? 'false' : 'true' }}">
                                     🔒 <span class="uppercase text-[9px]">Locked</span>
+                                </div>
+
+                                <div class="area-lock-explanation {{ $isApproved ? '' : 'hidden' }}"
+                                    role="tooltip"
+                                    aria-live="polite">
+                                    This area is approved and cannot be changed.
                                 </div>
 
                                 @if(!empty($cell) && !empty($cell->function))
