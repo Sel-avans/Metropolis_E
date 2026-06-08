@@ -1,10 +1,10 @@
 {
   "resources/css/app.css": {
-    "file": "assets/app-49APBcyU.css",
+    "file": "assets/app-DWoTMRBm.css",
     "src": "resources/css/app.css"
   },
   "resources/css/grid.css": {
-    "file": "assets/grid-CFes-cOk.css",
+    "file": "assets/grid-DuyDNWPB.css",
     "src": "resources/css/grid.css"
   },
   "resources/js/app.js": {
@@ -20,7 +20,7 @@
     "isEntry": true
   },
   "resources/js/grid.js": {
-    "file": "assets/grid-4YcqaZYw.js",
+    "file": "assets/grid-DUgCmqIh.js",
     "name": "grid",
     "src": "resources/js/grid.js",
     "isEntry": true

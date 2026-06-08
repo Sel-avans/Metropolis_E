@@ -74,16 +74,15 @@ class GridController extends Controller
 
     public function approveCell(Request $request)
     {
-        // Security check
+        // Security check: ensure the user has the 'City_planner' role
         if (!auth()->user() || auth()->user()->role->name !== 'City_planner') {
             return response()->json(['success' => false, 'error' => 'unauthorized'], 403);
         }
 
-        // Retrieve the array of cells from the request payload
         $cellsData = $request->input('cells', []);
 
-        // Fallback to support the old single-cell format (if needed)
-        if ($request->has('row') && $request->has('col')) {
+        // Fallback to support the old single-cell format
+        if (empty($cellsData) && $request->has('row') && $request->has('col')) {
             $cellsData[] = ['row' => $request->input('row'), 'col' => $request->input('col')];
         }
 
@@ -93,24 +92,32 @@ class GridController extends Controller
 
         $updatedCells = [];
 
-        // Process each cell in the array
         foreach ($cellsData as $cellData) {
-            $cell = GridCell::where('row', $cellData['row'])
-                            ->where('col', $cellData['col'])
-                            ->first();
+            // Force javascript strings to integers to ensure strict database matching
+            $row = intval($cellData['row']);
+            $col = intval($cellData['col']);
 
-            if ($cell) {
-                // Toggle the approval state
-                $cell->is_approved = !$cell->is_approved;
-                $cell->save();
-                
-                // Track the updated state to return to the frontend
-                $updatedCells[] = [
-                    'row' => $cell->row,
-                    'col' => $cell->col,
-                    'is_approved' => $cell->is_approved
-                ];
+            // Find the cell in the database
+            $cell = GridCell::where('row', $row)->where('col', $col)->first();
+
+            // If the cell does not exist in the database yet, create it on the fly
+            if (!$cell) {
+                $cell = new GridCell();
+                $cell->row = $row;
+                $cell->col = $col;
+                $cell->is_approved = false; // Default state, will be toggled below
             }
+
+            // Toggle the approval state
+            $cell->is_approved = !$cell->is_approved;
+            $cell->save(); // Save to the database
+            
+            // Track the updated state to return to the frontend
+            $updatedCells[] = [
+                'row' => $cell->row,
+                'col' => $cell->col,
+                'is_approved' => $cell->is_approved
+            ];
         }
 
         return response()->json(['success' => true, 'updated_cells' => $updatedCells]);

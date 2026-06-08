@@ -39,87 +39,113 @@ document.addEventListener("DOMContentLoaded", () => {
         alert(message);
     }
 
-    // --- APPROVE / LOCK LOGIC ---
-    const approveBtn = document.getElementById("approve-btn");
-    if (approveBtn) {
-        approveBtn.addEventListener("click", async () => {
-            // Find all currently selected cells
-            const selectedCells = document.querySelectorAll(".grid-cell.selected");
-            if (selectedCells.length === 0) {
-                alert("Please select at least one grid cell first to lock or unlock it.");
-                return;
-            }
+// --- APPROVE / LOCK LOGIC ---
+const approveBtn = document.getElementById("approve-btn");
+if (approveBtn) {
+    approveBtn.addEventListener("click", async () => {
+        console.log("Button clicked!");
+        
+        // Find all currently selected cells
+        const selectedCells = document.querySelectorAll(".grid-cell.selected");
+        if (selectedCells.length === 0) {
+            alert("Please select at least one grid cell first to lock or unlock it.");
+            return;
+        }
 
-            // Map selected cells to an array of row/col objects
-            const cellsPayload = Array.from(selectedCells).map(cell => ({
-                row: cell.dataset.row,
-                col: cell.dataset.col
-            }));
+        // Map selected cells to an array of row/col objects
+        const cellsPayload = Array.from(selectedCells).map(cell => ({
+            row: cell.dataset.row,
+            col: cell.dataset.col
+        }));
 
-            try {
-                const response = await fetch('/grid/approve', {
-                    method: 'POST',
-                    headers: {
-                        'Content-Type': 'application/json',
-                        'X-CSRF-TOKEN': document.querySelector('meta[name="csrf-token"]').content
-                    },
-                    // Send the array of cells to the backend
-                    body: JSON.stringify({ cells: cellsPayload })
-                });
+        try {
+            const response = await fetch('/grid/approve', {
+                method: 'POST',
+                headers: {
+                    'Content-Type': 'application/json',
+                    'X-CSRF-TOKEN': document.querySelector('meta[name="csrf-token"]').content
+                },
+                body: JSON.stringify({ cells: cellsPayload })
+            });
 
-                const data = await response.json();
+            const data = await response.json();
+            console.log("Antwoord van server:", data);
 
-                if (data.success) {
-                    // Update the UI for each modified cell returned by the server
-                    data.updated_cells.forEach(updatedData => {
-                        const cell = document.querySelector(`.grid-cell[data-row="${updatedData.row}"][data-col="${updatedData.col}"]`);
-                        if (!cell) return;
+            if (data.success) {
+                data.updated_cells.forEach(updatedData => {
+                    const cell = document.querySelector(`.grid-cell[data-row="${updatedData.row}"][data-col="${updatedData.col}"]`);
+                    if (!cell) return;
 
-                        const lockIndicator = cell.querySelector('.lock-indicator');
+                    const lockIndicator = cell.querySelector('.lock-indicator');
+                    console.log("Searching for lock indicator in HTML...", lockIndicator); // THIS IS IMPORTANT
+                    
+                    // Apply locked styling
+                    if (updatedData.is_approved) {
+                        cell.classList.add("is-locked", "bg-stripes", "opacity-60", "border-red-600");
+                        cell.classList.remove("bg-gray-300", "border-gray-800", "dark:bg-blue-950", "dark:border-gray-300", "hover:bg-gray-400", "hover:dark:bg-gray-100", "cursor-pointer");
+                        cell.classList.add(document.getElementById("approve-btn") ? "cursor-pointer" : "cursor-not-allowed");
                         
-                        // Apply locked styling
-                        if (updatedData.is_approved) {
-                            cell.classList.add("is-locked", "bg-stripes", "opacity-60", "border-red-600");
-                            cell.classList.remove("bg-gray-300", "border-gray-800", "dark:bg-blue-950", "dark:border-gray-300", "hover:bg-gray-400", "hover:dark:bg-gray-100", "cursor-pointer");
-                            cell.classList.add(document.getElementById("approve-btn") ? "cursor-pointer" : "cursor-not-allowed");
-                            if (document.getElementById("approve-btn")) {
-                                cell.dataset.allowLockSelect = "true";
-                            } else {
-                                cell.dataset.allowLockSelect = "false";
-                            }
-                            cell.setAttribute("draggable", "false");
-                            
-                            if (lockIndicator) lockIndicator.classList.remove('hidden');
-                            
-                            const deleteBtn = cell.querySelector(".delete-btn");
-                            if (deleteBtn) deleteBtn.classList.add("hidden");
-                        } 
-                        // Apply unlocked styling
-                        else {
-                            cell.classList.remove("is-locked", "bg-stripes", "opacity-60", "border-red-600", "cursor-not-allowed");
-                            cell.classList.add("bg-gray-300", "border-gray-800", "dark:bg-blue-950", "dark:border-gray-300", "hover:bg-gray-400", "hover:dark:bg-gray-100", "cursor-pointer");
+                        if (document.getElementById("approve-btn")) {
+                            cell.dataset.allowLockSelect = "true";
+                        } else {
                             cell.dataset.allowLockSelect = "false";
-                            
-                            if (cell.querySelector("img")) {
-                                cell.setAttribute("draggable", "true");
-                            }
-                            
-                            if (lockIndicator) lockIndicator.classList.add('hidden');
-                            
-                            const deleteBtn = cell.querySelector(".delete-btn");
-                            if (deleteBtn) deleteBtn.classList.remove("hidden");
                         }
                         
-                        // Clear the selection outline
-                        cell.classList.remove("selected");
-                    });
-                    
-                    alert("Selected areas successfully updated!"); 
-                }
-            } catch (err) {
-                console.error("Error during cell approval:", err);
+                        cell.setAttribute("draggable", "false");
+                        
+                        // COMPLETELY BLOCK THE IMAGE
+                        const img = cell.querySelector("img");
+                        if (img) {
+                            img.setAttribute("draggable", "false");
+                            img.setAttribute("ondragstart", "return false;");
+                            img.classList.add("pointer-events-none", "select-none");
+                        }
+                        
+                        cell.setAttribute("title", "This area is approved and cannot be changed.");
+                        
+                        if (lockIndicator) {
+                            lockIndicator.classList.remove('hidden');
+                            console.log("Lock indicator is now visible!");
+                        } else {
+                            console.error("Could not find the lock indicator in the HTML of this cell!");
+                        }
+                        
+                        const deleteBtn = cell.querySelector(".delete-btn");
+                        if (deleteBtn) deleteBtn.classList.add("hidden");
+                    } 
+                    // Apply unlocked styling
+                    else {
+                        cell.classList.remove("is-locked", "bg-stripes", "opacity-60", "border-red-600", "cursor-not-allowed");
+                        cell.classList.add("bg-gray-300", "border-gray-800", "dark:bg-blue-950", "dark:border-gray-300", "hover:bg-gray-400", "hover:dark:bg-gray-100", "cursor-pointer");
+                        cell.dataset.allowLockSelect = "false";
+                        
+                        cell.setAttribute("draggable", "true");
+                        
+                        // RELEASE THE IMAGE
+                        const img = cell.querySelector("img");
+                        if (img) {
+                            img.setAttribute("draggable", "true");
+                            img.removeAttribute("ondragstart");
+                            img.classList.remove("pointer-events-none", "select-none");
+                        }
+                        
+                        cell.removeAttribute("title");
+                        
+                        if (lockIndicator) lockIndicator.classList.add('hidden');
+                        
+                        const deleteBtn = cell.querySelector(".delete-btn");
+                        if (deleteBtn) deleteBtn.classList.remove("hidden");
+                    }
+                });
+                
+                // Clear the selections
+                document.querySelectorAll(".grid-cell.selected").forEach(c => c.classList.remove("selected"));
+                alert("Selected areas successfully updated!"); 
             }
-        });
+        } catch (err) {
+            console.error("Error during cell approval:", err);
+        }
+    });
     }
 
     // --- DELETE LOGIC ---

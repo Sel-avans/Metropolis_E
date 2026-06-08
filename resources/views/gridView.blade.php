@@ -39,7 +39,7 @@
             <button id="undo-btn" class="mt-4 px-4 py-2 bg-yellow-500 text-black font-semibold rounded shadow hover:bg-yellow-600 transition">Undo</button>
 
             @if(auth()->user() && auth()->user()->role->name === 'City_planner')
-                <button type="button" id="approve-btn" class="mt-2 px-4 py-2 bg-amber-600 text-white font-semibold rounded shadow hover:bg-amber-700 transition">Approve & Lock Area</button>
+                <button type="button" id="approve-btn" class="mt-2 px-4 py-2 bg-amber-600 text-white font-semibold rounded shadow hover:bg-amber-700 transition"> Lock & Unlock Area</button>
             @endif
 
             <div class="w-auto p-6">
@@ -48,36 +48,39 @@
                 <div class="city-grid grid grid-flow-col grid-rows-4 gap-3 w-min">
                     @for($col = 1; $col <= 3; $col++)
                         @for($row = 1; $row <= 4; $row++)
-                            @php
+@php
                                 $cell = $grid->first(fn($c) => $c->row == $row && $c->col == $col);
                                 $isApproved = $cell && $cell->is_approved;
                                 $isCityPlanner = auth()->user() && auth()->user()->role->name === 'City_planner';
-                                $lockedClasses = $isApproved
-                                    ? 'is-locked bg-stripes opacity-60 border-red-600 '
-                                        . ($isCityPlanner ? 'cursor-pointer' : 'cursor-not-allowed')
+                                
+                                // Define the classes for the cell based on its state
+                                $cellClasses = $isApproved
+                                    ? 'is-locked bg-stripes opacity-60 border-red-600 ' . ($isCityPlanner ? 'cursor-pointer' : 'cursor-not-allowed')
                                     : 'bg-gray-300 border-gray-800 dark:bg-blue-950 dark:border-gray-300 hover:bg-gray-400 hover:dark:bg-gray-100 cursor-pointer';
                             @endphp
                             
-                            <div class="grid-cell relative border-2 w-32 h-32 items-center justify-center transition focus:outline-none focus:ring-2 focus:ring-blue-500 {{ $lockedClasses }}"
+                            <div class="grid-cell relative flex border-2 w-32 h-32 items-center justify-center transition focus:outline-none focus:ring-2 focus:ring-blue-500 {{ $cellClasses }}"
                                 data-row="{{ $row }}"
                                 data-col="{{ $col }}"
                                 data-id="{{ $cell ? $cell->id : '' }}"
-                                data-allow-lock-select="{{ ($isCityPlanner && $isApproved) ? 'true' : 'false' }}"
-                                draggable="{{ $cell && $cell->function && !$isApproved ? 'true' : 'false' }}"
-                                role="button">
+                                draggable="{{ $cell && !$isApproved ? 'true' : 'false' }}"
+                                role="button"
+                                title="{{ $isApproved ? 'This area is approved and cannot be changed.' : '' }}">
                                 
-                                <div class="lock-indicator absolute top-1 left-1 bg-red-600 text-white text-[10px] font-bold px-1 rounded flex items-center gap-0.5 shadow {{ $isApproved ? '' : 'hidden' }}">
+                                <div class="lock-indicator absolute z-50 top-1 left-1 bg-red-600 text-white text-[10px] font-bold px-1 rounded flex items-center gap-0.5 shadow {{ $isApproved ? '' : 'hidden' }}">
                                     🔒 <span class="uppercase text-[9px]">Locked</span>
                                 </div>
 
                                 @if(!empty($cell) && !empty($cell->function))
                                     <img src="{{ asset($cell->function->image) }}"
-                                         alt="{{ $cell->function->name }}"
-                                         class="grid-function-icon object-contain w-full h-full p-4"
-                                         data-function-id="{{ $cell->function->id }}">
+                                        alt="{{ $cell->function->name }}"
+                                        class="grid-function-icon object-contain w-full h-full p-4 relative z-0 {{ $isApproved ? 'pointer-events-none select-none' : '' }}"
+                                        data-function-id="{{ $cell->function->id }}"
+                                        draggable="{{ $isApproved ? 'false' : 'true' }}"
+                                        ondragstart="{{ $isApproved ? 'return false;' : '' }}">
 
                                     @if(!$isApproved)
-                                        <button type="button" class="delete-btn absolute top-[2px] right-[2px] bg-red-600/80 text-white w-5 h-5 text-[14px] rounded cursor-pointer flex items-center justify-center">✖</button>
+                                        <button type="button" class="delete-btn absolute z-10 top-[2px] right-[2px] bg-red-600/80 text-white w-5 h-5 text-[14px] rounded cursor-pointer flex items-center justify-center">✖</button>
                                     @endif
                                 @endif
                             </div>
