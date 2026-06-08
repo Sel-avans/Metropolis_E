@@ -1,227 +1,444 @@
-// Houdt bij of de preview vergrendeld is door een klik of toetsenbord-focus
-let isLocked = false;
+const HOVER_DELAY_MS = 1000;
+const FETCH_TIMEOUT_MS = 1000;
 
-// Haalt preview data op van de server met een harde limiet van 1 seconde
+const PREVIEW_CACHE = new Map();
+
+let hoverTimer = null;
+let pinnedFunctionId = null;
+let activeFunctionId = null;
+let previewRequestId = 0;
+let suppressClickAfterDrag = false;
+let hoveredItem = null;
+
+function getPreviewElements() {
+    return {
+        panel: document.getElementById('library-preview-panel'),
+        title: document.getElementById('library-preview-title'),
+        category: document.getElementById('library-preview-category'),
+        icon: document.getElementById('library-preview-icon'),
+        effects: document.getElementById('library-preview-effects'),
+        conditions: document.getElementById('library-preview-conditions'),
+        status: document.getElementById('library-preview-status'),
+        body: document.getElementById('library-preview-body'),
+        closeBtn: document.getElementById('library-preview-close'),
+    };
+}
+
+function isVisibleLibraryItem(item) {
+    return item
+        && item.classList.contains('library-item')
+        && !item.classList.contains('hidden');
+}
+
+function setSelectedLibraryItem(functionId) {
+    document.querySelectorAll('.library-item').forEach((item) => {
+        const selected = Number(item.dataset.functionId) === functionId;
+        item.classList.toggle('library-item-selected', selected);
+        item.setAttribute('aria-selected', selected ? 'true' : 'false');
+    });
+}
+
+function setPreviewInteractivity(pinned) {
+    const { panel, closeBtn, body } = getPreviewElements();
+    if (!panel) return;
+
+    panel.classList.toggle('library-preview-pinned', pinned);
+    panel.classList.toggle('library-preview-hover', !pinned);
+    panel.classList.toggle('pointer-events-none', !pinned);
+    panel.classList.toggle('pointer-events-auto', pinned);
+    if (closeBtn) closeBtn.classList.toggle('hidden', !pinned);
+    if (body) {
+        body.classList.toggle('overflow-y-auto', pinned);
+        body.classList.toggle('overflow-hidden', !pinned);
+    }
+}
+
+function resetPreviewLayout() {
+    const { panel, body } = getPreviewElements();
+    if (!panel) return;
+
+    panel.style.top = '';
+    panel.style.bottom = '';
+    panel.style.maxHeight = '';
+    panel.classList.remove('library-preview-pinned', 'library-preview-hover');
+    if (body) {
+        body.scrollTop = 0;
+        body.classList.remove('overflow-y-auto');
+        body.classList.add('overflow-hidden');
+    }
+}
+
+function applyHoverPreviewLayout(item) {
+    const { panel } = getPreviewElements();
+    const column = document.getElementById('library-column');
+    if (!panel || !column || !item) return;
+
+    const columnRect = column.getBoundingClientRect();
+    const itemRect = item.getBoundingClientRect();
+    const topInColumn = itemRect.top - columnRect.top;
+    const maxHeight = Math.min(columnRect.height * 0.75, 420);
+
+    let top = Math.max(8, topInColumn - 4);
+    if (top + maxHeight > columnRect.height - 8) {
+        top = Math.max(8, columnRect.height - maxHeight - 8);
+    }
+
+    panel.style.bottom = 'auto';
+    panel.style.top = `${top}px`;
+    panel.style.maxHeight = `${maxHeight}px`;
+}
+
+function applyPinnedPreviewLayout() {
+    const { panel } = getPreviewElements();
+    if (!panel) return;
+
+    panel.style.top = '';
+    panel.style.bottom = '0';
+    panel.style.maxHeight = '';
+}
+
+function showPreviewPanel(pinned = false, item = null) {
+    const { panel } = getPreviewElements();
+    if (!panel) return;
+
+    if (pinned) {
+        applyPinnedPreviewLayout();
+    } else {
+        applyHoverPreviewLayout(item);
+    }
+
+    panel.classList.remove('hidden');
+    panel.setAttribute('aria-hidden', 'false');
+    setPreviewInteractivity(pinned);
+}
+
+export function closePreview(force = false) {
+    if (pinnedFunctionId && !force) return;
+
+    const { panel, status } = getPreviewElements();
+    if (!panel) return;
+
+    if (force) pinnedFunctionId = null;
+
+    panel.classList.add('hidden');
+    panel.setAttribute('aria-hidden', 'true');
+    resetPreviewLayout();
+    setPreviewInteractivity(false);
+    if (status) status.textContent = '';
+    activeFunctionId = null;
+    hoveredItem = null;
+    setSelectedLibraryItem(null);
+}
+
+function escapeHtml(value) {
+    return String(value ?? '')
+        .replace(/&/g, '&amp;')
+        .replace(/</g, '&lt;')
+        .replace(/>/g, '&gt;')
+        .replace(/"/g, '&quot;');
+}
+
+function effectValueClass(tone) {
+    switch (tone) {
+        case 'positive': return 'library-preview-value-positive';
+        case 'negative': return 'library-preview-value-negative';
+        case 'missing': return 'library-preview-value-missing';
+        default: return 'library-preview-value-neutral';
+    }
+}
+
+function renderEffects(effects) {
+    const { effects: container } = getPreviewElements();
+    if (!container) return;
+
+    const rows = (effects ?? []).map((effect) => `
+        <tr class="library-preview-effects-row">
+            <th scope="row" class="library-preview-effects-label">${escapeHtml(effect.label)}</th>
+            <td class="library-preview-effects-value ${effectValueClass(effect.value_tone)}">
+                <span aria-label="${escapeHtml(effect.label)} QoL impact">${escapeHtml(effect.display_value)}</span>
+            </td>
+        </tr>
+    `).join('');
+
+    container.innerHTML = `
+        <table class="library-preview-table library-preview-effects-table">
+            <caption class="sr-only">QoL effects grouped by category</caption>
+            <thead>
+                <tr>
+                    <th scope="col">Category</th>
+                    <th scope="col" class="text-right">QoL impact</th>
+                </tr>
+            </thead>
+            <tbody>${rows}</tbody>
+        </table>
+    `;
+}
+
+function conditionRowClass(type) {
+    return `library-preview-condition-row library-preview-condition-${type}`;
+}
+
+function renderConditions(conditions) {
+    const { conditions: container } = getPreviewElements();
+    if (!container) return;
+
+    const rows = (conditions ?? []).map((condition) => {
+        const partner = condition.partner_name
+            ? escapeHtml(condition.partner_name)
+            : '<span class="library-preview-value-missing">—</span>';
+
+        return `
+            <tr class="${conditionRowClass(condition.type)}">
+                <td class="library-preview-condition-type">
+                    <span class="library-preview-badge library-preview-badge-${escapeHtml(condition.type)}">
+                        ${escapeHtml(condition.type_label ?? condition.display_value)}
+                    </span>
+                </td>
+                <td class="library-preview-condition-partner">${partner}</td>
+                <td class="library-preview-condition-description">${escapeHtml(condition.description)}</td>
+            </tr>
+        `;
+    }).join('');
+
+    container.innerHTML = `
+        <table class="library-preview-table library-preview-conditions-table">
+            <caption class="sr-only">Placement conditions for this destination</caption>
+            <thead>
+                <tr>
+                    <th scope="col">Type</th>
+                    <th scope="col">Adjacent to</th>
+                    <th scope="col">Rule</th>
+                </tr>
+            </thead>
+            <tbody>${rows}</tbody>
+        </table>
+    `;
+}
+
+function renderPreview(data) {
+    const { title, category, icon } = getPreviewElements();
+    if (!data?.function) return;
+
+    if (title) title.textContent = data.function.name ?? '—';
+    if (category) {
+        category.textContent = data.function.category
+            ? data.function.category.charAt(0).toUpperCase() + data.function.category.slice(1)
+            : '—';
+    }
+    if (icon) {
+        icon.src = data.function.image ?? '';
+        icon.alt = data.function.name ?? 'Destination preview';
+        icon.classList.toggle('hidden', !data.function.image);
+    }
+
+    renderEffects(data.effects);
+    renderConditions(data.conditions);
+}
+
 async function fetchPreview(functionId) {
-    //  een simpele 1-seconde timeout controller
+    if (PREVIEW_CACHE.has(functionId)) {
+        return PREVIEW_CACHE.get(functionId);
+    }
+
     const controller = new AbortController();
-    const timeoutId = setTimeout(() => controller.abort(), 1000);
+    const timeoutId = setTimeout(() => controller.abort(), FETCH_TIMEOUT_MS);
 
     try {
-        const response = await fetch(`/functions/${functionId}/preview`, { signal: controller.signal });
+        const response = await fetch(`/functions/${functionId}/preview`, {
+            credentials: 'same-origin',
+            headers: { Accept: 'application/json' },
+            signal: controller.signal,
+        });
+
         clearTimeout(timeoutId);
-        if (!response.ok) return null;
-        return await response.json();
+
+        if (!response.ok) {
+            throw new Error(`Preview request failed (${response.status})`);
+        }
+
+        const data = await response.json();
+        PREVIEW_CACHE.set(functionId, data);
+
+        return data;
     } catch (error) {
         clearTimeout(timeoutId);
-        return { error: true, message: error.name === 'AbortError' ? 'Preview took too long.' : 'Kon data niet laden.' };
-    }
-}
 
-// de HTML voor effects en conditions
-function renderPreview(data) {
-    let html = '';
-
-    // Effects sectie
-    if (data.effects && data.effects.length > 0) {
-        html += '<p class="font-semibold mb-1 dark:text-white">Effects:</p><ul class="mb-3 space-y-0.5">';
-        data.effects.forEach(effect => {
-            const sign = effect.value >= 0 ? '+' : '';
-            const color = effect.value >= 0 ? 'text-green-600' : 'text-red-500';
-            html += `<li class="flex justify-between">
-                        <span class="capitalize">${effect.category}</span>
-                        <span class="font-bold ${color}">${sign}${effect.value}</span>
-                     </li>`;
-        });
-        html += '</ul>';
-    } else {
-        html += '<p class="text-gray-400 text-xs mb-3">Geen effects.</p>';
-    }
-
-    // Conditions sectie
-    if (data.conditions && data.conditions.length > 0) {
-        html += '<p class="font-semibold mb-1 dark:text-white">Plaatsingsregels:</p><ul class="space-y-0.5">';
-        data.conditions.forEach(condition => {
-            const color = condition.type === 'bonus'
-                ? 'text-green-600'
-                : condition.type === 'penalty'
-                    ? 'text-red-500'
-                    : 'text-orange-500';
-            html += `<li class="${color} capitalize">${condition.type} naast ${condition.with}</li>`;
-        });
-        html += '</ul>';
-    } else {
-        html += '<p class="text-gray-400 text-xs">Geen plaatsingsregels.</p>';
-    }
-
-    return html;
-}
-
-// Hulpfunctie om de popup te positioneren ten opzichte van de muis en schermranden
-function positionPreview(event) {
-    const panel = document.getElementById('library-preview');
-    if (!panel || !event) return;
-    
-    const offsetMouseX = 20; // Aantal pixels rechts van de muis
-    const offsetMouseY = 10; // Standaard aantal pixels onder de muis
-    
-    // Bereken de gewenste posities op basis van de muis
-    let targetLeft = event.clientX + offsetMouseX;
-    let targetTop = event.clientY + offsetMouseY;
-    
-    // Verkrijg de actuele hoogte en breedte van de geopende popup kaart
-    const popupHeight = panel.offsetHeight;
-    const popupWidth = panel.offsetWidth;
-    
-    // BOTSINGSDETECTIE ONDERKANT: Als de popup onder het browserscherm zou vallen:
-    if (targetTop + popupHeight > window.innerHeight) {
-        // Klap de popup omhoog en toon hem BOVEN de muiscursor
-        targetTop = event.clientY - popupHeight - 10; 
-    }
-    
-    // BOTSINGSDETECTIE RECHTERKANT (voor smalle schermen):
-    if (targetLeft + popupWidth > window.innerWidth) {
-        // Toon de popup aan de linkerkant van de muiscursor
-        targetLeft = event.clientX - popupWidth - 20;
-    }
-
-    // Extra veiligheid: voorkom dat hij eventueel bóven de bovenkant van het scherm schiet
-    if (targetTop < 10) {
-        targetTop = 10; 
-    }
-
-    panel.style.left = `${targetLeft}px`;
-    panel.style.top = `${targetTop}px`;
-}
-
-//  het preview paneel met de opgehaalde data
-async function openPreview(functionId, event, shouldLock = false) {
-    const panel = document.getElementById('library-preview');
-    const title = document.getElementById('preview-title');
-    const body  = document.getElementById('preview-body');
-
-    if (!panel) return;
-
-    // Bij een click of keyboard focus activeren de interactie-modus
-    if (shouldLock) {
-        isLocked = true;
-        panel.classList.remove('pointer-events-none');
-    } else if (!isLocked) {
-        panel.classList.add('pointer-events-none');
-    }
-
-    // Als er een muis-event is meegegeven, positioneer de popup direct
-    if (event) { //  Volg altijd de muis als er een event is (voorkomt wegschieten bij click lock)
-        positionPreview(event);
-    } else if (shouldLock) {
-        // Vaste fallback positie in het midden-links van het scherm bij keyboard focus/click lock
-        panel.style.left = '320px';
-        panel.style.top = '150px';
-    }
-
-    // Toon het paneel en start de fade-in transitie
-    panel.classList.remove('hidden');
-    // Forceer een reflow zodat de transitie direct werkt
-    void panel.offsetWidth;
-    panel.classList.remove('opacity-0');
-    panel.classList.add('opacity-100');
-
-    body.innerHTML = '<p class="text-gray-400 text-xs">Laden...</p>';
-
-    const data = await fetchPreview(functionId);
-
-    // Toon een foutmelding bij netwerkfouten of als de server er langer dan 1 seconde over deed
-    if (!data || data.error) {
-        body.innerHTML = `<p class="text-red-400 text-xs">${data?.message || 'Kon data niet laden.'}</p>`;
-        return;
-    }
-
-    title.textContent = data.name;
-    body.innerHTML = renderPreview(data);
-    
-    
-    if (event) { // Herbereken positie op basis van muis na laden om verspringen te voorkomen
-        positionPreview(event);
-    }
-}
-
-// Verbergt het preview paneel met een soepele fade-out
-export function closePreview(force = false) {
-    const panel = document.getElementById('library-preview');
-    if (!panel) return;
-
-    // Voorkom sluiten bij mouseleave als de preview vergrendeld is door een klik
-    if (isLocked && !force) return;
-
-    if (force) isLocked = false;
-
-    panel.classList.remove('opacity-100');
-    panel.classList.add('opacity-0');
-
-    // Wacht tot de Tailwind transitie (duration-150) klaar is voor we hidden toevoegen
-    setTimeout(() => {
-        if (panel.classList.contains('opacity-0')) {
-            panel.classList.add('hidden');
-            panel.classList.add('pointer-events-none');
+        if (error.name === 'AbortError') {
+            throw new Error('Preview took too long to load.');
         }
-    }, 150);
+
+        throw error;
+    }
 }
 
-// Zet hover en click listeners op alle library items
-export function initLibraryPreview() {
-    const panel   = document.getElementById('library-preview');
-    const closeBtn = document.getElementById('preview-close');
+async function openPreview(item, pinned = false) {
+    const functionId = Number(item.dataset.functionId);
+    const { status } = getPreviewElements();
+    const requestId = ++previewRequestId;
 
-    if (!panel) return;
-
-    // Sluit knop activeert een harde forceer-sluiting
-    if (closeBtn) {
-        closeBtn.addEventListener('click', () => closePreview(true));
+    if (pinned) {
+        pinnedFunctionId = functionId;
     }
 
-    // Listeners op elk library item
-    document.querySelectorAll('.library-item').forEach(item => {
-        const id = item.dataset.functionId;
-        let hoverTimer = null;
+    showPreviewPanel(pinned, item);
+    if (status) status.textContent = 'Loading preview…';
 
-        // Maak items bereikbaar met het toetsenbord (Tab-key)
-        item.setAttribute('tabindex', '0');
+    try {
+        const data = await fetchPreview(functionId);
 
-        // Click opent de preview permanent (isLocked = true)
-        item.addEventListener('click', (event) => {
-            clearTimeout(hoverTimer);
-            openPreview(id, event, true);
-        });
+        if (requestId !== previewRequestId) return;
 
-        // Hover opent de preview na korte vertraging
-        item.addEventListener('mouseenter', (event) => {
-            if (isLocked) return;
-            hoverTimer = setTimeout(() => {
-                openPreview(id, event, false);
-            }, 300);
-        });
+        activeFunctionId = functionId;
+        hoveredItem = item;
+        setSelectedLibraryItem(functionId);
+        renderPreview(data);
+        if (status) status.textContent = '';
 
-        // Volg de muis zolang de gebruiker over het item beweegt (zorgt voor realtime updates bij scrollen/bewegen)
-        item.addEventListener('mousemove', (event) => {
-            if (!panel.classList.contains('hidden') && !isLocked) {
-                positionPreview(event);
-            }
-        });
+        if (pinned) {
+            applyPinnedPreviewLayout();
+        } else {
+            applyHoverPreviewLayout(item);
+        }
+    } catch (error) {
+        if (requestId !== previewRequestId) return;
+        if (status) status.textContent = error.message || 'Could not load preview.';
+        console.error('Library preview error:', error);
+    }
+}
 
-        // Verlaat het item: stop de timer en sluit de preview (behalve bij click-lock)
-        item.addEventListener('mouseleave', () => {
-            clearTimeout(hoverTimer);
-            closePreview(false);
-        });
+function scheduleHoverPreview(item) {
+    clearTimeout(hoverTimer);
+    const functionId = Number(item.dataset.functionId);
 
-        // Toetsenbord focus (toegankelijkheid)
-        item.addEventListener('focus', () => {
-            openPreview(id, null, true);
-        });
+    fetchPreview(functionId).catch(() => {});
 
-        // Toetsenbord verlies van focus
-        item.addEventListener('blur', () => {
+    hoverTimer = setTimeout(() => {
+        if (pinnedFunctionId) return;
+        openPreview(item, false);
+    }, HOVER_DELAY_MS);
+}
+
+function cancelHoverPreview() {
+    clearTimeout(hoverTimer);
+}
+
+function resolveLibraryItem(target) {
+    return target?.closest?.('.library-item') ?? null;
+}
+
+export function initLibraryPreview() {
+    const libraryList = document.getElementById('library-list');
+    const libraryColumn = document.getElementById('library-column');
+    const { panel, closeBtn } = getPreviewElements();
+
+    if (!libraryList || !libraryColumn || !panel) return;
+
+    document.addEventListener('dragstart', (event) => {
+        if (resolveLibraryItem(event.target)) {
+            suppressClickAfterDrag = true;
             closePreview(true);
-        });
+        }
+    });
+
+    document.addEventListener('dragend', () => {
+        setTimeout(() => {
+            suppressClickAfterDrag = false;
+        }, 0);
+    });
+
+    libraryList.addEventListener('mouseover', (event) => {
+        const item = resolveLibraryItem(event.target);
+        if (!isVisibleLibraryItem(item)) return;
+        if (pinnedFunctionId && Number(item.dataset.functionId) !== pinnedFunctionId) return;
+
+        if (hoveredItem !== item) {
+            hoveredItem = item;
+            if (!pinnedFunctionId) {
+                scheduleHoverPreview(item);
+            }
+        }
+    });
+
+    libraryList.addEventListener('mouseout', (event) => {
+        const item = resolveLibraryItem(event.target);
+        if (!item) return;
+
+        const related = event.relatedTarget;
+        if (related && item.contains(related)) return;
+        if (related && panel.contains(related)) return;
+
+        if (hoveredItem === item) {
+            hoveredItem = null;
+            cancelHoverPreview();
+            if (!pinnedFunctionId) {
+                previewRequestId += 1;
+                closePreview(false);
+            }
+        }
+    });
+
+    libraryList.addEventListener('click', (event) => {
+        const item = resolveLibraryItem(event.target);
+        if (!isVisibleLibraryItem(item) || suppressClickAfterDrag) return;
+
+        event.preventDefault();
+        event.stopPropagation();
+        openPreview(item, true);
+    });
+
+    libraryList.addEventListener('keydown', (event) => {
+        const item = resolveLibraryItem(event.target);
+        if (!isVisibleLibraryItem(item)) return;
+
+        if (event.key !== 'Enter' && event.key !== ' ') return;
+
+        event.preventDefault();
+        openPreview(item, true);
+    });
+
+    panel.addEventListener('mouseenter', () => {
+        cancelHoverPreview();
+    });
+
+    panel.addEventListener('mouseleave', () => {
+        if (!pinnedFunctionId) {
+            previewRequestId += 1;
+            closePreview(false);
+        }
+    });
+
+    libraryColumn.addEventListener('mouseleave', (event) => {
+        const related = event.relatedTarget;
+        if (related && libraryColumn.contains(related)) return;
+
+        cancelHoverPreview();
+        if (!pinnedFunctionId) {
+            previewRequestId += 1;
+            closePreview(false);
+        }
+    });
+
+    closeBtn?.addEventListener('click', (event) => {
+        event.stopPropagation();
+        previewRequestId += 1;
+        closePreview(true);
+    });
+
+    document.addEventListener('mousedown', (event) => {
+        if (!pinnedFunctionId || panel.classList.contains('hidden')) return;
+
+        const target = event.target;
+        if (panel.contains(target)) return;
+        if (resolveLibraryItem(target)) return;
+
+        previewRequestId += 1;
+        closePreview(true);
+    });
+
+    document.addEventListener('keydown', (event) => {
+        if (event.key === 'Escape' && !panel.classList.contains('hidden')) {
+            previewRequestId += 1;
+            closePreview(true);
+        }
     });
 }

@@ -1,7 +1,8 @@
 <x-app-layout>
 <div class="flex gap-4 h-full">
     {{-- LEFT: Function Library --}}
-    <div class="library-sidebar w-auto p-6 max-h-[73vh] overflow-y-auto flex-shrink-0 flex flex-col min-h-0">
+    <div id="library-column" class="library-sidebar relative w-auto flex-shrink-0 max-h-[73vh] flex flex-col min-h-0">
+        <div id="library-scroll" class="overflow-y-auto p-6 flex-1 min-h-0 flex flex-col">
         <div class="flex flex-col mb-4 gap-3 shrink-0">
             <h1 class="text-2xl dark:text-teal-500 font-bold mb-4">Function Library</h1>
             <div class="grid grid-cols-2 gap-3 w-full">
@@ -48,19 +49,6 @@
             No destinations match your search.
         </p>
 
-        {{-- Preview paneel — Zwevende fixed popup --}}
-        <div id="library-preview"
-            class="hidden fixed z-50 pointer-events-none p-4 bg-white dark:bg-gray-800 border border-gray-300 dark:border-gray-600 rounded-lg text-sm shadow-xl max-w-xs transition-opacity duration-150 opacity-0">
-            <div class="flex justify-between items-center mb-2">
-                <span id="preview-title" class="font-bold dark:text-white"></span>
-                <button id="preview-close"
-                    class="text-gray-400 hover:text-gray-600 dark:hover:text-white text-xs cursor-pointer">✕ sluiten</button>
-            </div>
-            <div id="preview-body" class="dark:text-gray-300">
-                <p class="text-gray-400 text-xs">Laden...</p>
-            </div>
-        </div>
-
         <div id="library-list" class="library-list-panel flex-1 min-h-0">
             @forelse($functions as $category => $items)
                 <div class="library-category-group mb-4" data-category="{{ $category }}">
@@ -87,6 +75,43 @@
             @empty
                 <p class="text-gray-500">No functions available.</p>
             @endforelse
+        </div>
+        </div>
+
+        <div id="library-preview-panel"
+            class="hidden absolute inset-x-0 bottom-0 z-10 flex flex-col overflow-hidden bg-slate-900/95 border-t border-slate-600 rounded-t-lg shadow-xl text-white pointer-events-none library-preview-panel"
+            role="dialog"
+            aria-live="polite"
+            aria-hidden="true"
+            aria-labelledby="library-preview-title">
+            <div id="library-preview-header" class="library-preview-header shrink-0 flex items-start justify-between gap-3 px-4 pt-4 pb-2 border-b border-slate-600 bg-slate-900/95">
+                <div class="flex items-center gap-3 min-w-0">
+                    <img id="library-preview-icon" src="" alt="" class="w-10 h-10 object-contain hidden">
+                    <div class="min-w-0">
+                        <h3 id="library-preview-title" class="text-base font-bold text-white truncate">—</h3>
+                        <p id="library-preview-category" class="text-xs uppercase tracking-wide text-white/80">—</p>
+                    </div>
+                </div>
+                <button id="library-preview-close" type="button"
+                    class="hidden shrink-0 w-7 h-7 rounded-full border border-slate-500 text-white hover:border-white focus:outline-none focus:ring-2 focus:ring-blue-500"
+                    aria-label="Close destination preview">
+                    <span aria-hidden="true">&times;</span>
+                </button>
+            </div>
+
+            <div id="library-preview-body" class="library-preview-body min-h-0 overflow-hidden px-4 pb-4">
+                <p id="library-preview-status" class="text-xs text-white/70 mb-2"></p>
+
+                <section class="library-preview-section mb-4" aria-labelledby="library-preview-effects-heading">
+                    <h4 id="library-preview-effects-heading" class="library-preview-section-title">Effects by category</h4>
+                    <div id="library-preview-effects" class="library-preview-section-content"></div>
+                </section>
+
+                <section class="library-preview-section" aria-labelledby="library-preview-conditions-heading">
+                    <h4 id="library-preview-conditions-heading" class="library-preview-section-title">Placement conditions</h4>
+                    <div id="library-preview-conditions" class="library-preview-section-content"></div>
+                </section>
+            </div>
         </div>
     </div>
 
