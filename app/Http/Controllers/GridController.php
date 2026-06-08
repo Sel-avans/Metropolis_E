@@ -6,6 +6,7 @@ use App\Models\CityFunction;
 use App\Models\GridCell;
 use App\Models\AdjacencyRule;
 use App\Models\Condition;
+use Barryvdh\DomPDF\Facade\Pdf;
 use Illuminate\Http\Request;
 use App\Models\UndoAction;
 use App\Http\Controllers\QoLController;
@@ -180,5 +181,57 @@ class GridController extends Controller
             'success' => true,
             'qol_data' => $freshQol
         ]);
+    }
+
+    public function exportPdf()
+    {
+        try {
+            \Log::info('PDF export started');
+            
+            $grid = GridCell::with('function.effects')->get();
+            \Log::info('Grid loaded with ' . $grid->count() . ' cells');
+            
+            // Get QoL data for PDF report
+            $qolData = QoLController::computeQoLData();
+            \Log::info('QoL data computed');
+
+            foreach ($grid as $cell) {
+                if ($cell->function && !empty($cell->function->image)) {
+                    $imageUri = $this->convertImageToDataUri($cell->function->image);
+                    if ($imageUri) {
+                        $cell->function->image_base64 = $imageUri;
+                    }
+                }
+            }
+            \Log::info('Images converted to base64');
+
+            $pdf = Pdf::loadView('pdf.simulation-report', [
+                'grid' => $grid,
+                'qolData' => $qolData,
+                'exportedAt' => now()->toDateTimeString(),
+            ])->setPaper('a4', 'portrait');
+
+            $filename = 'simulation-report-' . now()->format('Y-m-d_H-i-s') . '.pdf';
+            \Log::info('PDF generated with filename: ' . $filename);
+
+            return $pdf->download($filename);
+        } catch (\Exception $e) {
+            \Log::error('PDF export error: ' . $e->getMessage(), ['exception' => $e]);
+            return response()->json(['error' => 'PDF generation failed: ' . $e->getMessage()], 500);
+        }
+    }
+
+    private function convertImageToDataUri(string $relativePath): ?string
+    {
+        $path = public_path($relativePath);
+
+        if (!file_exists($path)) {
+            return null;
+        }
+
+        $contents = file_get_contents($path);
+        $mimeType = mime_content_type($path) ?: 'image/png';
+
+        return 'data:' . $mimeType . ';base64,' . base64_encode($contents);
     }
 }

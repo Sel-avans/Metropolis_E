@@ -556,6 +556,91 @@ function initGridPage() {
     }
 
     // =========================================================
+    // PDF EXPORT
+    // =========================================================
+
+    function setExportMessage(message, isError = false) {
+        const statusEl = document.getElementById('exportPdfStatus');
+        if (!statusEl) return;
+        statusEl.textContent = message;
+        statusEl.classList.toggle('text-red-600', isError);
+        statusEl.classList.toggle('text-slate-600', !isError);
+        statusEl.classList.toggle('dark:text-slate-400', !isError);
+    }
+
+    async function handleExportPdf() {
+        const button = document.getElementById('exportPdfButton');
+        if (!button) return;
+
+        button.disabled = true;
+        setExportMessage('Preparing PDF export...');
+
+        const timeoutId = setTimeout(() => {
+            setExportMessage('Generating PDF. Please wait...');
+        }, 2000);
+
+        try {
+            const response = await fetch('/grid/export-pdf', {
+                method: 'POST',
+                headers: {
+                    'X-CSRF-TOKEN': document.querySelector('meta[name="csrf-token"]')?.content || '',
+                }
+            });
+
+            clearTimeout(timeoutId);
+
+            if (!response.ok) {
+                let errorMessage = 'PDF export failed';
+                const contentType = response.headers.get('content-type');
+                
+                if (contentType && contentType.includes('application/json')) {
+                    try {
+                        const errorData = await response.json();
+                        errorMessage = errorData.error || errorMessage;
+                    } catch (e) {
+                        console.error('Failed to parse error JSON:', e);
+                    }
+                } else {
+                    const errorText = await response.text();
+                    console.error('PDF export error response:', errorText);
+                    if (errorText.includes('error')) {
+                        errorMessage = 'Server error: Check console for details';
+                    }
+                }
+                
+                console.error('PDF export failed with status', response.status, errorMessage);
+                setExportMessage(errorMessage, true);
+                button.disabled = false;
+                return;
+            }
+
+            const blob = await response.blob();
+            const filename = `simulation-report-${new Date().toISOString().slice(0,19).replace(/[:T-]/g, '-')}.pdf`;
+            const fileUrl = URL.createObjectURL(blob);
+            const anchor = document.createElement('a');
+            anchor.href = fileUrl;
+            anchor.download = filename;
+            document.body.appendChild(anchor);
+            anchor.click();
+            anchor.remove();
+            URL.revokeObjectURL(fileUrl);
+
+            setExportMessage('✓ PDF export completed. Check your downloads folder.');
+            button.disabled = false;
+        } catch (err) {
+            clearTimeout(timeoutId);
+            console.error('Export PDF error:', err);
+            setExportMessage('PDF export failed: ' + (err.message || 'Unknown error'), true);
+            button.disabled = false;
+        }
+    }
+
+    const exportPdfButton = document.getElementById('exportPdfButton');
+    if (exportPdfButton) {
+        exportPdfButton.addEventListener('click', handleExportPdf);
+    }
+
+    // =========================================================
     // HIGHLIGHT LOGICA
     // =========================================================
 
