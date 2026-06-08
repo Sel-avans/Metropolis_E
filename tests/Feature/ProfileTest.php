@@ -1,4 +1,5 @@
 <?php
+// Tests voor Login Opportunity
 
 namespace Tests\Feature;
 
@@ -9,6 +10,13 @@ use Tests\TestCase;
 class ProfileTest extends TestCase
 {
     use RefreshDatabase;
+
+    protected function setUp(): void
+    {
+        parent::setUp();
+
+        $this->withMiddleware();
+    }
 
     public function test_profile_page_is_displayed(): void
     {
