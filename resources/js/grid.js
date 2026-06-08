@@ -1,8 +1,13 @@
 import { registerActiveEventIdsProvider, getNeighborsWithQoL } from './neighbours.js';
 import { simulationLoop, onSimulationTimeUpdate } from './simulation.js';
 import { setMaxTime, syncTimelineUI, syncPlayPauseUI, minutesToHHMM, datetimeToSimMinutes, getCurrentTime, getMaxTime, getIsPlaying, setCurrentTime, setIsPlaying, TOTAL_MINUTES } from './regulation.js';
+import { initLibraryFilter } from './library-filter.js';
 
 const SIM_STATE_KEY = 'metropolis_simulation_state';
+
+document.addEventListener("DOMContentLoaded", () => {
+    initLibraryFilter();
+});
 
 // =========================================================
 // HULPFUNCTIE: maak een toegankelijke delete-knop
@@ -112,6 +117,11 @@ function initGridPage() {
         sessionStorage.removeItem(SIM_STATE_KEY);
     }
 
+    let eventTimerInterval = null;
+    let serverClockOffsetMs = 0;
+    let eventBoundaryTimeouts = [];
+    const EVENT_POLL_MS = 1000;
+    const MAX_SCHEDULE_MS = 24 * 60 * 60 * 1000;
     // =========================================================
     // HULPFUNCTIES
     // =========================================================
@@ -1154,8 +1164,9 @@ function initGridPage() {
     fetchAllEvents();
     requestAnimationFrame(simulationLoop);
     window.addEventListener('beforeunload', saveSimulationState);
-}
+};
 
 document.addEventListener('DOMContentLoaded', initGridPage);
 document.addEventListener('turbo:load', initGridPage);
 document.addEventListener('turbo:render', initGridPage);
+
