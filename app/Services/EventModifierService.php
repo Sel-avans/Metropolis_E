@@ -164,10 +164,8 @@ class EventModifierService
         }
 
         if ($event->type === 'recurring' && $event->recurring_start_time && $event->recurring_end_time) {
-            // recurring_start_time / recurring_end_time worden opgeslagen als pure tijdstrings
-            // (bijv. "19:00:00") zonder timezone — geen conversie nodig.
-            [$sh, $sm] = array_map('intval', explode(':', substr((string) $event->recurring_start_time, 0, 5)));
-            [$eh, $em] = array_map('intval', explode(':', substr((string) $event->recurring_end_time, 0, 5)));
+            [$sh, $sm] = self::parseClockTime($event->recurring_start_time);
+            [$eh, $em] = self::parseClockTime($event->recurring_end_time);
 
             $startMins = (($sh * 60 + $sm) - $startOffset + self::SIMULATION_CYCLE_MINUTES) % self::SIMULATION_CYCLE_MINUTES;
             $endMins   = (($eh * 60 + $em) - $startOffset + self::SIMULATION_CYCLE_MINUTES) % self::SIMULATION_CYCLE_MINUTES;
@@ -180,6 +178,21 @@ class EventModifierService
         }
 
         return [0, self::SIMULATION_CYCLE_MINUTES, self::SIMULATION_CYCLE_MINUTES];
+    }
+
+    /** @return array{0: int, 1: int} hour and minute from TIME column or datetime string */
+    public static function parseClockTime(mixed $value): array
+    {
+        if ($value === null || $value === '') {
+            return [0, 0];
+        }
+
+        $string = (string) $value;
+        if (preg_match('/(\d{1,2}):(\d{2})/', $string, $matches) === 1) {
+            return [(int) $matches[1], (int) $matches[2]];
+        }
+
+        return [0, 0];
     }
 
     /** True when the event spans at most one 24-hour period (Active Events panel). */

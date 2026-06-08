@@ -97,7 +97,9 @@ class SimulationEventController extends Controller
             'city_functions.*'       => 'integer|exists:city_functions,id',
         ]);
 
-        $event->update(EventModifierService::normalizeEventMoments($validated));
+        $event->update(collect(EventModifierService::normalizeEventMoments($validated))
+            ->only((new SimulationEvent())->getFillable())
+            ->all());
 
         $this->syncEventEffects(
             $event,

@@ -135,7 +135,10 @@
                 const display = row.querySelector('.cat-value-display');
 
                 const setValue = (next) => {
-                    const clamped = Math.max(-5, Math.min(5, next));
+                    let clamped = Math.max(-5, Math.min(5, next));
+                    if (clamped === 0) {
+                        clamped = next > parseInt(hidden.value, 10) ? 1 : -1;
+                    }
                     hidden.value = clamped;
                     display.textContent = (clamped >= 0 ? '+' : '') + clamped;
                     selectedCategories.set(category, clamped);
@@ -204,7 +207,7 @@
         document.getElementById('add_category_btn').addEventListener('click', () => {
             const category = categoryPicker.value;
             if (!category || selectedCategories.has(category)) return;
-            selectedCategories.set(category, 0);
+            selectedCategories.set(category, 1);
             categoriesDone = false;
             updateCategoriesDoneState();
             renderCategories();

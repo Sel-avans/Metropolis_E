@@ -71,6 +71,7 @@ function initGridPage() {
             currentTime: getCurrentTime(),
             isPlaying: getIsPlaying(),
             fullCycleMode: getFullCycleMode(),
+            eventConfigs: Object.fromEntries(allEvents.map(e => [e.id, buildEventConfigFingerprint(e)])),
             events: allEvents.map(e => ({
                 id: e.id,
                 activatedEarly: Boolean(e.activatedEarly),
@@ -78,6 +79,17 @@ function initGridPage() {
                 cycleActivationStart: e.cycleActivationStart ?? null,
             })),
         }));
+    }
+
+    function buildEventConfigFingerprint(event) {
+        return JSON.stringify({
+            start: event.start_minutes,
+            end: event.end_minutes,
+            ids: (event.affectedFunctionIds || []).slice().sort((a, b) => a - b),
+            mods: event.modifiers ?? {},
+            fits: event.fitsInCycle,
+            type: event.type,
+        });
     }
 
     function scheduleSaveSimulationState() {
@@ -140,10 +152,26 @@ function initGridPage() {
         event.isActive = false;
     }
 
+    function normalizeSimDate(value) {
+        if (value == null || value === '') return null;
+        const str = String(value).slice(0, 10);
+        return /^\d{4}-\d{2}-\d{2}$/.test(str) ? str : null;
+    }
+
+    /**
+     * Recurring events in simulation replay a representative city day.
+     * The daily time window (e.g. 18:00–22:00) drives activation — not whether
+     * simulationReferenceDate equals recurring_start_date (a future policy start
+     * should still be previewable on the grid).
+     * Only block after recurring_end_date has passed.
+     */
     function matchesRecurringSchedule(event, referenceDate) {
         if (event.type !== 'recurring') return true;
-        if (event.recurringStartDate && referenceDate && referenceDate < event.recurringStartDate) return false;
-        if (event.recurringEndDate && referenceDate && referenceDate > event.recurringEndDate) return false;
+
+        const ref = normalizeSimDate(referenceDate);
+        const end = normalizeSimDate(event.recurringEndDate);
+        if (ref && end && ref > end) return false;
+
         return true;
     }
 
@@ -788,7 +816,11 @@ function initGridPage() {
         try {
             const response = await fetch('/events/simulation', {
                 credentials: 'same-origin',
-                headers: { 'Accept': 'application/json' },
+                cache: 'no-store',
+                headers: {
+                    'Accept': 'application/json',
+                    'Cache-Control': 'no-cache',
+                },
             });
             if (!response.ok) return;
 
@@ -799,6 +831,7 @@ function initGridPage() {
             const persisted  = loadSimulationState();
             const storedById = {};
             (persisted?.events ?? []).forEach(e => { storedById[e.id] = e; });
+            const storedConfigs = persisted?.eventConfigs ?? {};
 
             const prevState = {};
             allEvents.forEach(e => {
@@ -812,7 +845,7 @@ function initGridPage() {
             allEvents = data.events.map(e => {
                 const stored = storedById[e.id];
                 const memory = prevState[e.id];
-                return {
+                const draft = {
                     id:                    e.id,
                     name:                  e.name,
                     type:                  e.type ?? 'one-off',
@@ -827,11 +860,22 @@ function initGridPage() {
                     durationMinutes:       e.duration_minutes ?? 0,
                     calendarDurationMinutes: e.calendar_duration_minutes ?? e.duration_minutes ?? 0,
                     fitsInCycle:           e.fits_in_cycle ?? true,
-                    activatedEarly:        stored?.activatedEarly        ?? memory?.activatedEarly        ?? false,
-                    activatedForCycle:     stored?.activatedForCycle     ?? memory?.activatedForCycle     ?? false,
-                    cycleActivationStart:  stored?.cycleActivationStart  ?? memory?.cycleActivationStart  ?? null,
                     isActive:              false,
                 };
+                const configKey = buildEventConfigFingerprint(draft);
+                const configChanged = storedConfigs[e.id] != null && storedConfigs[e.id] !== configKey;
+
+                draft.activatedEarly = configChanged
+                    ? false
+                    : (stored?.activatedEarly ?? memory?.activatedEarly ?? false);
+                draft.activatedForCycle = configChanged
+                    ? false
+                    : (stored?.activatedForCycle ?? memory?.activatedForCycle ?? false);
+                draft.cycleActivationStart = configChanged
+                    ? null
+                    : (stored?.cycleActivationStart ?? memory?.cycleActivationStart ?? null);
+
+                return draft;
             });
 
             if (persisted?.fullCycleMode != null) {
@@ -858,6 +902,8 @@ function initGridPage() {
 
             registerActiveEventIdsProvider(getActiveEventIdsForQoL);
 
+            lastActiveEventSignature = '';
+            lastQoLEventIdsKey = null;
             applySimulationTime(getCurrentTime());
             updateQoL({ immediate: true });
             saveSimulationState();
@@ -1083,6 +1129,18 @@ function initGridPage() {
     fetchAllEvents();
     requestAnimationFrame(simulationLoop);
     window.addEventListener('beforeunload', saveSimulationState);
+
+    const refreshEventsFromServer = () => {
+        lastActiveEventSignature = '';
+        lastQoLEventIdsKey = null;
+        fetchAllEvents();
+    };
+
+    window.addEventListener('pageshow', (event) => {
+        if (event.persisted) {
+            refreshEventsFromServer();
+        }
+    });
 }
 
 document.addEventListener('DOMContentLoaded', initGridPage);

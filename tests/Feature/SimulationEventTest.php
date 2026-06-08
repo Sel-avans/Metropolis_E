@@ -201,4 +201,111 @@ class SimulationEventTest extends TestCase
         $response->assertJsonPath('events.1.fits_in_cycle', false);
         $response->assertJsonPath('events.0.affected_function_ids.0', $function->id);
     }
+
+    public function test_updating_event_modifiers_preserves_function_assignments_and_simulation_window(): void
+    {
+        $admin = User::factory()->create(['role' => UserRole::Administrator]);
+        $function = CityFunction::factory()->create(['category' => 'recreation']);
+
+        $event = SimulationEvent::create([
+            'name' => 'Market',
+            'type' => 'recurring',
+            'recurring_schedule' => 'weekly',
+            'recurring_start_date' => now()->format('Y-m-d'),
+            'recurring_end_date' => now()->addMonth()->format('Y-m-d'),
+            'recurring_start_time' => '09:00',
+            'recurring_end_time' => '17:00',
+        ]);
+
+        Effect::create([
+            'function_id' => null,
+            'simulation_event_id' => $event->id,
+            'category' => 'recreation',
+            'value' => 2,
+        ]);
+
+        EventEffect::create([
+            'simulation_event_id' => $event->id,
+            'city_function_id' => $function->id,
+            'modifier' => 0,
+        ]);
+
+        [$startBefore, $endBefore] = array_slice(
+            EventModifierService::resolveSimulationWindow($event->fresh()),
+            0,
+            2
+        );
+
+        $response = $this->actingAs($admin)->put("/events/{$event->id}", [
+            'name' => 'Market',
+            'description' => null,
+            'type' => 'recurring',
+            'recurring_schedule' => 'weekly',
+            'recurring_start_date' => $event->recurring_start_date,
+            'recurring_end_date' => $event->recurring_end_date,
+            'recurring_start_time' => '09:00',
+            'recurring_end_time' => '17:00',
+            'category_modifiers' => ['recreation' => 4],
+            'city_functions' => [$function->id],
+        ]);
+
+        $response->assertRedirect('/events');
+
+        $this->assertDatabaseHas('effects', [
+            'simulation_event_id' => $event->id,
+            'category' => 'recreation',
+            'value' => 4,
+        ]);
+
+        $this->assertDatabaseHas('event_effects', [
+            'simulation_event_id' => $event->id,
+            'city_function_id' => $function->id,
+        ]);
+
+        $simulation = $this->actingAs($admin)->getJson('/events/simulation');
+        $simulation->assertOk();
+        $simulation->assertJsonPath('events.0.affected_function_ids.0', $function->id);
+        $simulation->assertJsonPath('events.0.modifiers.recreation', 4);
+        $simulation->assertJsonPath('events.0.start_minutes', $startBefore);
+        $simulation->assertJsonPath('events.0.end_minutes', $endBefore);
+    }
+
+    public function test_recurring_event_with_future_start_date_still_has_simulation_window(): void
+    {
+        Carbon::setTestNow(Carbon::parse('2026-06-09 12:00:00', 'UTC'));
+
+        $user = User::factory()->create(['role' => UserRole::Administrator]);
+        $function = CityFunction::factory()->create(['category' => 'amenities']);
+
+        $event = SimulationEvent::create([
+            'name' => 'Koopavond',
+            'type' => 'recurring',
+            'recurring_schedule' => 'weekly',
+            'recurring_start_date' => '2026-06-12',
+            'recurring_end_date' => '2026-06-12',
+            'recurring_start_time' => '18:00:00',
+            'recurring_end_time' => '22:00:00',
+        ]);
+
+        Effect::create([
+            'function_id' => null,
+            'simulation_event_id' => $event->id,
+            'category' => 'amenities',
+            'value' => 2,
+        ]);
+
+        EventEffect::create([
+            'simulation_event_id' => $event->id,
+            'city_function_id' => $function->id,
+            'modifier' => 0,
+        ]);
+
+        $response = $this->actingAs($user)->getJson('/events/simulation');
+
+        $response->assertOk();
+        $response->assertJsonPath('events.0.name', 'Koopavond');
+        $response->assertJsonPath('events.0.start_minutes', 720);
+        $response->assertJsonPath('events.0.end_minutes', 960);
+        $response->assertJsonPath('simulation_reference_date', '2026-06-09');
+    }
 }
