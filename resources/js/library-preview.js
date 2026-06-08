@@ -166,7 +166,7 @@ function renderEffects(effects) {
             <thead>
                 <tr>
                     <th scope="col">Category</th>
-                    <th scope="col" class="text-right">QoL impact</th>
+                    <th scope="col">QoL impact</th>
                 </tr>
             </thead>
             <tbody>${rows}</tbody>

@@ -4,7 +4,7 @@ async function e(e,t){try{let n=await fetch(`/qol/cell/${e}/${t}`);if(!n.ok)thro
             <thead>
                 <tr>
                     <th scope="col">Category</th>
-                    <th scope="col" class="text-right">QoL impact</th>
+                    <th scope="col">QoL impact</th>
                 </tr>
             </thead>
             <tbody>${(e??[]).map(e=>`
