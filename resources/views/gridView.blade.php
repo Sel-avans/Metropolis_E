@@ -15,6 +15,7 @@
                 <h1 class="text-2xl dark:text-teal-500 font-bold mb-4">Function Library</h1>
                 <nav aria-label="Management navigation">
                     <div class="grid grid-cols-2 gap-3 w-full">
+                        @if(auth()->user() && auth()->user()->role->name === 'Administrator')
                         <a href="{{ route('functions.index') }}"
                             class="px-3 py-2 bg-blue-600 text-white rounded hover:bg-blue-700 text-sm shadow text-center focus:outline-none focus:ring-2 focus:ring-blue-500">
                             Function Management
@@ -27,6 +28,7 @@
                             class="px-3 py-2 bg-blue-600 text-white rounded hover:bg-blue-700 text-sm shadow text-center focus:outline-none focus:ring-2 focus:ring-blue-500">
                             Condition Management
                         </a>
+                        @endif
                         <a href="{{ route('events.index') }}"
                             class="px-3 py-2 bg-purple-600 text-white rounded hover:bg-purple-700 text-sm shadow text-center focus:outline-none focus:ring-2 focus:ring-purple-500">
                             Events
@@ -119,7 +121,7 @@
             {{-- Undo and Export Buttons --}}
             <div class="flex gap-2 mb-4">
 
-                @if(auth()->user() && auth()->user()->role->name === 'City_planner')
+                @if(auth()->user() && (auth()->user()->role->name === 'Municipal_Policy_Maker' || auth()->user()->role->name === 'Administrator'))
                 <button type="button" id="approve-btn"
                     class="flex-1 px-4 py-2 bg-amber-600 text-white font-semibold rounded shadow hover:bg-amber-700 transition focus:ring-2 focus:ring-yellow-400"
                 > Lock & Unlock Area</button>
@@ -129,11 +131,13 @@
                     class="flex-1 px-4 py-2 bg-yellow-500 text-black font-semibold rounded shadow hover:bg-yellow-600 transition focus:ring-2 focus:ring-yellow-400">
                     Undo
                 </button>
+                @if(auth()->user() && (auth()->user()->role->name === 'Municipal_Policy_Maker'))
                 <button id="exportPdfButton" type="button"
                         class="flex-1 px-4 py-2 bg-teal-600 text-white font-semibold rounded shadow hover:bg-teal-700 focus:outline-none focus:ring-2 focus:ring-teal-500 transition"
                         aria-label="Export the current simulation as a PDF report">
                     Export as PDF
                 </button>
+                @endif
             </div>
 
             {{-- City Grid --}}
