@@ -67,7 +67,7 @@ class PagePolicy
     {
         return in_array($user->role, [
             UserRole::City_planner,
-            UserRole::Municipal_Policy_Makerm,
+            UserRole::Municipal_Policy_Maker,
             UserRole::Administrator
         ]);
     }
@@ -124,7 +124,14 @@ class PagePolicy
     {
         return $user->role === UserRole::Municipal_Policy_Maker;
     }
-
+    // Event Management
+    public function CanManageEvents(User $user): bool
+{
+    return in_array($user->role, [
+        UserRole::Administrator,
+        UserRole::Municipal_Policy_Maker
+    ]);
+}
     
 
 }

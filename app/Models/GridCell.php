@@ -8,14 +8,7 @@ use Illuminate\Database\Eloquent\Factories\HasFactory;
 class GridCell extends Model
 {
     use HasFactory;
-
-   
-    protected $fillable = ['row', 'col', 'function_id', 'is_approved'];
-
-    
-    protected $casts = [
-        'is_approved' => 'boolean',
-    ];
+    protected $fillable = ['row', 'col', 'function_id'];
 
     public $timestamps = false;
 
@@ -24,3 +17,4 @@ class GridCell extends Model
         return $this->belongsTo(CityFunction::class, 'function_id');
     }
 }
+

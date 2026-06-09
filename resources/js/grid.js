@@ -220,6 +220,19 @@ if (approveBtn) {
             return;
         }
 
+        // Capture previous function for undo
+        const img = cell.querySelector('.grid-function-icon');
+        if (img) {
+            lastAction = {
+                type: 'delete',
+                functionId: Number(img.dataset.functionId),
+                name: img.alt,
+                row: cell.dataset.row,
+                col: cell.dataset.col,
+            };
+            enableUndoButton();
+        }
+
         clearCellFunction(cell);
         cell.removeAttribute("draggable");
         activateCell(cell);
@@ -437,6 +450,21 @@ if (approveBtn) {
 
             const oldRow = sourceCell?.dataset.row;
             const oldCol = sourceCell?.dataset.col;
+
+            // Capture previous state for undo
+            const prevImg = cell.querySelector('.grid-function-icon');
+            lastAction = {
+                type: 'move',
+                functionId: draggedItem?.id,
+                name: draggedItem?.name,
+                oldRow: oldRow ?? null,
+                oldCol: oldCol ?? null,
+                newRow: cell.dataset.row,
+                newCol: cell.dataset.col,
+                replaced: prevImg ? { functionId: Number(prevImg.dataset.functionId), name: prevImg.alt } : null
+            };
+            enableUndoButton();
+
             if (sourceCell) {
                 clearCellFunction(sourceCell);
                 sourceCell.classList.remove("drag-source");
@@ -472,11 +500,88 @@ if (approveBtn) {
     });
 
     const undoBtn = document.getElementById("undo-btn");
+
+    function enableUndoButton() {
+        if (!undoBtn) return;
+        undoBtn.disabled = false;
+        undoBtn.classList.remove('opacity-50');
+    }
+
+    function disableUndoButton() {
+        if (!undoBtn) return;
+        undoBtn.disabled = true;
+        undoBtn.classList.add('opacity-50');
+    }
+
     if (undoBtn) {
+        // start disabled until an action exists
+        disableUndoButton();
+
         undoBtn.addEventListener("click", async () => {
-            if (lastAction) {
-                await fetch('/grid/undo', { method: 'POST', headers: { 'X-CSRF-TOKEN': document.querySelector('meta[name="csrf-token"]').content } });
-                location.reload();
+            if (!lastAction) {
+                alert('No action to undo.');
+                return;
+            }
+
+            try {
+                const res = await fetch('/undo', {
+                    method: 'POST',
+                    headers: {
+                        'X-CSRF-TOKEN': document.querySelector('meta[name="csrf-token"]').content
+                    }
+                });
+
+                        if (res && res.ok) {
+                            const data = await res.json().catch(() => ({}));
+                            if (data.success) {
+                                // Apply returned cell restoration
+                                if (data.cell) {
+                                    const c = data.cell;
+                                    const cellEl = document.querySelector(`.grid-cell[data-row="${c.row}"][data-col="${c.col}"]`);
+                                    if (cellEl) {
+                                        clearCellFunction(cellEl);
+                                        if (c.function_id) {
+                                            appendCellFunction(cellEl, { id: c.function_id, name: c.name ?? '', image: c.image ?? '' });
+                                        }
+                                    }
+                                }
+
+                                // Clear any cell that was cleared by the undo (e.g., moved-from cell)
+                                if (data.cleared) {
+                                    const cl = data.cleared;
+                                    const clearedEl = document.querySelector(`.grid-cell[data-row="${cl.row}"][data-col="${cl.col}"]`);
+                                    if (clearedEl) {
+                                        clearCellFunction(clearedEl);
+                                    }
+                                }
+
+                                // Update QoL UI using returned data if present
+                                if (data.qol_data) {
+                                    const scoreEl = document.getElementById('qol-score-value');
+                                    const breakdownEl = document.getElementById('breakdown-qol-score');
+                                    const oldScoreEl = document.getElementById('old-qol-score');
+                                    if (scoreEl) scoreEl.textContent = data.qol_data.total_score;
+                                    if (oldScoreEl) oldScoreEl.innerHTML = compareScores(data.qol_data);
+                                    if (breakdownEl) breakdownEl.innerHTML = renderQoLBreakdown(data.qol_data);
+                                } else {
+                                    // fallback: fetch fresh QoL
+                                    updateQoL();
+                                }
+
+                                lastAction = null;
+                                disableUndoButton();
+                                // small confirmation
+                                console.log('Undo applied');
+                            } else {
+                                alert(data.message || 'Unable to undo action.');
+                            }
+                        } else {
+                            const data = await res.json().catch(() => ({}));
+                            alert(data.message || 'Unable to undo action.');
+                        }
+            } catch (err) {
+                console.error('Error performing undo:', err);
+                alert('Error performing undo. See console for details.');
             }
         });
     }
@@ -484,32 +589,5 @@ if (approveBtn) {
     document.addEventListener("dragend", () => { isDragging = false; if (sourceCell) sourceCell.classList.remove("drag-source"); });
 
     updateQoL();
-    document.addEventListener("DOMContentLoaded", () => {
-    const undoBtn = document.getElementById("undo-btn");
 
-    if (undoBtn) {
-        console.log("Undo knop gevonden!"); // Test 1: Verschijnt dit in je console?
-        
-        undoBtn.addEventListener("click", () => {
-            console.log("Undo knop is aangeklikt!"); // Test 2: Verschijnt dit na klikken?
-            
-            // Simpele test: reload de pagina
-            // location.reload(); 
-        });
-    } else {
-        console.error("Undo knop NIET gevonden! Check je HTML ID."); // Test 3: Foutmelding
-    }
-    // TEST CODE: Plak dit helemaal onderaan je bestand
-window.addEventListener('load', () => {
-    const btn = document.getElementById('undo-btn');
-    if (btn) {
-        btn.style.border = "5px solid red"; // Krijgt de knop een rode rand?
-        btn.addEventListener('click', () => {
-            alert('De knop werkt en de code bereikt hem!');
-        });
-    } else {
-        console.error("DEBUG: Undo knop is niet gevonden door het systeem.");
-    }
-});
-});
 });

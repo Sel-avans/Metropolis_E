@@ -35,6 +35,7 @@ class EffectsController extends Controller
 
     foreach ($effects as $category => $value) {
         Effect::where('function_id', $functionId)
+            ->whereNull('simulation_event_id')
             ->where('category', $category)
             ->update(['value' => $value]);
     }
