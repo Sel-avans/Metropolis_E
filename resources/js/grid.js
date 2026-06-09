@@ -160,8 +160,8 @@ function initGridPage() {
     // HULPFUNCTIES
     // =========================================================
 
-    function activateCell(cell) {
-        document.querySelectorAll(".grid-cell").forEach(c => c.classList.remove("selected"));
+    function activateCell(cell, additive = false) {
+        if (!additive) document.querySelectorAll(".grid-cell").forEach(c => c.classList.remove("selected"));
         cell.classList.add("selected");
     }
 
@@ -1297,9 +1297,25 @@ function initGridPage() {
                 flashLockExplanation(cell);
                 return;
             }
-            activateCell(cell);
+
+            const approveBtnExists = Boolean(document.getElementById('approve-btn'));
+
+            // If approve button is present, allow multi-select via toggling.
+            // Also allow ctrl/meta to add to selection when approve button is not visible.
+            const additive = approveBtnExists || e.ctrlKey || e.metaKey;
+
+            if (approveBtnExists) {
+                // toggle selection for multi-select UX
+                if (cell.classList.contains('selected')) cell.classList.remove('selected');
+                else activateCell(cell, true);
+            } else if (additive) {
+                // additive selection without approve button (ctrl/meta pressed)
+                if (cell.classList.contains('selected')) cell.classList.remove('selected');
+                else cell.classList.add('selected');
+            } else {
+                activateCell(cell, false);
+            }
         });
-        cell.addEventListener("click",   () => { if (!isDragging) activateCell(cell); });
         cell.addEventListener("keydown", e  => { if (!isDragging && (e.key === "Enter" || e.key === " ")) activateCell(cell); });
         cell.addEventListener('mouseenter', (event) => {
             const row = parseInt(cell.dataset.row), col = parseInt(cell.dataset.col);
