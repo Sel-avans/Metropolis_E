@@ -65,7 +65,7 @@
                             @foreach($items as $function)
                                 {{-- HERSTELD: 'tabindex="0"' en 'role="button"' toegevoegd voor Keyboard Toegankelijkheid --}}
                                 <li class="library-item flex items-center gap-3 px-4 py-3 border border-gray-400 dark:border-gray-600 rounded cursor-pointer hover:border-blue-500 transition focus:outline-none focus:ring-2 focus:ring-blue-500"
-                                    draggable="true"
+                                    draggable="{{ (auth()->user() && (auth()->user()->role->name === 'City_planner' || auth()->user()->role->name === 'Administrator')) ? 'true' : 'false' }}"
                                     tabindex="0"
                                     role="button"
                                     data-function-id="{{ $function->id }}"

@@ -1262,7 +1262,8 @@ function initGridPage() {
 
             if (res && res.status === 403) {
                 const data = await res.json().catch(() => ({}));
-                alert(data.message ?? "You can't modify this locked area.");
+                // More accurate default message when the server forbids the action
+                alert(data.message ?? "You don't have permission to modify the grid.");
                 location.reload();
                 return;
             }
