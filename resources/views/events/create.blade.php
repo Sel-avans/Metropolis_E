@@ -171,14 +171,19 @@
                 oneOffFields.style.display = 'block';
                 recurringFields.style.display = 'none';
                 
-                // Set required attributes for one-off fields
+                startInput.disabled = false;
+                endInput.disabled = false;
+                scheduleInput.disabled = true;
+                recurringStartDateInput.disabled = true;
+                recurringEndDateInput.disabled = true;
+                recurringStartTimeInput.disabled = true;
+                recurringEndTimeInput.disabled = true;
+                
                 startInput.setAttribute('required', 'required');
                 endInput.setAttribute('required', 'required');
                 
-                // Remove required attributes for recurring fields
                 scheduleInput.removeAttribute('required');
                 recurringStartDateInput.removeAttribute('required');
-                // recurringEndDateInput.removeAttribute('required');
                 recurringStartTimeInput.removeAttribute('required');
                 recurringEndTimeInput.removeAttribute('required');
                 
@@ -186,11 +191,17 @@
                 oneOffFields.style.display = 'none';
                 recurringFields.style.display = 'block';
                 
-                // Remove required attributes for one-off fields
+                startInput.disabled = true;
+                endInput.disabled = true;
+                scheduleInput.disabled = false;
+                recurringStartDateInput.disabled = false;
+                recurringEndDateInput.disabled = false;
+                recurringStartTimeInput.disabled = false;
+                recurringEndTimeInput.disabled = false;
+                
                 startInput.removeAttribute('required');
                 endInput.removeAttribute('required');
                 
-                // Set required attributes for recurring fields
                 scheduleInput.setAttribute('required', 'required');
                 recurringStartDateInput.setAttribute('required', 'required');
                 recurringEndDateInput.setAttribute('required', 'required');

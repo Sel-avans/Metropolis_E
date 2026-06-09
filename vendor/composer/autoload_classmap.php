@@ -7343,6 +7343,7 @@ return array(
     'Tests\\Feature\\Auth\\PasswordResetTest' => $baseDir . '/tests/Feature/Auth/PasswordResetTest.php',
     'Tests\\Feature\\Auth\\PasswordUpdateTest' => $baseDir . '/tests/Feature/Auth/PasswordUpdateTest.php',
     'Tests\\Feature\\Auth\\RegistrationTest' => $baseDir . '/tests/Feature/Auth/RegistrationTest.php',
+    'Tests\\Feature\\DayNightIndicatorTest' => $baseDir . '/tests/Feature/DayNightIndicatorTest.php',
     'Tests\\Feature\\EffectsControllerTest' => $baseDir . '/tests/Feature/EffectsControllerTest.php',
     'Tests\\Feature\\ExampleTest' => $baseDir . '/tests/Feature/ExampleTest.php',
     'Tests\\Feature\\FunctionsControllerTest' => $baseDir . '/tests/Feature/FunctionsControllerTest.php',

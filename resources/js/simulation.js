@@ -8,25 +8,31 @@ import {
     MINUTES_PER_SECOND,
 } from './regulation.js';
 
-export const simulationState = {
-    speed: 1,
-};
+export const simulationState = { speed: 1 };
+
+/** Full simulation cycle length in minutes (06:00 → next 06:00). */
+export const CYCLE_LENGTH_MINUTES = 1440;
 
 export const setSimulationSpeed = async (speed) => {
-    simulationState.speed = parseInt(speed);
-
-    // Update active-speed-display
+    simulationState.speed = parseInt(speed, 10);
     const display = document.getElementById('active-speed-display');
     if (display) display.innerText = speed + '×';
+
+    document.querySelectorAll('.speed-btn').forEach(btn => {
+        const selected = parseInt(btn.getAttribute('data-speed'), 10) === simulationState.speed;
+        btn.setAttribute('aria-pressed', selected ? 'true' : 'false');
+    });
+
+    syncTimelineUI();
 
     try {
         const response = await fetch('/api/simulation/speed', {
             method: 'POST',
             headers: {
                 'Content-Type': 'application/json',
-                'X-CSRF-TOKEN': document.querySelector('meta[name="csrf-token"]').content
+                'X-CSRF-TOKEN': document.querySelector('meta[name="csrf-token"]').content,
             },
-            body: JSON.stringify({ speed: simulationState.speed })
+            body: JSON.stringify({ speed: simulationState.speed }),
         });
         if (!response.ok) throw new Error('Failed to update speed');
     } catch (error) {
@@ -42,39 +48,48 @@ if (!window.__simControlsInitialized) {
 }
 
 let lastTimestamp = 0;
-
-// Callback die grid.js registreert voor tick-updates
 let onTimeUpdateCallback = null;
+let onCycleCompleteCallback = null;
+
 export const onSimulationTimeUpdate = (cb) => { onTimeUpdateCallback = cb; };
+export const onSimulationCycleComplete = (cb) => { onCycleCompleteCallback = cb; };
+
+/**
+ * Advance simulation time, snap to day/night boundary when crossing, wrap at cycle end.
+ * @returns {{ wrapped: boolean }}
+ */
+export function advanceSimulationTime(deltaTimeSeconds) {
+    const maxTime   = getMaxTime();
+    const current   = getCurrentTime();
+    const increment = MINUTES_PER_SECOND * simulationState.speed * deltaTimeSeconds;
+    let next        = current + increment;
+    let wrapped     = false;
+
+    if (next >= maxTime) {
+        next = next - maxTime;
+        wrapped = true;
+    }
+
+    setCurrentTime(next);
+    syncTimelineUI();
+
+    if (onTimeUpdateCallback) {
+        onTimeUpdateCallback(getCurrentTime());
+    }
+
+    if (wrapped && onCycleCompleteCallback) {
+        onCycleCompleteCallback();
+    }
+
+    return { wrapped };
+}
 
 export function simulationLoop(timestamp) {
     if (getIsPlaying()) {
         if (!lastTimestamp) lastTimestamp = timestamp;
 
         const deltaTime = (timestamp - lastTimestamp) / 1000;
-        const maxTime   = getMaxTime();
-        const current   = getCurrentTime();
-
-        if (current < maxTime) {
-            const increment = MINUTES_PER_SECOND * simulationState.speed * deltaTime;
-            setCurrentTime(current + increment);
-            syncTimelineUI();
-
-            if (onTimeUpdateCallback) {
-                onTimeUpdateCallback(getCurrentTime());
-            }
-        } else {
-            // Dag voorbij: stop en sync event-state (eind cyclus 06:00)
-            setCurrentTime(maxTime);
-            syncTimelineUI();
-
-            if (onTimeUpdateCallback) {
-                onTimeUpdateCallback(getCurrentTime());
-            }
-
-            const playPauseBtn = document.getElementById('playPauseBtn');
-            if (playPauseBtn && getIsPlaying()) playPauseBtn.click();
-        }
+        advanceSimulationTime(deltaTime);
 
         lastTimestamp = timestamp;
     } else {

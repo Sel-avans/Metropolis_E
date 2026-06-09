@@ -3,18 +3,18 @@
 namespace Tests\Feature;
 
 use Tests\TestCase;
-use App\Models\activeEvent;   
-use App\Services\simspeed;     
+use App\Models\SimulationEvent;   
+use App\Services\SimSpeedService;     
 use Illuminate\Support\Carbon;
 
 class simspeedTest extends TestCase
 {
-    private simspeed $eventManager;
+    private SimSpeedService $eventManager;
 
     protected function setUp(): void
     {
         parent::setUp();
-        $this->eventManager = new simspeed(); 
+        $this->eventManager = new SimSpeedService(); 
     }
 
     public function test_it_calculates_effective_duration_correctly()
@@ -29,7 +29,7 @@ class simspeedTest extends TestCase
         $knownDate = Carbon::create(2026, 5, 29, 12, 0, 0);
         Carbon::setTestNow($knownDate);
 
-        $activeEvent = new activeEvent([
+        $activeEvent = new SimulationEvent([
             'remaining_base_duration' => 100.0,
             'last_updated_at' => $knownDate->copy()->subSeconds(10)->toDateTimeString(),
         ]);
@@ -48,14 +48,14 @@ class simspeedTest extends TestCase
         $knownDate = Carbon::create(2026, 5, 29, 12, 0, 0);
         Carbon::setTestNow($knownDate);
 
-        $finishedEvent = new activeEvent([
+        $finishedEvent = new SimulationEvent([
             'remaining_base_duration' => 20.0,
             'last_updated_at' => $knownDate->copy()->subSeconds(10)->toDateTimeString(),
         ]);
 
         $this->assertTrue($this->eventManager->isEventFinished($finishedEvent, 2.0));
 
-        $activeEvent = new activeEvent([
+        $activeEvent = new SimulationEvent([
             'remaining_base_duration' => 20.0,
             'last_updated_at' => $knownDate->copy()->subSeconds(5)->toDateTimeString(),
         ]);

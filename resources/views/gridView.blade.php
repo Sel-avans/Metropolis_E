@@ -58,13 +58,10 @@
             <div id="library-list" class="library-list-panel flex-1 min-h-0">
             @forelse($functions as $category => $items)
                 <h2 class="text-xl dark:text-teal-600 font-semibold mt-6 mb-2">{{ ucfirst($category) }}</h2>
-                {{-- WCAG 1.3.1: role="list" explicieter; items krijgen tabindex zodra toetsenbord-feature klaar is --}}
                 <ul class="space-y-2 dark:text-white" role="list">
                     @foreach($items as $function)
                         <li class="library-item flex items-center gap-3 px-4 py-3 border border-gray-400 dark:border-gray-600 rounded cursor-pointer hover:border-blue-500 transition focus:outline-none focus:ring-2 focus:ring-blue-500"
-                            draggable="true"
-                            data-function-id="{{ $function->id }}"
-                            data-function-name="{{ $function->name }}"
+                            draggable="true" data-function-id="{{ $function->id }}" data-function-name="{{ $function->name }}"
                             data-image="{{ asset($function->image) }}">
                             <img src="{{ asset($function->image) }}" alt="{{ $function->name }}"
                                 class="w-8 h-8 object-contain pointer-events-none">
@@ -104,7 +101,8 @@
             <div class="justify-center">
                 <h1 class="text-2xl text-center font-bold mb-2 dark:text-teal-300">City Grid</h1>
 
-                <div class="city-grid grid grid-flow-col grid-rows-3 gap-3 w-min mx-auto">
+                <div class="city-grid grid grid-flow-col grid-rows-3 gap-3 w-min mx-auto"
+                aria-label="City planning grid">
                     @for($col = 1; $col <= 4; $col++)
                         @for($row = 1; $row <= 3; $row++)
 @php
@@ -157,24 +155,76 @@
             </div>
 
             {{-- Simulation Controls --}}
-            <section id="simulation-controls"
-                aria-label="Simulation controls"
+            <section id="simulation-controls" aria-label="Simulation controls"
                 class="mt-6 p-6 border-t border-gray-300 dark:border-gray-700 bg-white dark:bg-gray-900 rounded-b-lg">
                 <h2 class="text-lg font-semibold mb-4 text-sky-500 dark:text-teal-500">Simulation Controls</h2>
 
                 {{-- Timeline --}}
                 <div class="mb-6">
                     <label for="simulation-timeline" class="sr-only">Simulation timeline</label>
-                    <input type="range" id="simulation-timeline" class="w-full" min="0" max="1440" value="0"
-                        aria-valuemin="0" aria-valuemax="1440" aria-valuenow="0"
-                        aria-valuetext="06:00">
-                    <div class="flex justify-between items-center mt-2 text-xs text-gray-500 dark:text-gray-400" aria-hidden="true">
-                        <span class="font-mono">06:00</span>
-                        <span id="simulation-time-display"
-                            class="font-bold font-mono text-sky-600 dark:text-teal-400 text-base tabular-nums">
-                            06:00
-                        </span>
-                        <span class="font-mono">06:00</span>
+                    <input type="range" id="simulation-timeline" class="w-full" min="0" max="1080" value="0"
+                        aria-valuemin="0" aria-valuemax="1080" aria-valuenow="0" aria-valuetext="06:00">
+                    <div class="flex justify-between items-center mt-2 text-xs text-gray-500 dark:text-gray-400">
+                        <span class="font-mono" aria-hidden="true">06:00</span>
+                        <div class="flex flex-col items-center gap-1">
+                            <span id="simulation-time-display"
+                                class="font-bold font-mono text-sky-600 dark:text-teal-400 text-base tabular-nums"
+                                aria-hidden="true">
+                                06:00
+                            </span>
+                            <div class="flex items-center gap-2 flex-wrap justify-center">
+                                <div id="day-night-indicator" data-state="day" data-full-cycle="false" role="status"
+                                    aria-live="polite" aria-atomic="true"
+                                    class="flex items-center gap-2 px-3 py-1 rounded-full border text-xs font-semibold select-none transition-all duration-500
+           [&[data-state=day]]:bg-amber-100 [&[data-state=day]]:border-amber-400 [&[data-state=day]]:text-amber-800
+           dark:[&[data-state=day]]:bg-amber-900/40 dark:[&[data-state=day]]:border-amber-500 dark:[&[data-state=day]]:text-amber-300
+           [&[data-state=night]]:bg-indigo-900 [&[data-state=night]]:border-indigo-400 [&[data-state=night]]:text-indigo-200">
+
+                                    <span data-day class="flex items-center gap-2">
+                                        <span class="text-base leading-none" aria-hidden="true">☀️</span>
+                                        <span class="font-bold tracking-wide">Day</span>
+                                        <span class="opacity-60 font-normal">(06:00 – 24:00)</span>
+                                    </span>
+
+                                    <span data-night class="hidden flex items-center gap-2">
+                                        <span class="text-base leading-none" aria-hidden="true">🌙</span>
+                                        <span class="font-bold tracking-wide">Night</span>
+                                        <span class="opacity-60 font-normal">(00:00 – 06:00)</span>
+                                    </span>
+                                </div>
+                                <button type="button" id="full-cycle-toggle" aria-pressed="false" data-active="false"
+                                    aria-label="Day simulation only (06:00 to 24:00). Click to enable the full day/night cycle (06:00 to 06:00)."
+                                    title="Day simulation (06:00 to 24:00). Click to enable the full day/night cycle (06:00 to 06:00)."
+                                    class="px-3 py-1 rounded-full border text-xs font-semibold transition-all duration-200
+                                    border-gray-300 dark:border-gray-600 text-gray-600 dark:text-gray-300
+                                    hover:border-sky-400 hover:text-sky-600 dark:hover:border-teal-500 dark:hover:text-teal-400
+                                    data-[active=true]:bg-sky-100 data-[active=true]:border-sky-500 data-[active=true]:text-sky-800
+                                    dark:data-[active=true]:bg-teal-900/40 dark:data-[active=true]:border-teal-500 dark:data-[active=true]:text-teal-300">
+                                    Day Simulation
+                                </button>
+
+                                {{-- Cycle Duration inline --}}
+                                <div class="flex items-center gap-2 bg-gray-100 dark:bg-gray-800 px-3 py-1 rounded-lg border border-gray-200 dark:border-gray-700">
+                                    <span class="text-xs font-semibold text-gray-500 dark:text-gray-400 uppercase tracking-wider">Cycle</span>
+                                    <span class="text-sm leading-none" aria-hidden="true">☀️</span>
+                                    <input type="number" id="day-hours-input" min="1" max="23" value="18" step="1"
+                                        class="w-11 text-center border border-gray-300 dark:border-gray-600 rounded px-1 py-0.5 text-sm dark:bg-gray-700 dark:text-white"
+                                        aria-label="Day duration in hours (1–23)">
+                                    <span class="text-xs text-gray-500 dark:text-gray-400">h</span>
+                                    <span class="text-gray-300 dark:text-gray-600 select-none">|</span>
+                                    <span class="text-sm leading-none" aria-hidden="true">🌙</span>
+                                    <input type="number" id="night-hours-input" min="1" max="23" value="6" step="1"
+                                        class="w-11 text-center border border-gray-300 dark:border-gray-600 rounded px-1 py-0.5 text-sm dark:bg-gray-700 dark:text-white"
+                                        aria-label="Night duration in hours (1–23)">
+                                    <span class="text-xs text-gray-500 dark:text-gray-400">h</span>
+                                </div>
+                                <p id="duration-validation-msg" class="hidden text-xs text-red-500 dark:text-red-400">
+                                    Day + night must total 24 h
+                                </p>
+                            </div>
+                            <span id="day-night-live" class="sr-only">Simulation cycle: Day only (06:00 to 24:00)</span>
+                        </div>
+                        <span id="timeline-end-label" class="font-mono" aria-hidden="true">24:00</span>
                     </div>
                 </div>
 
@@ -184,7 +234,8 @@
                     {{-- Speed --}}
                     <div class="flex flex-col items-center gap-2">
                         <fieldset>
-                            <legend class="text-xs font-bold text-gray-500 uppercase tracking-wider dark:text-gray-400 mb-2">
+                            <legend
+                                class="text-xs font-bold text-gray-500 uppercase tracking-wider dark:text-gray-400 mb-2">
                                 Simulation Speed
                             </legend>
                             <div class="flex gap-2 bg-gray-100 dark:bg-gray-800 p-2 rounded-lg border border-gray-200 dark:border-gray-700"
@@ -192,42 +243,39 @@
                                 @foreach([1, 2, 5] as $speed)
                                     <button type="button" onclick="setSimulationSpeed({{ $speed }})"
                                         class="speed-btn px-4 py-2 bg-white dark:bg-gray-700 hover:bg-sky-600 hover:text-white text-gray-700 dark:text-gray-200 shadow-sm border border-gray-300 dark:border-gray-600 font-medium rounded transition focus:outline-none focus:ring-2 focus:ring-sky-500"
-                                        data-speed="{{ $speed }}"
-                                        aria-label="Set simulation speed to {{ $speed }}x"
+                                        data-speed="{{ $speed }}" aria-label="Set simulation speed to {{ $speed }}x"
                                         aria-pressed="false">{{ $speed }}×</button>
                                 @endforeach
                             </div>
                         </fieldset>
                         <p class="text-xs text-gray-600 dark:text-gray-400" aria-live="polite">
-                            Current: <span id="active-speed-display" class="font-bold text-sky-600 dark:text-teal-500">1×</span>
+                            Current: <span id="active-speed-display"
+                                class="font-bold text-sky-600 dark:text-teal-500">1×</span>
                         </p>
                     </div>
 
                     {{-- Playback --}}
                     <div class="flex flex-col items-center gap-2">
                         <fieldset>
-                            <legend class="text-xs font-bold text-gray-500 uppercase tracking-wider dark:text-gray-400 mb-2">
+                            <legend
+                                class="text-xs font-bold text-gray-500 uppercase tracking-wider dark:text-gray-400 mb-2">
                                 Animation Play
                             </legend>
                             <div class="flex gap-2 bg-gray-100 dark:bg-gray-800 p-2 rounded-lg border border-gray-200 dark:border-gray-700"
                                 role="group">
-                                <button type="button" id="reverseBtn"
-                                    aria-label="Rewind simulation"
+                                <button type="button" id="reverseBtn" aria-label="Rewind simulation"
                                     class="px-4 py-2 bg-white dark:bg-gray-700 hover:bg-sky-600 hover:text-white text-gray-700 dark:text-gray-200 shadow-sm border border-gray-300 dark:border-gray-600 font-medium rounded transition focus:outline-none focus:ring-2 focus:ring-sky-500">
                                     <span aria-hidden="true">&#x23EA;</span>
                                 </button>
-                                <button type="button" id="playPauseBtn"
-                                    aria-label="Play simulation"
+                                <button type="button" id="playPauseBtn" aria-label="Play simulation"
                                     class="px-4 py-2 bg-white dark:bg-gray-700 hover:bg-sky-600 hover:text-white text-gray-700 dark:text-gray-200 shadow-sm border border-gray-300 dark:border-gray-600 font-medium rounded transition focus:outline-none focus:ring-2 focus:ring-sky-500">
                                     <span aria-hidden="true">&#x25B6;</span>
                                 </button>
-                                <button type="button" id="forwardBtn"
-                                    aria-label="Skip simulation forward"
+                                <button type="button" id="forwardBtn" aria-label="Skip simulation forward"
                                     class="px-4 py-2 bg-white dark:bg-gray-700 hover:bg-sky-600 hover:text-white text-gray-700 dark:text-gray-200 shadow-sm border border-gray-300 dark:border-gray-600 font-medium rounded transition focus:outline-none focus:ring-2 focus:ring-sky-500">
                                     <span aria-hidden="true">&#x23E9;</span>
                                 </button>
-                                <button type="button" id="replayBtn"
-                                    aria-label="Restart simulation"
+                                <button type="button" id="replayBtn" aria-label="Restart simulation"
                                     class="px-4 py-2 bg-white dark:bg-gray-700 hover:bg-sky-600 hover:text-white text-gray-700 dark:text-gray-200 shadow-sm border border-gray-300 dark:border-gray-600 font-medium rounded transition focus:outline-none focus:ring-2 focus:ring-sky-500">
                                     <span aria-hidden="true">&#x21BB;</span>
                                 </button>
@@ -236,12 +284,11 @@
                     </div>
 
                     {{-- Active Events --}}
-                    <div class="flex-1 min-w-[200px] bg-gray-50 dark:bg-gray-800 p-4 rounded-md border border-gray-200 dark:border-gray-600">
+                    <div
+                        class="flex-1 min-w-[200px] bg-gray-50 dark:bg-gray-800 p-4 rounded-md border border-gray-200 dark:border-gray-600">
                         <h3 class="text-sm font-semibold text-sky-500 dark:text-teal-500 mb-2">Active Events</h3>
-                        <ul id="active-events-list"
-                            class="text-xs text-gray-700 dark:text-gray-300 space-y-1"
-                            aria-live="polite"
-                            aria-label="Active simulation events">
+                        <ul id="active-events-list" class="text-xs text-gray-700 dark:text-gray-300 space-y-1"
+                            aria-live="polite" aria-label="Active simulation events">
                             <li class="text-gray-500">Loading events...</li>
                         </ul>
                     </div>
@@ -268,24 +315,17 @@
             {{-- All Events --}}
             <div id="all-events-panel">
                 <h2 class="text-lg font-semibold mb-2 dark:text-teal-500">All Events</h2>
-                <ul id="all-events-detail-list"
-                    class="space-y-1 text-sm dark:text-white"
-                    aria-live="polite"
+                <ul id="all-events-detail-list" class="space-y-1 text-sm dark:text-white" aria-live="polite"
                     aria-label="All simulation events">
                     <li class="text-sm text-gray-500">Loading events...</li>
                 </ul>
             </div>
 
         </div>
-        {{-- END RIGHT --}}
-
-        <div id="breakdown-qol-score" class="border-solid border-l border-gray-400 dark:border-white w-2/12 p-3 ml-auto"></div>
     </div>
 
     {{-- QoL popup --}}
-    <div id="qol-popup"
-        role="tooltip"
-        aria-label="Cell QoL influence"
+    <div id="qol-popup" role="tooltip" aria-label="Cell QoL influence"
         class="hidden fixed z-50 bg-slate-900 border border-slate-600 rounded-lg shadow-xl p-3 w-56 pointer-events-none opacity-0 scale-95 transition-all duration-150">
         <h3 class="text-xs font-bold text-slate-400 uppercase tracking-wider mb-2">Cell QoL Influence</h3>
         <ul id="popup-neighbors-list" class="space-y-1"></ul>

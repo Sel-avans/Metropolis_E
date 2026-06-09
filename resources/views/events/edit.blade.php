@@ -174,6 +174,14 @@
                 oneOffFields.style.display = 'block';
                 recurringFields.style.display = 'none';
                 
+                startInput.disabled = false;
+                endInput.disabled = false;
+                scheduleInput.disabled = true;
+                recurringStartDateInput.disabled = true;
+                recurringEndDateInput.disabled = true;
+                recurringStartTimeInput.disabled = true;
+                recurringEndTimeInput.disabled = true;
+                
                 // Set required attributes for one-off fields
                 startInput.setAttribute('required', 'required');
                 endInput.setAttribute('required', 'required');
@@ -181,13 +189,20 @@
                 // Remove required attributes for recurring fields
                 scheduleInput.removeAttribute('required');
                 recurringStartDateInput.removeAttribute('required');
-                // recurringEndDateInput.removeAttribute('required');
                 recurringStartTimeInput.removeAttribute('required');
                 recurringEndTimeInput.removeAttribute('required');
                 
             } else {
                 oneOffFields.style.display = 'none';
                 recurringFields.style.display = 'block';
+                
+                startInput.disabled = true;
+                endInput.disabled = true;
+                scheduleInput.disabled = false;
+                recurringStartDateInput.disabled = false;
+                recurringEndDateInput.disabled = false;
+                recurringStartTimeInput.disabled = false;
+                recurringEndTimeInput.disabled = false;
                 
                 // Remove required attributes for one-off fields
                 startInput.removeAttribute('required');

@@ -1,7 +1,26 @@
 import { registerActiveEventIdsProvider, getNeighborsWithQoL } from './neighbours.js';
-import { simulationLoop, onSimulationTimeUpdate } from './simulation.js';
-import { setMaxTime, syncTimelineUI, syncPlayPauseUI, minutesToHHMM, datetimeToSimMinutes, getCurrentTime, getMaxTime, getIsPlaying, setCurrentTime, setIsPlaying, TOTAL_MINUTES } from './regulation.js';
 import { initLibraryFilter } from './library-filter.js';
+import { simulationLoop, onSimulationTimeUpdate, onSimulationCycleComplete } from './simulation.js';
+import {
+    setMaxTime,
+    setFullCycleMode,
+    getFullCycleMode,
+    syncTimelineUI,
+    syncPlayPauseUI,
+    minutesToHHMM,
+    datetimeToSimMinutes,
+    getCurrentTime,
+    getMaxTime,
+    getIsPlaying,
+    setCurrentTime,
+    setIsPlaying,
+    setDayNightDuration,
+    getDayHours,
+    getNightHours,
+    HOURS_MIN,
+    HOURS_MAX,
+} from './regulation.js';
+import { resetDayNightIndicatorState } from './day-night-indicator.js';
 
 const SIM_STATE_KEY = 'metropolis_simulation_state';
 
@@ -98,14 +117,26 @@ function initGridPage() {
         sessionStorage.setItem(SIM_STATE_KEY, JSON.stringify({
             currentTime: getCurrentTime(),
             isPlaying: getIsPlaying(),
+            fullCycleMode: getFullCycleMode(),
+            eventConfigs: Object.fromEntries(allEvents.map(e => [e.id, buildEventConfigFingerprint(e)])),
             events: allEvents.map(e => ({
                 id: e.id,
                 activatedEarly: Boolean(e.activatedEarly),
                 activatedForCycle: Boolean(e.activatedForCycle),
                 cycleActivationStart: e.cycleActivationStart ?? null,
-                deactivatedForCycle: Boolean(e.deactivatedForCycle),
             })),
         }));
+    }
+
+    function buildEventConfigFingerprint(event) {
+        return JSON.stringify({
+            start: event.start_minutes,
+            end: event.end_minutes,
+            ids: (event.affectedFunctionIds || []).slice().sort((a, b) => a - b),
+            mods: event.modifiers ?? {},
+            fits: event.fitsInCycle,
+            type: event.type,
+        });
     }
 
     function scheduleSaveSimulationState() {
@@ -127,13 +158,8 @@ function initGridPage() {
     // =========================================================
 
     function activateCell(cell) {
-        document.querySelectorAll(".grid-cell").forEach(c => {
-            c.classList.remove("selected");
-            // WCAG 4.1.2: aria-selected bijhouden op alle cellen
-            c.setAttribute('aria-selected', 'false');
-        });
+        document.querySelectorAll(".grid-cell").forEach(c => c.classList.remove("selected"));
         cell.classList.add("selected");
-        cell.setAttribute('aria-selected', 'true');
     }
 
     // --- LOCK / APPROVE HELPERS ---
@@ -257,39 +283,16 @@ function initGridPage() {
                 contributing: isEventContributingToQoL(e, simTime),
                 early: e.activatedEarly ?? false,
                 cycle: e.activatedForCycle ?? false,
-                deactivated: e.deactivatedForCycle ?? false,
             }))
         );
     }
 
-    function isEventDeactivated(event) {
-        return Boolean(event.deactivatedForCycle);
+    function cycleEvents() {
+        return allEvents.filter(e => e.fitsInCycle || e.activatedForCycle);
     }
 
-    function isEventInActivePanel(event, simTime = getCurrentTime()) {
-        if (hasEventEnded(event, simTime) || isEventDeactivated(event)) {
-            return false;
-        }
-
-        if (!event.fitsInCycle) {
-            return event.activatedForCycle || isEventContributingToQoL(event, simTime);
-        }
-
-        return event.activatedEarly
-            || event.isActive
-            || (!isSimulationAtDayStart(simTime) && isScheduledEventActive(event, simTime));
-    }
-
-    function isEventInAllPanel(event, simTime = getCurrentTime()) {
-        return !hasEventEnded(event, simTime) && !isEventInActivePanel(event, simTime);
-    }
-
-    function activePanelEvents(simTime = getCurrentTime()) {
-        return allEvents.filter(e => isEventInActivePanel(e, simTime));
-    }
-
-    function allPanelEvents(simTime = getCurrentTime()) {
-        return allEvents.filter(e => isEventInAllPanel(e, simTime));
+    function longEvents() {
+        return allEvents.filter(e => !e.fitsInCycle && !e.activatedForCycle);
     }
 
     function isSimulationAtDayStart(simTime) {
@@ -302,49 +305,27 @@ function initGridPage() {
         event.isActive = false;
     }
 
-    function deactivateEvent(event) {
-        event.deactivatedForCycle = true;
-        event.activatedEarly = false;
-        resetLongEventCycleActivation(event);
+    function normalizeSimDate(value) {
+        if (value == null || value === '') return null;
+        const str = String(value).slice(0, 10);
+        return /^\d{4}-\d{2}-\d{2}$/.test(str) ? str : null;
     }
 
-    function activateEvent(event, simTime) {
-        event.deactivatedForCycle = false;
-
-        if (hasEventEnded(event, simTime)) {
-            return;
-        }
-
-        if (!event.fitsInCycle) {
-            if (!event.activatedForCycle) {
-                event.activatedForCycle = true;
-                event.cycleActivationStart = simTime;
-            }
-            return;
-        }
-
-        if (isBeforeEventStart(event, simTime)) {
-            event.activatedEarly = true;
-        }
-    }
-
+    /**
+     * Recurring events in simulation replay a representative city day.
+     * The daily time window (e.g. 18:00–22:00) drives activation — not whether
+     * simulationReferenceDate equals recurring_start_date (a future policy start
+     * should still be previewable on the grid).
+     * Only block after recurring_end_date has passed.
+     */
     function matchesRecurringSchedule(event, referenceDate) {
-        if (event.type !== 'recurring') {
-            return true;
-        }
+        if (event.type !== 'recurring') return true;
+
+        const ref = normalizeSimDate(referenceDate);
+        const end = normalizeSimDate(event.recurringEndDate);
+        if (ref && end && ref > end) return false;
+
         return true;
-    }
-
-    function isLongEventScheduledActive(event, simTime) {
-        if (event.fitsInCycle || isSimulationAtDayStart(simTime)) {
-            return false;
-        }
-
-        if (event.activatedForCycle) {
-            return false;
-        }
-
-        return isEventActiveAtSimTime(event, simTime);
     }
 
     function isScheduledEventActive(event, simTime) {
@@ -353,19 +334,13 @@ function initGridPage() {
     }
 
     function isEventContributingToQoL(event, simTime) {
-        if (isSimulationAtDayStart(simTime) || isEventDeactivated(event)) return false;
+        if (isSimulationAtDayStart(simTime)) return false;
 
         if (!event.fitsInCycle) {
-            if (event.activatedForCycle) {
-                const activationStart = Number(event.cycleActivationStart);
-                if (Number.isNaN(activationStart) || simTime < activationStart || simTime >= getMaxTime()) {
-                    return false;
-                }
-
-                return true;
-            }
-
-            return isLongEventScheduledActive(event, simTime);
+            if (!event.activatedForCycle) return false;
+            const activationStart = Number(event.cycleActivationStart);
+            if (Number.isNaN(activationStart) || simTime < activationStart || simTime >= getMaxTime()) return false;
+            return true;
         }
 
         if (hasEventEnded(event, simTime)) return false;
@@ -388,12 +363,7 @@ function initGridPage() {
         const start = Number(event.start_minutes);
         const end   = Number(event.end_minutes);
         if (Number.isNaN(start) || Number.isNaN(end)) return false;
-
-        if (end > TOTAL_MINUTES) {
-            const effectiveEndSim = Math.min(end, TOTAL_MINUTES);
-            return simTime >= start && simTime <= effectiveEndSim;
-        }
-
+        if (end > 1440) return simTime >= start;
         return simTime >= start && simTime <= end;
     }
 
@@ -413,26 +383,19 @@ function initGridPage() {
         let changed = false;
 
         allEvents.forEach(event => {
-            if (isEventDeactivated(event)) {
-                if (event.isActive) { event.isActive = false; changed = true; }
-                return;
-            }
-
             if (!event.fitsInCycle) {
-                if (event.activatedForCycle) {
-                    const activationStart = Number(event.cycleActivationStart);
-                    const cycleEnd = getMaxTime();
-                    if (simTime >= cycleEnd || Number.isNaN(activationStart)) {
-                        if (simTime >= cycleEnd) { resetLongEventCycleActivation(event); changed = true; }
-                        else if (event.isActive) { event.isActive = false; changed = true; }
-                        return;
-                    }
-                    const shouldBeActive = isSimulationAtDayStart(simTime) ? false : simTime >= activationStart;
-                    if (event.isActive !== shouldBeActive) { event.isActive = shouldBeActive; changed = true; }
+                if (!event.activatedForCycle) {
+                    if (event.isActive) { event.isActive = false; changed = true; }
                     return;
                 }
-
-                const shouldBeActive = isLongEventScheduledActive(event, simTime);
+                const activationStart = Number(event.cycleActivationStart);
+                const cycleEnd = getMaxTime();
+                if (simTime >= cycleEnd || Number.isNaN(activationStart)) {
+                    if (simTime >= cycleEnd) { resetLongEventCycleActivation(event); changed = true; }
+                    else if (event.isActive) { event.isActive = false; changed = true; }
+                    return;
+                }
+                const shouldBeActive = isSimulationAtDayStart(simTime) ? false : simTime >= activationStart;
                 if (event.isActive !== shouldBeActive) { event.isActive = shouldBeActive; changed = true; }
                 return;
             }
@@ -453,6 +416,23 @@ function initGridPage() {
         return changed;
     }
 
+    function toggleEventEarlyActivation(event, simTime) {
+        if (hasEventEnded(event, simTime) || !isBeforeEventStart(event, simTime)) return;
+        if (event.activatedEarly) {
+            event.activatedEarly = false;
+            event.isActive = false;
+            return;
+        }
+        event.activatedEarly = true;
+    }
+
+    function toggleLongEventCycleActivation(event, simTime) {
+        if (event.fitsInCycle || simTime >= getMaxTime()) return;
+        if (event.activatedForCycle) { resetLongEventCycleActivation(event); return; }
+        event.activatedForCycle = true;
+        event.cycleActivationStart = simTime;
+    }
+
     function refreshEventPanelsAndGrid() {
         const simTime = getCurrentTime();
         syncEventActiveStates(simTime);
@@ -470,9 +450,9 @@ function initGridPage() {
     }
 
     function applySimulationTime(simTime) {
-        if (!allEvents.length) return;
-
         syncEventActiveStates(simTime);
+
+        if (!allEvents.length) return;
 
         const signature = buildEventSignature(allEvents, simTime);
         const idsKey    = buildQoLActiveIdsKey(simTime);
@@ -500,7 +480,7 @@ function initGridPage() {
         let html = '';
         if (old_score !== undefined) {
             const delta = data.total_score - old_score;
-            html += `<span class="text-xl float-right ${delta < 0 ? 'text-red-600' : 'text-green-600'}" aria-hidden="true">
+            html += `<span class="text-xl float-right ${delta < 0 ? 'text-red-600' : 'text-green-600'}">
                 ${delta >= 0 ? '+' : ''}${delta}
             </span>`;
         }
@@ -756,8 +736,6 @@ function initGridPage() {
     // =========================================================
 
     function updateCellHighlights() {
-        const simTime = getCurrentTime();
-
         document.querySelectorAll('.grid-cell').forEach(cell => {
             const functionImg = cell.querySelector('.grid-function-icon');
             if (!functionImg) { cell.classList.remove('event-highlight'); return; }
@@ -770,7 +748,7 @@ function initGridPage() {
                 .filter(Boolean);
 
             const isHighlighted = allEvents.some(event => {
-                if (!isEventContributingToQoL(event, simTime)) return false;
+                if (!event.isActive) return false;
 
                 const functionIds = (event.affectedFunctionIds || [])
                     .map(Number)
@@ -796,27 +774,33 @@ function initGridPage() {
         applySimulationTime(simTime);
     }
 
+    function onSimulationCycleComplete() {
+        allEvents.forEach(event => {
+            event.activatedEarly = false;
+            if (event.activatedForCycle) resetLongEventCycleActivation(event);
+        });
+        lastQoLEventIdsKey = null;
+        lastActiveEventSignature = '';
+        applySimulationTime(getCurrentTime());
+        updateQoL({ immediate: true });
+        scheduleSaveSimulationState();
+    }
+
     onSimulationTimeUpdate(onSimulationTick);
+    onSimulationCycleComplete(onSimulationCycleComplete);
 
     // =========================================================
     // EVENTS PANEL RENDERING
     // =========================================================
 
     function renderToggleButton(event, { showDeactivate }) {
-        const action = showDeactivate ? 'deactivate' : 'activate';
-        // WCAG 4.1.2: aria-label geeft volledige context; niet alleen "Activate" of "Deactivate"
-        const ariaLabel = showDeactivate
-            ? `Deactivate event ${event.name || 'Nameless Event'}`
-            : `Activate event ${event.name || 'Nameless Event'}`;
         return `<button
             type="button"
             class="event-toggle-btn flex-shrink-0 px-2 py-1 text-xs font-semibold rounded transition
                 ${showDeactivate
                     ? 'bg-amber-500 hover:bg-amber-600 text-white'
                     : 'bg-slate-600 hover:bg-teal-600 hover:text-white text-slate-200'}"
-            data-event-id="${event.id}"
-            data-action="${action}"
-            aria-label="${ariaLabel}">
+            data-event-id="${event.id}">
             ${showDeactivate ? 'Deactivate' : 'Activate'}
         </button>`;
     }
@@ -835,10 +819,16 @@ function initGridPage() {
         const endLabel   = minutesToHHMM(event.end_minutes);
 
         let toggleButton = '';
-        if (panel === 'all') {
-            toggleButton = renderToggleButton(event, { showDeactivate: false });
-        } else if (panel === 'active') {
+        if (isLongEvent && panel === 'active' && event.activatedForCycle) {
             toggleButton = renderToggleButton(event, { showDeactivate: true });
+        } else if (isLongEvent && panel === 'all') {
+            toggleButton = renderToggleButton(event, { showDeactivate: false });
+        } else if (!isLongEvent) {
+            const canToggleEarly = isBeforeEventStart(event, simTime) && !hasEventEnded(event, simTime);
+            const showDeactivate = event.activatedEarly && isBeforeEventStart(event, simTime);
+            if (canToggleEarly) {
+                toggleButton = renderToggleButton(event, { showDeactivate });
+            }
         }
 
         if (panel === 'active') {
@@ -872,9 +862,9 @@ function initGridPage() {
         const listEl = document.getElementById('all-events-detail-list');
         if (!listEl) return;
         listEl.innerHTML = '';
-        const events = allPanelEvents();
+        const events = longEvents();
         if (!events.length) {
-            listEl.innerHTML = '<li class="text-sm text-gray-500">No inactive events.</li>';
+            listEl.innerHTML = '<li class="text-sm text-gray-500">No events longer than 24 hours.</li>';
             return;
         }
         events.forEach(event => listEl.appendChild(renderEventListItem(event, { panel: 'all' })));
@@ -884,9 +874,9 @@ function initGridPage() {
         const listEl = document.getElementById('active-events-list');
         if (!listEl) return;
         listEl.innerHTML = '';
-        const events = activePanelEvents();
+        const events = cycleEvents();
         if (!events.length) {
-            listEl.innerHTML = '<li class="text-sm text-gray-500">No active events.</li>';
+            listEl.innerHTML = '<li class="text-sm text-gray-500">No events within the 24-hour cycle.</li>';
             return;
         }
         events.forEach(event => listEl.appendChild(renderEventListItem(event, { panel: 'active' })));
@@ -904,19 +894,50 @@ function initGridPage() {
         if (!event) return;
 
         const simTime = getCurrentTime();
-        if (btn.dataset.action === 'deactivate') {
-            deactivateEvent(event);
+        if (event.fitsInCycle) {
+            toggleEventEarlyActivation(event, simTime);
         } else {
-            activateEvent(event, simTime);
+            toggleLongEventCycleActivation(event, simTime);
         }
         refreshEventPanelsAndGrid();
     });
+
+    function syncFullCycleToggleUI() {
+        const btn = document.getElementById('full-cycle-toggle');
+        if (!btn) return;
+
+        const active = getFullCycleMode();
+        btn.setAttribute('aria-pressed', active ? 'true' : 'false');
+        btn.dataset.active = active ? 'true' : 'false';
+        btn.textContent = active ? 'Day/Night Cycle Enabled' : 'Day Simulation';
+        btn.setAttribute(
+            'aria-label',
+            active
+                ? 'Day/night cycle enabled. Click to switch to day-only simulation (06:00 to 24:00).'
+                : 'Day simulation only (06:00 to 24:00). Click to enable the full day/night cycle (06:00 to 06:00).'
+        );
+        btn.title = active
+            ? 'Day/night cycle is active (06:00 to 06:00). Click to show day only (06:00 to 24:00).'
+            : 'Day simulation (06:00 to 24:00). Click to enable the full day/night cycle (06:00 to 06:00).';
+    }
 
     // Timeline scrub
     const simulationTimeline = document.getElementById('simulation-timeline');
     if (simulationTimeline) {
         simulationTimeline.addEventListener('input', (e) => {
             applySimulationTime(parseInt(e.target.value, 10));
+        });
+    }
+
+    const fullCycleToggle = document.getElementById('full-cycle-toggle');
+    if (fullCycleToggle) {
+        fullCycleToggle.addEventListener('click', () => {
+            setFullCycleMode(!getFullCycleMode());
+            resetDayNightIndicatorState();
+            syncFullCycleToggleUI();
+            syncTimelineUI();
+            applySimulationTime(getCurrentTime());
+            scheduleSaveSimulationState();
         });
     }
 
@@ -936,14 +957,94 @@ function initGridPage() {
     document.getElementById('replayBtn')?.addEventListener('click', () => {
         allEvents.forEach(event => {
             event.activatedEarly = false;
-            event.deactivatedForCycle = false;
             if (event.activatedForCycle) resetLongEventCycleActivation(event);
         });
         clearSimulationState();
         lastQoLEventIdsKey = null;
+        lastActiveEventSignature = '';
+        resetDayNightIndicatorState();
+        syncTimelineUI();
         applySimulationTime(getCurrentTime());
         updateQoL({ immediate: true });
     });
+
+    // =========================================================
+    // DAG / NACHT DUUR INPUTS
+    // =========================================================
+
+    const dayInput   = document.getElementById('day-hours-input');
+    const nightInput = document.getElementById('night-hours-input');
+    const validMsg   = document.getElementById('duration-validation-msg');
+
+    /**
+     * Pas duur aan, update gekoppeld veld, herbereken timeline en simulatie.
+     * Wordt maximaal 1x per animatieframe uitgevoerd (debounce via rAF).
+     */
+    let _durationRafPending = false;
+    function _applyDurationChange(dayHours) {
+        if (_durationRafPending) return;
+        _durationRafPending = true;
+        requestAnimationFrame(() => {
+            _durationRafPending = false;
+            setDayNightDuration(dayHours);
+            resetDayNightIndicatorState();
+            syncTimelineUI();
+            applySimulationTime(getCurrentTime());
+            scheduleSaveSimulationState();
+        });
+    }
+
+    if (dayInput) {
+        // Zet initiële waarde vanuit localStorage
+        dayInput.value = getDayHours();
+
+        dayInput.addEventListener('input', () => {
+            const d = parseInt(dayInput.value, 10);
+            if (!d || d < HOURS_MIN || d > HOURS_MAX) {
+                validMsg?.classList.remove('hidden');
+                return;
+            }
+            validMsg?.classList.add('hidden');
+            if (nightInput) nightInput.value = 24 - d;
+            _applyDurationChange(d);
+        });
+
+        // Klem waarde bij verlaten van het veld
+        dayInput.addEventListener('blur', () => {
+            const d = parseInt(dayInput.value, 10);
+            const clamped = isNaN(d) ? getDayHours() : Math.max(HOURS_MIN, Math.min(HOURS_MAX, d));
+            dayInput.value = clamped;
+            if (nightInput) nightInput.value = 24 - clamped;
+            validMsg?.classList.add('hidden');
+            _applyDurationChange(clamped);
+        });
+    }
+
+    if (nightInput) {
+        nightInput.value = getNightHours();
+
+        nightInput.addEventListener('input', () => {
+            const n = parseInt(nightInput.value, 10);
+            if (!n || n < HOURS_MIN || n > HOURS_MAX) {
+                validMsg?.classList.remove('hidden');
+                return;
+            }
+            validMsg?.classList.add('hidden');
+            const d = 24 - n;
+            if (dayInput) dayInput.value = d;
+            _applyDurationChange(d);
+        });
+
+        nightInput.addEventListener('blur', () => {
+            const n = parseInt(nightInput.value, 10);
+            const clamped = isNaN(n) ? getNightHours() : Math.max(HOURS_MIN, Math.min(HOURS_MAX, n));
+            nightInput.value = clamped;
+            const d = 24 - clamped;
+            if (dayInput) dayInput.value = d;
+            validMsg?.classList.add('hidden');
+            _applyDurationChange(d);
+        });
+    }
 
     // =========================================================
     // FETCH EVENTS
@@ -953,7 +1054,11 @@ function initGridPage() {
         try {
             const response = await fetch('/events/simulation', {
                 credentials: 'same-origin',
-                headers: { 'Accept': 'application/json' },
+                cache: 'no-store',
+                headers: {
+                    'Accept': 'application/json',
+                    'Cache-Control': 'no-cache',
+                },
             });
             if (!response.ok) return;
 
@@ -964,6 +1069,7 @@ function initGridPage() {
             const persisted  = loadSimulationState();
             const storedById = {};
             (persisted?.events ?? []).forEach(e => { storedById[e.id] = e; });
+            const storedConfigs = persisted?.eventConfigs ?? {};
 
             const prevState = {};
             allEvents.forEach(e => {
@@ -971,14 +1077,13 @@ function initGridPage() {
                     activatedEarly: e.activatedEarly,
                     activatedForCycle: e.activatedForCycle,
                     cycleActivationStart: e.cycleActivationStart,
-                    deactivatedForCycle: e.deactivatedForCycle,
                 };
             });
 
             allEvents = data.events.map(e => {
                 const stored = storedById[e.id];
                 const memory = prevState[e.id];
-                return {
+                const draft = {
                     id:                    e.id,
                     name:                  e.name,
                     type:                  e.type ?? 'one-off',
@@ -993,13 +1098,29 @@ function initGridPage() {
                     durationMinutes:       e.duration_minutes ?? 0,
                     calendarDurationMinutes: e.calendar_duration_minutes ?? e.duration_minutes ?? 0,
                     fitsInCycle:           e.fits_in_cycle ?? true,
-                    activatedEarly:        stored?.activatedEarly        ?? memory?.activatedEarly        ?? false,
-                    activatedForCycle:     stored?.activatedForCycle     ?? memory?.activatedForCycle     ?? false,
-                    cycleActivationStart:  stored?.cycleActivationStart  ?? memory?.cycleActivationStart  ?? null,
-                    deactivatedForCycle:   stored?.deactivatedForCycle   ?? memory?.deactivatedForCycle   ?? false,
                     isActive:              false,
                 };
+                const configKey = buildEventConfigFingerprint(draft);
+                const configChanged = storedConfigs[e.id] != null && storedConfigs[e.id] !== configKey;
+
+                draft.activatedEarly = configChanged
+                    ? false
+                    : (stored?.activatedEarly ?? memory?.activatedEarly ?? false);
+                draft.activatedForCycle = configChanged
+                    ? false
+                    : (stored?.activatedForCycle ?? memory?.activatedForCycle ?? false);
+                draft.cycleActivationStart = configChanged
+                    ? null
+                    : (stored?.cycleActivationStart ?? memory?.cycleActivationStart ?? null);
+
+                return draft;
             });
+
+            if (persisted?.fullCycleMode != null) {
+                setFullCycleMode(Boolean(persisted.fullCycleMode));
+            } else {
+                setFullCycleMode(false);
+            }
 
             if (persisted?.currentTime != null) setCurrentTime(Number(persisted.currentTime));
 
@@ -1012,12 +1133,15 @@ function initGridPage() {
             });
 
             setMaxTime();
+            syncFullCycleToggleUI();
             syncTimelineUI();
 
             if (persisted?.isPlaying) { setIsPlaying(true); syncPlayPauseUI(); }
 
             registerActiveEventIdsProvider(getActiveEventIdsForQoL);
 
+            lastActiveEventSignature = '';
+            lastQoLEventIdsKey = null;
             applySimulationTime(getCurrentTime());
             updateQoL({ immediate: true });
             saveSimulationState();
@@ -1107,17 +1231,24 @@ function initGridPage() {
 
             if (sourceCell) {
                 oldRow = sourceCell.dataset.row; oldCol = sourceCell.dataset.col;
-                sourceCell.innerHTML = "";
-                sourceCell.removeAttribute("draggable");
-                // WCAG 4.1.2: aria-label bijwerken naar lege cel na verplaatsing
-                sourceCell.setAttribute('aria-label', `Empty cell ${oldRow},${oldCol}. Press Enter to select.`);
+                sourceCell.innerHTML = ""; sourceCell.removeAttribute("draggable");
                 sourceCell.classList.remove("drag-source");
             }
 
-            sourceCell = null;
+            sourceCell = null; cell.innerHTML = "";
+            const img = document.createElement("img");
+            img.src = draggedItem.image; img.alt = draggedItem.name;
+            img.dataset.functionId = draggedItem.id;
+            img.classList.add("grid-function-icon", "object-contain");
+            cell.appendChild(img);
 
-            // Gebruik gecentraliseerde helper voor toegankelijke cel-opbouw
-            restoreCellContent(cell, draggedItem.id, draggedItem.name, draggedItem.image);
+            const deleteBtn = document.createElement("button");
+            deleteBtn.type = "button";
+            deleteBtn.className = "delete-btn absolute top-[2px] right-[2px] bg-red-600/80 text-white w-5 h-5 text-[14px] rounded cursor-pointer flex items-center justify-center";
+            deleteBtn.setAttribute("aria-label", `Remove ${draggedItem.name} from grid cell`);
+            deleteBtn.append("✖");
+            cell.appendChild(deleteBtn);
+            cell.setAttribute("draggable", "true");
             activateCell(cell);
 
             lastAction = { oldRow, oldCol, newRow, newCol, functionId: draggedItem.id };
@@ -1137,26 +1268,18 @@ function initGridPage() {
                 if (window.confirm("Placement is forbidden by adjacency rules. Force placement anyway?")) {
                     const res2 = await saveMove(oldRow, oldCol, newRow, newCol, true);
                     if (!res2 || !res2.ok) {
-                        // Herstel broncel via toegankelijke helper
                         if (originalSourceCell) {
-                            restoreCellContent(originalSourceCell, draggedItem.id, draggedItem.name, draggedItem.image);
+                            originalSourceCell.innerHTML = `<img src="${draggedItem.image}" alt="${draggedItem.name}" data-function-id="${draggedItem.id}" class="grid-function-icon object-contain"><button class="delete-btn absolute top-[2px] right-[2px] bg-red-600/80 text-white w-5 h-5 text-[14px] rounded cursor-pointer flex items-center justify-center">✖</button>`;
+                            originalSourceCell.setAttribute('draggable', 'true');
                         }
-                        cell.innerHTML = "";
-                        cell.removeAttribute('draggable');
-                        cell.setAttribute('aria-label', `Empty cell ${newRow},${newCol}. Press Enter to select.`);
-                        updateQoL();
-                        return;
+                        cell.innerHTML = ""; cell.removeAttribute('draggable'); updateQoL(); return;
                     }
                 } else {
-                    // Herstel broncel via toegankelijke helper
                     if (originalSourceCell) {
-                        restoreCellContent(originalSourceCell, draggedItem.id, draggedItem.name, draggedItem.image);
+                        originalSourceCell.innerHTML = `<img src="${draggedItem.image}" alt="${draggedItem.name}" data-function-id="${draggedItem.id}" class="grid-function-icon object-contain"><button class="delete-btn absolute top-[2px] right-[2px] bg-red-600/80 text-white w-5 h-5 text-[14px] rounded cursor-pointer flex items-center justify-center">✖</button>`;
+                        originalSourceCell.setAttribute('draggable', 'true');
                     }
-                    cell.innerHTML = "";
-                    cell.removeAttribute('draggable');
-                    cell.setAttribute('aria-label', `Empty cell ${newRow},${newCol}. Press Enter to select.`);
-                    updateQoL();
-                    return;
+                    cell.innerHTML = ""; cell.removeAttribute('draggable'); updateQoL(); return;
                 }
             }
 
@@ -1173,7 +1296,8 @@ function initGridPage() {
             }
             activateCell(cell);
         });
-        cell.addEventListener("keydown", e  => { if (!isDragging && (e.key === "Enter" || e.key === " ")) { e.preventDefault(); activateCell(cell); } });
+        cell.addEventListener("click",   () => { if (!isDragging) activateCell(cell); });
+        cell.addEventListener("keydown", e  => { if (!isDragging && (e.key === "Enter" || e.key === " ")) activateCell(cell); });
         cell.addEventListener('mouseenter', (event) => {
             const row = parseInt(cell.dataset.row), col = parseInt(cell.dataset.col);
             clearTimeout(hoverTimer);
@@ -1232,9 +1356,8 @@ function initGridPage() {
     // =========================================================
 
     document.addEventListener("click", async (e) => {
-        const deleteBtn = e.target.closest('.delete-btn');
-        if (!deleteBtn) return;
-        const cell = deleteBtn.closest(".grid-cell");
+        if (!e.target.classList.contains("delete-btn")) return;
+        const cell = e.target.closest(".grid-cell");
         if (!cell) return;
         if (isLockedCell(cell)) {
             // Do not allow deletion on locked cells
@@ -1267,14 +1390,7 @@ function initGridPage() {
         if (dropOccurred) { dropOccurred = false; return; }
         const rect = document.querySelector(".city-grid").getBoundingClientRect();
         if (e.pageX >= rect.left && e.pageX <= rect.right && e.pageY >= rect.top && e.pageY <= rect.bottom) return;
-
-        const row = sourceCell.dataset.row;
-        const col = sourceCell.dataset.col;
-        sourceCell.innerHTML = "";
-        sourceCell.removeAttribute("draggable");
-        sourceCell.setAttribute('aria-label', `Empty cell ${row},${col}. Press Enter to select.`);
-        activateCell(sourceCell);
-
+        sourceCell.innerHTML = ""; sourceCell.removeAttribute("draggable"); activateCell(sourceCell);
         try {
             await fetch(`/grid/cell/${sourceCell.dataset.id}/function`, {
                 method: "DELETE",
@@ -1315,24 +1431,14 @@ function initGridPage() {
                 const targetCell = document.querySelector(`[data-row="${data.cell.row}"][data-col="${data.cell.col}"]`);
                 if (targetCell) {
                     if (data.cell.function_id) {
-                        // WCAG 4.1.2: gebruik gecentraliseerde helper voor toegankelijke markup
-                        restoreCellContent(targetCell, data.cell.function_id, data.cell.name ?? 'Function', data.cell.image);
-                    } else {
-                        targetCell.innerHTML = "";
-                        targetCell.removeAttribute("draggable");
-                        targetCell.setAttribute('aria-label', `Empty cell ${data.cell.row},${data.cell.col}. Press Enter to select.`);
-                    }
+                        targetCell.innerHTML = `<img src="${data.cell.image}" class="grid-function-icon object-contain" data-function-id="${data.cell.function_id}"><button class="delete-btn absolute top-[2px] right-[2px] bg-red-600/80 text-white w-5 h-5 text-[14px] rounded cursor-pointer flex items-center justify-center">✖</button>`;
+                        targetCell.setAttribute("draggable", "true");
+                    } else { targetCell.innerHTML = ""; targetCell.removeAttribute("draggable"); }
                     activateCell(targetCell);
                 }
                 if (data.cleared) {
                     const clearedCell = document.querySelector(`[data-row="${data.cleared.row}"][data-col="${data.cleared.col}"]`);
-                    if (clearedCell) {
-                        clearedCell.innerHTML = "";
-                        clearedCell.removeAttribute("draggable");
-                        clearedCell.classList.remove("selected");
-                        clearedCell.setAttribute('aria-selected', 'false');
-                        clearedCell.setAttribute('aria-label', `Empty cell ${data.cleared.row},${data.cleared.col}. Press Enter to select.`);
-                    }
+                    if (clearedCell) { clearedCell.innerHTML = ""; clearedCell.removeAttribute("draggable"); clearedCell.classList.remove("selected"); }
                 }
                 updateCellHighlights(); setTimeout(() => updateQoL(), 50);
             });
@@ -1343,10 +1449,27 @@ function initGridPage() {
     // INIT
     // =========================================================
 
+    resetDayNightIndicatorState();
+    setFullCycleMode(false);
+    syncFullCycleToggleUI();
+    syncTimelineUI();
+
     fetchAllEvents();
     requestAnimationFrame(simulationLoop);
     window.addEventListener('beforeunload', saveSimulationState);
-};
+
+    const refreshEventsFromServer = () => {
+        lastActiveEventSignature = '';
+        lastQoLEventIdsKey = null;
+        fetchAllEvents();
+    };
+
+    window.addEventListener('pageshow', (event) => {
+        if (event.persisted) {
+            refreshEventsFromServer();
+        }
+    });
+}
 
 document.addEventListener('DOMContentLoaded', initGridPage);
 document.addEventListener('turbo:load', initGridPage);
