@@ -84,7 +84,9 @@
             <div class="flex gap-2 mb-4">
 
                 @if(auth()->user() && auth()->user()->role->name === 'City_planner')
-                <button type="button" id="approve-btn" class="mt-2 px-4 py-2 bg-amber-600 text-white font-semibold rounded shadow hover:bg-amber-700 transition"> Lock & Unlock Area</button>
+                <button type="button" id="approve-btn"
+                    class="flex-1 px-4 py-2 bg-amber-600 text-white font-semibold rounded shadow hover:bg-amber-700 transition focus:ring-2 focus:ring-yellow-400"
+                > Lock & Unlock Area</button>
                 @endif
 
                 <button id="undoButton"
