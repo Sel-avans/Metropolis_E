@@ -14,7 +14,8 @@ class GridCellFactory extends Factory
         return [
             'row' => $this->faker->numberBetween(1, 4),
             'col' => $this->faker->numberBetween(1, 3),
-            'function_id' => null, //Deze was noodzakelijk voor het slagen van de tests
+            'function_id' => null,
+            'is_approved' => false,
         ];
     }
 }

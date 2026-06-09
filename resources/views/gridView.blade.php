@@ -80,9 +80,13 @@
 
         {{-- MIDDLE: QoL + Undo + Grid + Simulation Controls --}}
         <div class="flex flex-col flex-1 min-w-0 py-2">
-
             {{-- Undo and Export Buttons --}}
             <div class="flex gap-2 mb-4">
+
+                @if(auth()->user() && auth()->user()->role->name === 'City_planner')
+                <button type="button" id="approve-btn" class="mt-2 px-4 py-2 bg-amber-600 text-white font-semibold rounded shadow hover:bg-amber-700 transition"> Lock & Unlock Area</button>
+                @endif
+
                 <button id="undoButton"
                     class="flex-1 px-4 py-2 bg-yellow-500 text-black font-semibold rounded shadow hover:bg-yellow-600 transition focus:ring-2 focus:ring-yellow-400">
                     Undo
@@ -98,37 +102,51 @@
             <div class="justify-center">
                 <h1 class="text-2xl text-center font-bold mb-2 dark:text-teal-300">City Grid</h1>
 
-                <div class="city-grid grid grid-flow-col grid-rows-3 gap-3 w-min mx-auto"
-                    role="grid"
-                    aria-label="City planning grid">
+                <div class="city-grid grid grid-flow-col grid-rows-3 gap-3 w-min mx-auto">
                     @for($col = 1; $col <= 4; $col++)
                         @for($row = 1; $row <= 3; $row++)
-                            @php
+@php
                                 $cell = $grid->first(fn($c) => $c->row == $row && $c->col == $col);
-                                $fn   = $cell?->function ?? null;
-                                $categories = $fn ? collect($fn->effects)->pluck('category')->unique()->implode(',') : '';
+                                $isApproved = $cell && $cell->is_approved;
+                                $isCityPlanner = auth()->user() && auth()->user()->role->name === 'City_planner';
+                                
+                                // Define the classes for the cell based on its state
+                                $cellClasses = $isApproved
+                                    ? 'is-locked bg-stripes opacity-60 border-red-600 ' . ($isCityPlanner ? 'cursor-pointer' : 'cursor-not-allowed')
+                                    : 'bg-gray-300 border-gray-800 dark:bg-blue-950 dark:border-gray-300 hover:bg-gray-400 hover:dark:bg-gray-100 cursor-pointer';
                             @endphp
-                            <div class="grid-cell relative border-2 bg-gray-200 border-gray-400 dark:bg-blue-950 dark:border-gray-600 w-32 h-32 flex items-center justify-center cursor-pointer transition hover:bg-gray-300 dark:hover:bg-blue-900 focus:outline-none focus:ring-2 focus:ring-blue-500"
+            
+                            <div class="grid-cell relative flex border-2 w-32 h-32 items-center justify-center transition focus:outline-none focus:ring-2 focus:ring-blue-500 {{ $cellClasses }}"
                                 data-row="{{ $row }}"
                                 data-col="{{ $col }}"
-                                data-id="{{ $cell->id ?? '' }}"
-                                draggable="{{ $fn ? 'true' : 'false' }}"
+                                data-id="{{ $cell ? $cell->id : '' }}"
+                                draggable="{{ $cell && !$isApproved ? 'true' : 'false' }}"
                                 role="button"
                                 tabindex="0"
-                                aria-label="{{ $fn ? 'Cell ' . $row . ',' . $col . ' contains ' . $fn->name . '. Press Enter to select.' : 'Empty cell ' . $row . ',' . $col . '. Press Enter to select.' }}">
+                                @if($isApproved) aria-label="Approved area row {{ $row }}, column {{ $col }}" @endif>
+                                
+                                <div class="lock-indicator absolute z-50 top-1 left-1 bg-red-600 text-white text-[10px] font-bold px-1 rounded flex items-center gap-0.5 shadow {{ $isApproved ? '' : 'hidden' }}"
+                                    aria-hidden="{{ $isApproved ? 'false' : 'true' }}">
+                                    🔒 <span class="uppercase text-[9px]">Locked</span>
+                                </div>
 
-                                @if($fn)
-                                    <img src="{{ asset($fn->image) }}"
-                                        alt="{{ $fn->name }}"
-                                        class="grid-function-icon object-contain"
-                                        data-function-id="{{ $fn->id }}"
-                                        data-categories="{{ $categories }}">
+                                <div class="area-lock-explanation {{ $isApproved ? '' : 'hidden' }}"
+                                    role="tooltip"
+                                    aria-live="polite">
+                                    This area is approved and cannot be changed.
+                                </div>
 
-                                    <button type="button"
-                                        class="delete-btn absolute top-[2px] right-[2px] bg-red-600/80 text-white w-5 h-5 text-[14px] rounded cursor-pointer flex items-center justify-center focus:outline-none focus:ring-2 focus:ring-red-400"
-                                        aria-label="Remove {{ $fn->name }} from grid cell {{ $row }},{{ $col }}">
-                                        <span aria-hidden="true">✖</span>
-                                    </button>
+                                @if(!empty($cell) && !empty($cell->function))
+                                    <img src="{{ asset($cell->function->image) }}"
+                                        alt="{{ $cell->function->name }}"
+                                        class="grid-function-icon object-contain w-full h-full p-4 relative z-0 {{ $isApproved ? 'pointer-events-none select-none' : '' }}"
+                                        data-function-id="{{ $cell->function->id }}"
+                                        draggable="{{ $isApproved ? 'false' : 'true' }}"
+                                        ondragstart="{{ $isApproved ? 'return false;' : '' }}">
+
+                                    @if(!$isApproved)
+                                        <button type="button" class="delete-btn absolute z-10 top-[2px] right-[2px] bg-red-600/80 text-white w-5 h-5 text-[14px] rounded cursor-pointer flex items-center justify-center">✖</button>
+                                    @endif
                                 @endif
                             </div>
                         @endfor
@@ -259,6 +277,7 @@
         </div>
         {{-- END RIGHT --}}
 
+        <div id="breakdown-qol-score" class="border-solid border-l border-gray-400 dark:border-white w-2/12 p-3 ml-auto"></div>
     </div>
 
     {{-- QoL popup --}}
@@ -270,4 +289,16 @@
         <ul id="popup-neighbors-list" class="space-y-1"></ul>
     </div>
 
+    <style>
+        .bg-stripes {
+            background-color: #fca5a5;
+            background-image: repeating-linear-gradient(45deg, transparent, transparent 10px, rgba(239, 68, 68, 0.15) 10px, rgba(239, 68, 68, 0.15) 20px);
+        }
+        .dark .bg-stripes {
+            background-color: #7f1d1d;
+            background-image: repeating-linear-gradient(45deg, transparent, transparent 10px, rgba(239, 68, 68, 0.3) 10px, rgba(239, 68, 68, 0.3) 20px);
+        }
+    </style>
+
+    @vite(['resources/js/grid.js'])
 </x-app-layout>
