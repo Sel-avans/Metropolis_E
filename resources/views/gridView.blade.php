@@ -10,7 +10,7 @@
     <div class="flex gap-4 h-full">
 
         {{-- LEFT: Function Library --}}
-        <div class="library-sidebar w-auto p-6 max-h-[73vh] overflow-y-auto flex-shrink-0 flex flex-col min-h-0">
+        <div id="library-column" class="library-sidebar relative w-auto p-6 max-h-[73vh] overflow-y-auto flex-shrink-0 flex flex-col min-h-0">
             <div class="flex flex-col mb-4 gap-3 shrink-0">
                 <h1 class="text-2xl dark:text-teal-500 font-bold mb-4">Function Library</h1>
                 <nav aria-label="Management navigation">
@@ -56,24 +56,63 @@
             </p>
 
             <div id="library-list" class="library-list-panel flex-1 min-h-0">
-            @forelse($functions as $category => $items)
-                <h2 class="text-xl dark:text-teal-600 font-semibold mt-6 mb-2">{{ ucfirst($category) }}</h2>
-                <ul class="space-y-2 dark:text-white" role="list">
-                    @foreach($items as $function)
-                        <li class="library-item flex items-center gap-3 px-4 py-3 border border-gray-400 dark:border-gray-600 rounded cursor-pointer hover:border-blue-500 transition focus:outline-none focus:ring-2 focus:ring-blue-500"
-                            draggable="true" data-function-id="{{ $function->id }}" data-function-name="{{ $function->name }}"
-                            data-image="{{ asset($function->image) }}">
-                            <img src="{{ asset($function->image) }}" alt="{{ $function->name }}"
-                                class="w-8 h-8 object-contain pointer-events-none">
-                            <span class="text-sm font-medium">{{ $function->name }}</span>
-                        </li>
-                    @endforeach
-                </ul>
-            @empty
-                <p class="text-gray-500">No functions available.</p>
-            @endforelse
+                @forelse($functions as $category => $items)
+                    <div class="library-category-group mb-4" data-category="{{ $category }}">
+                        <h2 class="text-xl dark:text-teal-600 font-semibold mt-2 mb-2">{{ ucfirst($category) }}</h2>
+                        <ul class="space-y-2 dark:text-white" role="list">
+                            @foreach($items as $function)
+                                {{-- HERSTELD: 'tabindex="0"' en 'role="button"' toegevoegd voor Keyboard Toegankelijkheid --}}
+                                <li class="library-item flex items-center gap-3 px-4 py-3 border border-gray-400 dark:border-gray-600 rounded cursor-pointer hover:border-blue-500 transition focus:outline-none focus:ring-2 focus:ring-blue-500"
+                                    draggable="true"
+                                    tabindex="0"
+                                    role="button"
+                                    data-function-id="{{ $function->id }}"
+                                    data-function-name="{{ $function->name }}"
+                                    data-category="{{ $function->category }}"
+                                    data-image="{{ asset($function->image) }}"
+                                    aria-label="{{ $function->name }}">
+                                    <img src="{{ asset($function->image) }}" alt="{{ $function->name }}"
+                                        class="w-8 h-8 object-contain pointer-events-none">
+                                    <span class="text-sm font-medium">{{ $function->name }}</span>
+                                </li>
+                            @endforeach
+                        </ul>
+                    </div>
+                @empty
+                    <p class="text-gray-500">No functions available.</p>
+                @endforelse
+            </div>
+
+            <div id="library-preview-panel"
+            class="hidden absolute inset-x-0 bottom-0 z-10 flex flex-col w-full overflow-hidden bg-slate-900/95 border-t border-slate-600 rounded-t-lg shadow-xl text-white pointer-events-none library-preview-panel"
+            role="dialog"
+            aria-live="polite"
+            aria-hidden="true"
+            aria-labelledby="library-preview-title">
+            <div id="library-preview-header" class="library-preview-header shrink-0 flex items-start justify-between gap-3 px-4 pt-4 pb-2 border-b border-slate-600 bg-slate-900/95">
+                <div class="flex items-center gap-3 min-w-0">
+                    <img id="library-preview-icon" src="" alt="" class="w-10 h-10 object-contain hidden">
+                    <div class="min-w-0">
+                        <h3 id="library-preview-title" class="text-base font-bold text-white truncate">—</h3>
+                        <p id="library-preview-category" class="text-xs uppercase tracking-wide text-white/80">—</p>
+                    </div>
+                </div>
+                <button id="library-preview-close" type="button"
+                    class="hidden shrink-0 w-7 h-7 rounded-full border border-slate-500 text-white hover:border-white focus:outline-none focus:ring-2 focus:ring-blue-500"
+                    aria-label="Close destination preview">
+                    <span aria-hidden="true">&times;</span>
+                </button>
+            </div>
+            <div id="library-preview-body" class="library-preview-body p-4 overflow-hidden">
+                <div id="library-preview-status" class="text-xs text-amber-400 mb-2"></div>
+                <div id="library-preview-effects" class="mb-3"></div>
+                <div id="library-preview-conditions" class="text-xs"></div>
             </div>
         </div>
+
+        </div>
+
+        
 
         {{-- MIDDLE: QoL + Undo + Grid + Simulation Controls --}}
         <div class="flex flex-col flex-1 min-w-0 py-2">

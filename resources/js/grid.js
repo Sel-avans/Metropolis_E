@@ -25,9 +25,7 @@ import { initLibraryPreview, closePreview } from './library-preview.js';
 
 const SIM_STATE_KEY = 'metropolis_simulation_state';
 
-document.addEventListener("DOMContentLoaded", () => {
-    initLibraryFilter();
-});
+// Library filter/preview will be initialized when the grid page initializes
 
 // =========================================================
 // HULPFUNCTIE: maak een toegankelijke delete-knop
@@ -77,6 +75,10 @@ function initGridPage() {
     const gridRoot = document.querySelector('.city-grid');
     if (gridRoot.dataset.gridInitialized === 'true') return;
     gridRoot.dataset.gridInitialized = 'true';
+
+    // Initialize library UI (filter + preview) when grid and library DOM are present
+    try { initLibraryFilter(); } catch (e) { /* ignore if not present */ }
+    try { initLibraryPreview(); } catch (e) { /* ignore if not present */ }
 
     // =========================================================
     // VARIABELEN
