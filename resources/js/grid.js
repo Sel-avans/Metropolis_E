@@ -136,6 +136,107 @@ function initGridPage() {
         cell.setAttribute('aria-selected', 'true');
     }
 
+    // --- LOCK / APPROVE HELPERS ---
+    function isCellOccupied(cell) {
+        return cell.querySelector('.grid-function-icon') !== null;
+    }
+
+    function isLockedCell(cell) {
+        return cell && cell.classList.contains('is-locked');
+    }
+
+    function canSelectLockedCell(cell) {
+        return cell && cell.dataset.allowLockSelect === 'true';
+    }
+
+    function flashLockExplanation(cell) {
+        if (!cell) return;
+        cell.classList.add('show-lock-explanation');
+        window.setTimeout(() => cell.classList.remove('show-lock-explanation'), 2500);
+    }
+
+    function showLockedPlacementMessage(cell) {
+        const message = isCellOccupied(cell)
+            ? "You can't replace the function in this area"
+            : "You can't add a function in this area";
+        alert(message);
+    }
+
+    function ensureLockUi(cell) {
+        let lockIndicator = cell.querySelector('.lock-indicator');
+        if (!lockIndicator) {
+            lockIndicator = document.createElement('div');
+            lockIndicator.className = 'lock-indicator absolute z-50 top-1 left-1 bg-red-600 text-white text-[10px] font-bold px-1 rounded flex items-center gap-0.5 shadow hidden';
+            lockIndicator.setAttribute('aria-hidden', 'true');
+            lockIndicator.innerHTML = '🔒 <span class="uppercase text-[9px]">Locked</span>';
+            cell.prepend(lockIndicator);
+        }
+
+        let lockExplanation = cell.querySelector('.area-lock-explanation');
+        if (!lockExplanation) {
+            lockExplanation = document.createElement('div');
+            lockExplanation.className = 'area-lock-explanation hidden';
+            lockExplanation.setAttribute('role', 'tooltip');
+            lockExplanation.setAttribute('aria-live', 'polite');
+            lockExplanation.textContent = 'This area is approved and cannot be changed.';
+            lockIndicator.insertAdjacentElement('afterend', lockExplanation);
+        }
+
+        return { lockIndicator, lockExplanation };
+    }
+
+    function applyLockedCellState(cell) {
+        ensureLockUi(cell);
+
+        cell.classList.add('is-locked', 'bg-stripes', 'opacity-60', 'border-red-600');
+        cell.classList.remove('bg-gray-300', 'border-gray-800', 'dark:bg-blue-950', 'dark:border-gray-300', 'hover:bg-gray-400', 'hover:dark:bg-gray-100', 'cursor-pointer');
+        cell.classList.add(document.getElementById('approve-btn') ? 'cursor-pointer' : 'cursor-not-allowed');
+        cell.dataset.allowLockSelect = document.getElementById('approve-btn') ? 'true' : 'false';
+        cell.setAttribute('draggable', 'false');
+        cell.setAttribute('aria-label', `Approved area row ${cell.dataset.row}, column ${cell.dataset.col}`);
+
+        const img = cell.querySelector('.grid-function-icon');
+        if (img) {
+            img.setAttribute('draggable', 'false');
+            img.setAttribute('ondragstart', 'return false;');
+            img.classList.add('pointer-events-none', 'select-none');
+        }
+
+        const { lockIndicator, lockExplanation } = ensureLockUi(cell);
+        lockIndicator.classList.remove('hidden');
+        lockIndicator.setAttribute('aria-hidden', 'false');
+        lockExplanation.classList.remove('hidden');
+
+        const deleteBtn = cell.querySelector('.delete-btn');
+        if (deleteBtn) deleteBtn.remove();
+    }
+
+    function applyUnlockedCellState(cell) {
+        cell.classList.remove('is-locked', 'bg-stripes', 'opacity-60', 'border-red-600', 'cursor-not-allowed');
+        cell.classList.add('bg-gray-300', 'border-gray-800', 'dark:bg-blue-950', 'dark:border-gray-300', 'hover:bg-gray-400', 'hover:dark:bg-gray-100', 'cursor-pointer');
+        cell.dataset.allowLockSelect = 'false';
+        cell.setAttribute('draggable', 'true');
+        cell.removeAttribute('aria-label');
+        cell.classList.remove('show-lock-explanation');
+
+        const img = cell.querySelector('.grid-function-icon');
+        if (img) {
+            img.setAttribute('draggable', 'true');
+            img.removeAttribute('ondragstart');
+            img.classList.remove('pointer-events-none', 'select-none');
+        }
+
+        const { lockIndicator, lockExplanation } = ensureLockUi(cell);
+        lockIndicator.classList.add('hidden');
+        lockIndicator.setAttribute('aria-hidden', 'true');
+        lockExplanation.classList.add('hidden');
+
+        if (img && !cell.querySelector('.delete-btn')) {
+            const deleteBtn = createDeleteBtn(img.alt, cell.dataset.row, cell.dataset.col);
+            cell.appendChild(deleteBtn);
+        }
+    }
+
     function formatModifiers(modifiers) {
         if (!modifiers || typeof modifiers !== 'object') return '';
         const items = Object.entries(modifiers).map(([category, value]) => {
@@ -961,7 +1062,16 @@ function initGridPage() {
     });
 
     document.querySelectorAll(".grid-cell").forEach(cell => {
+        // Ensure lock UI elements exist and apply initial locked state if present server-side
+        ensureLockUi(cell);
+        if (cell.classList.contains('is-locked')) {
+            applyLockedCellState(cell);
+        }
         cell.addEventListener("dragstart", e => {
+            if (isLockedCell(cell)) {
+                e.preventDefault();
+                return;
+            }
             const img = cell.querySelector(".grid-function-icon");
             if (!img) return;
             isDragging = true; dropOccurred = false;
@@ -976,6 +1086,15 @@ function initGridPage() {
         cell.addEventListener("drop", async e => {
             e.preventDefault(); isDragging = false; dropOccurred = true;
             cell.classList.remove("drag-over");
+
+            // Block drops onto locked cells
+            if (isLockedCell(cell)) {
+                isDragging = false;
+                dropOccurred = true;
+                showLockedPlacementMessage(cell);
+                if (sourceCell) sourceCell.classList.remove('drag-source');
+                return;
+            }
 
             if (cell.querySelector("img") && !window.confirm("Are you sure you want to replace this feature?")) {
                 if (sourceCell) sourceCell.classList.remove("drag-source");
@@ -1006,6 +1125,13 @@ function initGridPage() {
             if (undoBtnEl) undoBtnEl.disabled = false;
 
             const res = await saveMove(oldRow, oldCol, newRow, newCol, false);
+
+            if (res && res.status === 403) {
+                const data = await res.json().catch(() => ({}));
+                alert(data.message ?? "You can't modify this locked area.");
+                location.reload();
+                return;
+            }
 
             if (res && res.status === 409) {
                 if (window.confirm("Placement is forbidden by adjacency rules. Force placement anyway?")) {
@@ -1038,7 +1164,15 @@ function initGridPage() {
             updateQoL();
         });
 
-        cell.addEventListener("click",   () => { if (!isDragging) activateCell(cell); });
+        cell.addEventListener("click",   (e) => { 
+            if (isDragging) return;
+            if (isLockedCell(cell) && !canSelectLockedCell(cell)) {
+                e.preventDefault();
+                flashLockExplanation(cell);
+                return;
+            }
+            activateCell(cell);
+        });
         cell.addEventListener("keydown", e  => { if (!isDragging && (e.key === "Enter" || e.key === " ")) { e.preventDefault(); activateCell(cell); } });
         cell.addEventListener('mouseenter', (event) => {
             const row = parseInt(cell.dataset.row), col = parseInt(cell.dataset.col);
@@ -1047,6 +1181,51 @@ function initGridPage() {
         });
         cell.addEventListener('mouseleave', () => { clearTimeout(hoverTimer); hidePopup(); });
     });
+
+    // --- APPROVE / LOCK LOGIC ---
+    const approveBtn = document.getElementById("approve-btn");
+    if (approveBtn) {
+        approveBtn.addEventListener("click", async () => {
+            // Find all currently selected cells
+            const selectedCells = document.querySelectorAll(".grid-cell.selected");
+            if (selectedCells.length === 0) {
+                alert("Please select at least one grid cell first to lock or unlock it.");
+                return;
+            }
+
+            const cellsPayload = Array.from(selectedCells).map(cell => ({ row: cell.dataset.row, col: cell.dataset.col }));
+
+            try {
+                const response = await fetch('/grid/approve', {
+                    method: 'POST',
+                    headers: {
+                        'Content-Type': 'application/json',
+                        'X-CSRF-TOKEN': document.querySelector('meta[name="csrf-token"]').content
+                    },
+                    body: JSON.stringify({ cells: cellsPayload })
+                });
+
+                const data = await response.json();
+                if (data.success) {
+                    data.updated_cells.forEach(updatedData => {
+                        const cell = document.querySelector(`.grid-cell[data-row="${updatedData.row}"][data-col="${updatedData.col}"]`);
+                        if (!cell) return;
+                        if (updatedData.is_approved) {
+                            applyLockedCellState(cell);
+                            flashLockExplanation(cell);
+                        } else {
+                            applyUnlockedCellState(cell);
+                        }
+                    });
+                    // Clear selections
+                    document.querySelectorAll('.grid-cell.selected').forEach(c => c.classList.remove('selected'));
+                    alert('Selected areas successfully updated!');
+                }
+            } catch (err) {
+                console.error('Error during cell approval:', err);
+            }
+        });
+    }
 
     // =========================================================
     // DELETE BUTTON
@@ -1057,7 +1236,10 @@ function initGridPage() {
         if (!deleteBtn) return;
         const cell = deleteBtn.closest(".grid-cell");
         if (!cell) return;
-
+        if (isLockedCell(cell)) {
+            // Do not allow deletion on locked cells
+            return;
+        }
         const row = cell.dataset.row;
         const col = cell.dataset.col;
         cell.innerHTML = "";
