@@ -21,6 +21,7 @@ import {
     HOURS_MAX,
 } from './regulation.js';
 import { resetDayNightIndicatorState } from './day-night-indicator.js';
+import { initLibraryPreview, closePreview } from './library-preview.js';
 
 const SIM_STATE_KEY = 'metropolis_simulation_state';
 
