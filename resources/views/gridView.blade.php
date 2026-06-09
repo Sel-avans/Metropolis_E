@@ -131,7 +131,7 @@
                     class="flex-1 px-4 py-2 bg-yellow-500 text-black font-semibold rounded shadow hover:bg-yellow-600 transition focus:ring-2 focus:ring-yellow-400">
                     Undo
                 </button>
-                @if(auth()->user() && (auth()->user()->role->name === 'Municipal_Policy_Maker'))
+                @if(auth()->user() && (auth()->user()->role->name === 'Municipal_Policy_Maker' || auth()->user()->role->name === 'Administrator'))
                 <button id="exportPdfButton" type="button"
                         class="flex-1 px-4 py-2 bg-teal-600 text-white font-semibold rounded shadow hover:bg-teal-700 focus:outline-none focus:ring-2 focus:ring-teal-500 transition"
                         aria-label="Export the current simulation as a PDF report">

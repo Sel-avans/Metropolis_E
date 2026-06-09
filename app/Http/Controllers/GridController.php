@@ -237,8 +237,10 @@ class GridController extends Controller
 
     public function approveCell(Request $request)
     {
-        // Security check: ensure the user has the 'City_planner' role
-        if (!auth()->user() || auth()->user()->role->name !== 'City_planner') {
+        // Security check: ensure the user has an authorized role
+        // (UI shows this button to Municipal_Policy_Maker and Administrator too)
+        $allowedRoles = ['City_planner', 'Municipal_Policy_Maker', 'Administrator'];
+        if (!auth()->user() || !in_array(auth()->user()->role->name, $allowedRoles, true)) {
             return response()->json(['success' => false, 'error' => 'unauthorized'], 403);
         }
 
