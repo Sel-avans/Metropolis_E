@@ -186,9 +186,10 @@
                                         data-function-id="{{ $cell->function->id }}"
                                         draggable="{{ $isApproved ? 'false' : 'true' }}"
                                         ondragstart="{{ $isApproved ? 'return false;' : '' }}">
-
-                                    @if(!$isApproved)
-                                        <button type="button" class="delete-btn absolute z-10 top-[2px] right-[2px] bg-red-600/80 text-white w-5 h-5 text-[14px] rounded cursor-pointer flex items-center justify-center">✖</button>
+                                    @if(auth()->user() && (auth()->user()->role->name === 'City_planner' || auth()->user()->role->name === 'Administrator'))
+                                        @if(!$isApproved)
+                                            <button type="button" class="delete-btn absolute z-10 top-[2px] right-[2px] bg-red-600/80 text-white w-5 h-5 text-[14px] rounded cursor-pointer flex items-center justify-center">✖</button>
+                                        @endif
                                     @endif
                                 @endif
                             </div>
