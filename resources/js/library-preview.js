@@ -9,6 +9,7 @@ let activeFunctionId = null;
 let previewRequestId = 0;
 let suppressClickAfterDrag = false;
 let hoveredItem = null;
+let lastPointerEvent = null;
 
 function getPreviewElements() {
     return {
@@ -38,18 +39,21 @@ function setSelectedLibraryItem(functionId) {
     });
 }
 
-function setPreviewInteractivity(pinned) {
+function setPreviewInteractivity(pinned, preferHover = false) {
     const { panel, closeBtn, body } = getPreviewElements();
     if (!panel) return;
 
-    panel.classList.toggle('library-preview-pinned', pinned);
-    panel.classList.toggle('library-preview-hover', !pinned);
+    const usePinnedClass = pinned && !preferHover;
+    const useHoverClass = !usePinnedClass;
+
+    panel.classList.toggle('library-preview-pinned', usePinnedClass);
+    panel.classList.toggle('library-preview-hover', useHoverClass);
     panel.classList.toggle('pointer-events-none', !pinned);
     panel.classList.toggle('pointer-events-auto', pinned);
     if (closeBtn) closeBtn.classList.toggle('hidden', !pinned);
     if (body) {
-        body.classList.toggle('overflow-y-auto', pinned);
-        body.classList.toggle('overflow-hidden', !pinned);
+        body.classList.toggle('overflow-y-auto', usePinnedClass);
+        body.classList.toggle('overflow-hidden', useHoverClass);
     }
 }
 
@@ -68,48 +72,75 @@ function resetPreviewLayout() {
     }
 }
 
-function applyHoverPreviewLayout(item) {
+function applyHoverPreviewLayout(item, pointer) {
     const { panel } = getPreviewElements();
     const column = document.getElementById('library-column');
     if (!panel || !column || !item) return;
-
     const columnRect = column.getBoundingClientRect();
     const itemRect = item.getBoundingClientRect();
-    const topInColumn = itemRect.top - columnRect.top;
-    const maxHeight = Math.min(columnRect.height * 0.75, 420);
+    // compute available area and desired top (use pointer Y if available)
+    const availableHeight = column.clientHeight - 16; // 8px padding top/bottom
+    const defaultMaxHeight = Math.min(columnRect.height * 0.75, 420);
 
-    let top = Math.max(8, topInColumn - 4);
-    if (top + maxHeight > columnRect.height - 8) {
-        top = Math.max(8, columnRect.height - maxHeight - 8);
+    // ensure panel has layout to measure its height
+    const panelHeight = Math.max(0, panel.getBoundingClientRect().height || panel.offsetHeight || defaultMaxHeight);
+
+    let desiredTop;
+    if (pointer && typeof pointer.clientY === 'number') {
+        desiredTop = column.scrollTop + (pointer.clientY - columnRect.top) + 4;
+    } else {
+        desiredTop = column.scrollTop + (itemRect.top - columnRect.top) + itemRect.height + 4;
     }
+
+    const minTop = column.scrollTop + 8;
+    const maxTop = Math.max(minTop, column.scrollTop + column.clientHeight - Math.min(panelHeight, defaultMaxHeight) - 8);
+    const top = Math.min(Math.max(desiredTop, minTop), maxTop);
+
+    // horizontal: fill the parent column
+    panel.style.left = '0px';
+    panel.style.right = '0px';
+    panel.style.width = '100%';
 
     panel.style.bottom = 'auto';
     panel.style.top = `${top}px`;
-    panel.style.maxHeight = `${maxHeight}px`;
+    panel.style.maxHeight = `${Math.min(defaultMaxHeight, availableHeight)}px`;
 }
 
 function applyPinnedPreviewLayout() {
     const { panel } = getPreviewElements();
     if (!panel) return;
 
+    // pinned defaults to bottom anchored within the library column
+    // pinned anchored at bottom and full width of parent column
+    panel.style.left = '0px';
+    panel.style.right = '0px';
+    panel.style.width = '100%';
+
     panel.style.top = '';
     panel.style.bottom = '0';
     panel.style.maxHeight = '';
 }
 
-function showPreviewPanel(pinned = false, item = null) {
+function showPreviewPanel(pinned = false, item = null, pointer = null) {
     const { panel } = getPreviewElements();
     if (!panel) return;
 
     if (pinned) {
-        applyPinnedPreviewLayout();
+        // if a pointer is available (click), prefer placing near pointer immediately
+        if (pointer) {
+            applyHoverPreviewLayout(item, pointer);
+            setPreviewInteractivity(true, true);
+        } else {
+            applyPinnedPreviewLayout();
+            setPreviewInteractivity(true, false);
+        }
     } else {
-        applyHoverPreviewLayout(item);
+        applyHoverPreviewLayout(item, pointer || lastPointerEvent);
+        setPreviewInteractivity(false, false);
     }
 
     panel.classList.remove('hidden');
     panel.setAttribute('aria-hidden', 'false');
-    setPreviewInteractivity(pinned);
 }
 
 export function closePreview(force = false) {
@@ -271,7 +302,7 @@ async function fetchPreview(functionId) {
     }
 }
 
-async function openPreview(item, pinned = false) {
+async function openPreview(item, pinned = false, pointerEvent = null) {
     const functionId = Number(item.dataset.functionId);
     const { status } = getPreviewElements();
     const requestId = ++previewRequestId;
@@ -280,7 +311,9 @@ async function openPreview(item, pinned = false) {
         pinnedFunctionId = functionId;
     }
 
-    showPreviewPanel(pinned, item);
+    // record pointer for initial placement, then show panel
+    if (pointerEvent) lastPointerEvent = pointerEvent;
+    showPreviewPanel(pinned, item, lastPointerEvent);
     if (status) status.textContent = 'Loading preview…';
 
     try {
@@ -295,9 +328,14 @@ async function openPreview(item, pinned = false) {
         if (status) status.textContent = '';
 
         if (pinned) {
-            applyPinnedPreviewLayout();
+            // if pointerEvent present, prefer positioning near click
+                if (pointerEvent) {
+                    applyHoverPreviewLayout(item, pointerEvent);
+                } else {
+                    applyPinnedPreviewLayout();
+                }
         } else {
-            applyHoverPreviewLayout(item);
+            applyHoverPreviewLayout(item, pointerEvent);
         }
     } catch (error) {
         if (requestId !== previewRequestId) return;
@@ -306,15 +344,16 @@ async function openPreview(item, pinned = false) {
     }
 }
 
-function scheduleHoverPreview(item) {
+function scheduleHoverPreview(item, pointerEvent = null) {
     clearTimeout(hoverTimer);
     const functionId = Number(item.dataset.functionId);
+    lastPointerEvent = pointerEvent;
 
     fetchPreview(functionId).catch(() => {});
 
     hoverTimer = setTimeout(() => {
         if (pinnedFunctionId) return;
-        openPreview(item, false);
+        openPreview(item, false, lastPointerEvent);
     }, HOVER_DELAY_MS);
 }
 
@@ -354,7 +393,7 @@ export function initLibraryPreview() {
         if (hoveredItem !== item) {
             hoveredItem = item;
             if (!pinnedFunctionId) {
-                scheduleHoverPreview(item);
+                scheduleHoverPreview(item, event);
             }
         }
     });
@@ -383,7 +422,7 @@ export function initLibraryPreview() {
 
         event.preventDefault();
         event.stopPropagation();
-        openPreview(item, true);
+        openPreview(item, true, event);
     });
 
     libraryList.addEventListener('keydown', (event) => {
@@ -393,7 +432,10 @@ export function initLibraryPreview() {
         if (event.key !== 'Enter' && event.key !== ' ') return;
 
         event.preventDefault();
-        openPreview(item, true);
+        // keyboard: position based on item bounding box
+        const rect = item.getBoundingClientRect();
+        const fakeEvent = { clientX: rect.left + rect.width / 2, clientY: rect.top + rect.height + 4 };
+        openPreview(item, true, fakeEvent);
     });
 
     panel.addEventListener('mouseenter', () => {
@@ -415,6 +457,25 @@ export function initLibraryPreview() {
         if (!pinnedFunctionId) {
             previewRequestId += 1;
             closePreview(false);
+        }
+    });
+
+    // Keep preview positioned when the column scrolls or the window resizes
+    libraryColumn.addEventListener('scroll', () => {
+        if (!panel || panel.classList.contains('hidden')) return;
+        if (panel.classList.contains('library-preview-hover')) {
+            applyHoverPreviewLayout(hoveredItem, lastPointerEvent);
+        } else {
+            applyPinnedPreviewLayout();
+        }
+    }, { passive: true });
+
+    window.addEventListener('resize', () => {
+        if (!panel || panel.classList.contains('hidden')) return;
+        if (panel.classList.contains('library-preview-hover')) {
+            applyHoverPreviewLayout(hoveredItem, lastPointerEvent);
+        } else {
+            applyPinnedPreviewLayout();
         }
     });
 
