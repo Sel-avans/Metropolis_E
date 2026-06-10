@@ -28,11 +28,11 @@
                             class="px-3 py-2 bg-blue-600 text-white rounded hover:bg-blue-700 text-sm shadow text-center focus:outline-none focus:ring-2 focus:ring-blue-500">
                             Condition Management
                         </a>
-                        @endif
                         <a href="{{ route('events.index') }}"
                             class="px-3 py-2 bg-purple-600 text-white rounded hover:bg-purple-700 text-sm shadow text-center focus:outline-none focus:ring-2 focus:ring-purple-500">
                             Events
                         </a>
+                        @endif
                     </div>
                 </nav>
             </div>
@@ -185,7 +185,7 @@
                                 @if(!empty($cell) && !empty($cell->function))
                                     <img src="{{ asset($cell->function->image) }}"
                                         alt="{{ $cell->function->name }}"
-                                        class="grid-function-icon object-contain w-full h-full p-4 relative z-0 {{ $isApproved ? 'pointer-events-none select-none' : '' }}"
+                                        class="grid-function-icon object-contain relative z-0 {{ $isApproved ? 'pointer-events-none select-none' : '' }}"
                                         data-function-id="{{ $cell->function->id }}"
                                         draggable="{{ $isApproved ? 'false' : 'true' }}"
                                         ondragstart="{{ $isApproved ? 'return false;' : '' }}">
