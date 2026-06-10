@@ -1371,6 +1371,51 @@ function initGridPage() {
         });
     }
 
+    // --- APPROVE ENTIRE GRID (only cells that contain a function and are not already approved) ---
+    const approveGridBtn = document.getElementById("approve-grid-btn");
+    if (approveGridBtn) {
+        approveGridBtn.addEventListener("click", async () => {
+            // Find all cells that contain a function and are not already locked/approved
+            const allCells = Array.from(document.querySelectorAll('.grid-cell'));
+            const targetCells = allCells.filter(c => isCellOccupied(c) && !isLockedCell(c));
+
+            if (targetCells.length === 0) {
+                alert('No unlocked grid cells with functions found to approve.');
+                return;
+            }
+
+            const cellsPayload = targetCells.map(cell => ({ row: cell.dataset.row, col: cell.dataset.col }));
+
+            try {
+                const response = await fetch('/grid/approve', {
+                    method: 'POST',
+                    headers: {
+                        'Content-Type': 'application/json',
+                        'X-CSRF-TOKEN': document.querySelector('meta[name="csrf-token"]').content
+                    },
+                    body: JSON.stringify({ cells: cellsPayload })
+                });
+
+                const data = await response.json();
+                if (data.success) {
+                    data.updated_cells.forEach(updatedData => {
+                        const cell = document.querySelector(`.grid-cell[data-row="${updatedData.row}"][data-col="${updatedData.col}"]`);
+                        if (!cell) return;
+                        if (updatedData.is_approved) {
+                            applyLockedCellState(cell);
+                            flashLockExplanation(cell);
+                        } else {
+                            applyUnlockedCellState(cell);
+                        }
+                    });
+                    alert('Grid approval updated for functions.');
+                }
+            } catch (err) {
+                console.error('Error during grid-wide approval:', err);
+            }
+        });
+    }
+
     // =========================================================
     // DELETE BUTTON
     // =========================================================

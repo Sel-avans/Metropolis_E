@@ -125,6 +125,9 @@
                 <button type="button" id="approve-btn"
                     class="flex-1 px-4 py-2 bg-amber-600 text-white font-semibold rounded shadow hover:bg-amber-700 transition focus:ring-2 focus:ring-yellow-400"
                 > Lock & Unlock Area</button>
+                <button type="button" id="approve-grid-btn"
+                    class="flex-1 px-4 py-2 bg-lime-600 text-white font-semibold rounded shadow hover:bg-lime-700 transition focus:ring-2 focus:ring-yellow-400"
+                > Approve Grid</button>
                 @endif
 
                 <button id="undoButton"
