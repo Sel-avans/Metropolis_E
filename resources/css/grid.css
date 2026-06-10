@@ -63,7 +63,7 @@
 }
 
 #library-preview-panel.library-preview-hover .library-preview-body {
-    overflow: hidden;
+    overflow-y: auto;
 }
 
 .library-preview-header {
