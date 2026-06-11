@@ -22,6 +22,7 @@ import {
 } from './regulation.js';
 import { resetDayNightIndicatorState } from './day-night-indicator.js';
 import { initLibraryPreview, closePreview } from './library-preview.js';
+import { initRoutePlanner, handleRouteCellClick, syncRoutePlannerEvents } from './route-planner.js';
 
 const SIM_STATE_KEY = 'metropolis_simulation_state';
 
@@ -57,6 +58,7 @@ function restoreCellContent(cell, functionId, functionName, functionImage) {
     img.src = functionImage;
     img.alt = functionName;
     img.dataset.functionId = functionId;
+    img.dataset.functionName = functionName;
     img.classList.add('grid-function-icon', 'object-contain');
     cell.appendChild(img);
 
@@ -79,6 +81,7 @@ function initGridPage() {
     // Initialize library UI (filter + preview) when grid and library DOM are present
     try { initLibraryFilter(); } catch (e) { /* ignore if not present */ }
     try { initLibraryPreview(); } catch (e) { /* ignore if not present */ }
+    try { initRoutePlanner(); } catch (e) { /* ignore if not present */ }
 
     // =========================================================
     // VARIABELEN
@@ -1147,6 +1150,7 @@ function initGridPage() {
             lastQoLEventIdsKey = null;
             applySimulationTime(getCurrentTime());
             updateQoL({ immediate: true });
+            syncRoutePlannerEvents(allEvents);
             saveSimulationState();
 
         } catch (err) {
@@ -1293,6 +1297,11 @@ function initGridPage() {
 
         cell.addEventListener("click",   (e) => { 
             if (isDragging) return;
+            if (handleRouteCellClick(cell)) {
+                e.preventDefault();
+                e.stopPropagation();
+                return;
+            }
             if (isLockedCell(cell) && !canSelectLockedCell(cell)) {
                 e.preventDefault();
                 flashLockExplanation(cell);

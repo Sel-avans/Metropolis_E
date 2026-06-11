@@ -11,7 +11,8 @@ use App\Http\Controllers\ConditionsController;
 use App\Http\Controllers\UndoController;
 use App\Policies\PagePolicy;
 use App\Http\Controllers\SimulationEventController;
-use App\Http\Controllers\FunctionPreviewController; 
+use App\Http\Controllers\FunctionPreviewController;
+use App\Http\Controllers\EventRouteController;
 
 // Publieke route
 Route::get('/', function () {
@@ -44,6 +45,12 @@ Route::middleware('auth')->group(function () {
         Route::post('/grid/update', [GridController::class, 'update'])->middleware('can:CanPlaceFunctions,' . PagePolicy::class);
         Route::post('/undo', [UndoController::class, 'undo'])->middleware('can:CanPlaceFunctions,' . PagePolicy::class);
         Route::delete('/grid/cell/{cell}/function', [GridController::class, 'removeFunction'])->middleware('can:CanPlaceFunctions,' . PagePolicy::class);
+
+        Route::middleware('can:CanManageEventRoutes,' . PagePolicy::class)->group(function () {
+            Route::get('/event-routes', [EventRouteController::class, 'index'])->name('event-routes.index');
+            Route::post('/event-routes/start-point', [EventRouteController::class, 'store'])->name('event-routes.start-point');
+            Route::delete('/event-routes/{event}', [EventRouteController::class, 'destroy'])->name('event-routes.destroy');
+        });
     });
 
     // === FUNCTIONS / FUNCTIEBEHEER ===
