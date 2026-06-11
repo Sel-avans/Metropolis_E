@@ -511,8 +511,8 @@ function initGridPage() {
     function positionPopup(x, y) {
         const popupEl = document.getElementById('qol-popup');
         if (!popupEl) return;
-        popupEl.style.left = `${x + 15}px`;
-        popupEl.style.top  = `${y + 15}px`;
+        popupEl.style.left = `${x}px`;
+        popupEl.style.top  = `${y}px`;
     }
 
     function renderNeighborsList(data) {
@@ -599,7 +599,7 @@ function initGridPage() {
     }
 
     async function handleTileHover(row, col, event) {
-        positionPopup(event.pageX, event.pageY);
+        positionPopup(event.clientX, event.clientY);
         const data = await getNeighborsWithQoL(row, col);
         renderNeighborsList(data);
         showPopup();
