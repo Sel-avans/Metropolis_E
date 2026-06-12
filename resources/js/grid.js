@@ -1246,6 +1246,7 @@ function initGridPage() {
             const img = document.createElement("img");
             img.src = draggedItem.image; img.alt = draggedItem.name;
             img.dataset.functionId = draggedItem.id;
+            img.dataset.functionName = draggedItem.name;
             img.classList.add("grid-function-icon", "object-contain");
             cell.appendChild(img);
 
@@ -1277,14 +1278,14 @@ function initGridPage() {
                     const res2 = await saveMove(oldRow, oldCol, newRow, newCol, true);
                     if (!res2 || !res2.ok) {
                         if (originalSourceCell) {
-                            originalSourceCell.innerHTML = `<img src="${draggedItem.image}" alt="${draggedItem.name}" data-function-id="${draggedItem.id}" class="grid-function-icon object-contain"><button class="delete-btn absolute top-[2px] right-[2px] bg-red-600/80 text-white w-5 h-5 text-[14px] rounded cursor-pointer flex items-center justify-center">✖</button>`;
+                            originalSourceCell.innerHTML = `<img src="${draggedItem.image}" alt="${draggedItem.name}" data-function-id="${draggedItem.id}" data-function-name="${draggedItem.name}" class="grid-function-icon object-contain"><button class="delete-btn absolute top-[2px] right-[2px] bg-red-600/80 text-white w-5 h-5 text-[14px] rounded cursor-pointer flex items-center justify-center">✖</button>`;
                             originalSourceCell.setAttribute('draggable', 'true');
                         }
                         cell.innerHTML = ""; cell.removeAttribute('draggable'); updateQoL(); return;
                     }
                 } else {
                     if (originalSourceCell) {
-                        originalSourceCell.innerHTML = `<img src="${draggedItem.image}" alt="${draggedItem.name}" data-function-id="${draggedItem.id}" class="grid-function-icon object-contain"><button class="delete-btn absolute top-[2px] right-[2px] bg-red-600/80 text-white w-5 h-5 text-[14px] rounded cursor-pointer flex items-center justify-center">✖</button>`;
+                        originalSourceCell.innerHTML = `<img src="${draggedItem.image}" alt="${draggedItem.name}" data-function-id="${draggedItem.id}" data-function-name="${draggedItem.name}" class="grid-function-icon object-contain"><button class="delete-btn absolute top-[2px] right-[2px] bg-red-600/80 text-white w-5 h-5 text-[14px] rounded cursor-pointer flex items-center justify-center">✖</button>`;
                         originalSourceCell.setAttribute('draggable', 'true');
                     }
                     cell.innerHTML = ""; cell.removeAttribute('draggable'); updateQoL(); return;

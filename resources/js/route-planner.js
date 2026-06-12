@@ -1,10 +1,27 @@
 const MAIN_ACCESS_ROAD_NAME = 'Road';
+const SET_START_LABEL = 'Set start point';
+const CHANGE_START_LABEL = 'Change starting point';
+
+const ROUTE_STATUS = {
+    selectEvent: 'Choose an event from the list above to plan a visitor route.',
+    noStartPoint: `No start point yet. Press ${SET_START_LABEL}, then select a Road cell on the City Grid.`,
+    selectRoadCell: 'Start point selection is on. Select a Road cell on the City Grid below — click the cell or focus it and press Enter.',
+    selectChangeRoadCell: 'Starting point selection is on. Select a new Road cell on the City Grid below — click the cell or focus it and press Enter.',
+    invalidCell: 'This cell cannot be the start point. Select a cell that contains a Road function.',
+    startPointSet: (row, col) => `Start point saved on the City Grid at row ${row}, column ${col}.`,
+    startPointChanged: (row, col) => `Starting point changed to row ${row}, column ${col} on the City Grid.`,
+    startPointRemoved: `Start point removed. Press ${SET_START_LABEL} and select a Road cell to choose a new one.`,
+    saving: 'Saving start point…',
+    removing: 'Removing start point…',
+    saveFailed: 'Could not save the start point. Please try again.',
+    removeFailed: 'Could not remove the start point. Please try again.',
+};
 
 let routePlannerEnabled = false;
 let startPointMode = false;
 let selectedEventId = null;
 let eventRoutes = [];
-let roadFunctionId = null;
+let roadFunctionIds = [];
 let routesFetchGeneration = 0;
 
 function csrfToken() {
@@ -39,16 +56,21 @@ function getCellFunctionName(cell) {
     return icon.dataset.functionName || icon.alt || null;
 }
 
+function isRoadFunctionName(name) {
+    return Boolean(name) && name.trim().toLowerCase() === MAIN_ACCESS_ROAD_NAME.toLowerCase();
+}
+
 function isMainAccessRoadCell(cell) {
     const icon = cell.querySelector('.grid-function-icon');
     if (!icon) return false;
 
-    if (roadFunctionId && icon.dataset.functionId) {
-        return Number(icon.dataset.functionId) === Number(roadFunctionId);
+    const name = getCellFunctionName(cell);
+    if (isRoadFunctionName(name)) {
+        return true;
     }
 
-    const name = getCellFunctionName(cell);
-    return name && name.toLowerCase() === MAIN_ACCESS_ROAD_NAME.toLowerCase();
+    const functionId = Number(icon.dataset.functionId);
+    return !Number.isNaN(functionId) && roadFunctionIds.includes(functionId);
 }
 
 function clearStartPointMarkers() {
@@ -93,14 +115,20 @@ function applyStartPointMarker(cell) {
 function renderStartPointsOnGrid() {
     clearStartPointMarkers();
 
-    eventRoutes.forEach((route) => {
-        const cell = document.querySelector(
-            `.grid-cell[data-row="${route.start_row}"][data-col="${route.start_col}"]`
-        );
-        if (cell) {
-            applyStartPointMarker(cell);
-        }
-    });
+    const route = getSelectedEventRoute();
+    if (!route) return;
+
+    const cell = document.querySelector(
+        `.grid-cell[data-row="${route.start_row}"][data-col="${route.start_col}"]`
+    );
+    if (cell) {
+        applyStartPointMarker(cell);
+    }
+}
+
+function getSelectedEventRoute() {
+    if (!selectedEventId) return null;
+    return eventRoutes.find((r) => Number(r.event_id) === Number(selectedEventId)) ?? null;
 }
 
 function updateStartPointButtonState() {
@@ -108,8 +136,20 @@ function updateStartPointButtonState() {
     if (!btn) return;
 
     const hasEvent = Boolean(selectedEventId);
+    const hasStartPoint = Boolean(getSelectedEventRoute());
     btn.disabled = !hasEvent;
+    btn.textContent = hasStartPoint ? CHANGE_START_LABEL : SET_START_LABEL;
     btn.setAttribute('aria-pressed', startPointMode ? 'true' : 'false');
+    btn.setAttribute(
+        'aria-label',
+        startPointMode
+            ? (hasStartPoint
+                ? 'Cancel changing starting point'
+                : 'Cancel start point selection')
+            : (hasStartPoint
+                ? 'Change starting point on a Road cell in the City Grid'
+                : 'Set start point on a Road cell in the City Grid')
+    );
     btn.classList.toggle('ring-2', startPointMode);
     btn.classList.toggle('ring-emerald-400', startPointMode);
 }
@@ -118,31 +158,31 @@ function updateRemoveButtonState() {
     const btn = document.getElementById('route-remove-start-btn');
     if (!btn) return;
 
-    const route = eventRoutes.find((r) => Number(r.event_id) === Number(selectedEventId));
-    btn.disabled = !route;
+    btn.disabled = !getSelectedEventRoute();
 }
 
 function updateStatusForSelectedEvent() {
     if (!selectedEventId) {
-        setStatus('Select an event to plan a visitor route.');
+        setStatus(ROUTE_STATUS.selectEvent);
         return;
     }
 
-    const route = eventRoutes.find((r) => Number(r.event_id) === Number(selectedEventId));
+    const route = getSelectedEventRoute();
     if (route) {
-        setStatus(
-            `Start point set at row ${route.start_row}, column ${route.start_col}.`,
-            'success'
-        );
+        if (startPointMode) {
+            setStatus(ROUTE_STATUS.selectChangeRoadCell);
+            return;
+        }
+        setStatus(ROUTE_STATUS.startPointSet(route.start_row, route.start_col), 'success');
         return;
     }
 
     if (startPointMode) {
-        setStatus('Click a main access road (Road) on the grid to set the start point.');
+        setStatus(ROUTE_STATUS.selectRoadCell);
         return;
     }
 
-    setStatus('No start point yet. Use "Set start point" and click a Road cell.');
+    setStatus(ROUTE_STATUS.noStartPoint);
 }
 
 function populateEventSelect(events) {
@@ -150,7 +190,7 @@ function populateEventSelect(events) {
     if (!select) return;
 
     const currentValue = select.value;
-    select.innerHTML = '<option value="">— Select event —</option>';
+    select.innerHTML = '<option value="">— Select —</option>';
 
     events.forEach((event) => {
         const option = document.createElement('option');
@@ -180,8 +220,11 @@ async function fetchEventRoutes() {
         if (generation !== routesFetchGeneration) return;
 
         eventRoutes = data.routes ?? [];
-        roadFunctionId = data.road_function_id ?? null;
+        roadFunctionIds = data.road_function_ids
+            ?? (data.road_function_id != null ? [data.road_function_id] : []);
+        roadFunctionIds = roadFunctionIds.map((id) => Number(id)).filter((id) => !Number.isNaN(id));
         renderStartPointsOnGrid();
+        updateStartPointButtonState();
         updateRemoveButtonState();
         updateStatusForSelectedEvent();
     } catch (error) {
@@ -192,6 +235,8 @@ async function fetchEventRoutes() {
 
 async function saveStartPoint(row, col) {
     if (!selectedEventId) return false;
+
+    const hadStartPoint = Boolean(getSelectedEventRoute());
 
     try {
         const response = await fetch('/event-routes/start-point', {
@@ -210,7 +255,7 @@ async function saveStartPoint(row, col) {
         const data = await response.json();
 
         if (!response.ok || !data.success) {
-            setStatus(data.message || 'Could not set the start point.', 'error');
+            setStatus(data.message || ROUTE_STATUS.invalidCell, 'error');
             return false;
         }
 
@@ -228,13 +273,15 @@ async function saveStartPoint(row, col) {
         renderStartPointsOnGrid();
         updateRemoveButtonState();
         setStatus(
-            `Start point saved at row ${data.route.start_row}, column ${data.route.start_col}.`,
+            hadStartPoint
+                ? ROUTE_STATUS.startPointChanged(data.route.start_row, data.route.start_col)
+                : ROUTE_STATUS.startPointSet(data.route.start_row, data.route.start_col),
             'success'
         );
         return true;
     } catch (error) {
         console.error('Failed to save start point:', error);
-        setStatus('Could not save the start point. Please try again.', 'error');
+        setStatus(ROUTE_STATUS.saveFailed, 'error');
         return false;
     }
 }
@@ -250,8 +297,9 @@ async function removeStartPoint() {
 
     eventRoutes = eventRoutes.filter((r) => Number(r.event_id) !== Number(selectedEventId));
     clearStartPointForCell(removedRow, removedCol);
+    updateStartPointButtonState();
     updateRemoveButtonState();
-    setStatus('Removing start point...');
+    setStatus(ROUTE_STATUS.removing);
 
     try {
         const response = await fetch(`/event-routes/${selectedEventId}`, {
@@ -266,16 +314,17 @@ async function removeStartPoint() {
         const data = await response.json().catch(() => ({}));
         if (!response.ok || !data.success || !data.deleted) {
             await fetchEventRoutes();
-            setStatus('Could not remove the start point.', 'error');
+            setStatus(ROUTE_STATUS.removeFailed, 'error');
             return;
         }
 
         renderStartPointsOnGrid();
-        setStatus('Start point removed. Select a Road cell to set a new one.');
+        updateStartPointButtonState();
+        setStatus(ROUTE_STATUS.startPointRemoved);
     } catch (error) {
         console.error('Failed to remove start point:', error);
         await fetchEventRoutes();
-        setStatus('Could not remove the start point.', 'error');
+        setStatus(ROUTE_STATUS.removeFailed, 'error');
     }
 }
 
@@ -285,7 +334,7 @@ export function handleRouteCellClick(cell) {
     }
 
     if (!isMainAccessRoadCell(cell)) {
-        setStatus('The start point must be a main access road (Road function).', 'error');
+        setStatus(ROUTE_STATUS.invalidCell, 'error');
         return true;
     }
 
@@ -298,7 +347,9 @@ export function handleRouteCellClick(cell) {
 export function syncRoutePlannerEvents(events) {
     if (!routePlannerEnabled) return;
     populateEventSelect(events);
+    renderStartPointsOnGrid();
     updateStartPointButtonState();
+    updateRemoveButtonState();
     updateStatusForSelectedEvent();
 }
 
@@ -316,6 +367,7 @@ export function initRoutePlanner() {
     eventSelect?.addEventListener('change', () => {
         selectedEventId = eventSelect.value ? Number(eventSelect.value) : null;
         startPointMode = false;
+        renderStartPointsOnGrid();
         updateStartPointButtonState();
         updateRemoveButtonState();
         updateStatusForSelectedEvent();
@@ -333,5 +385,5 @@ export function initRoutePlanner() {
     });
 
     fetchEventRoutes();
-    setStatus('Select an event to plan a visitor route.');
+    setStatus(ROUTE_STATUS.selectEvent);
 }

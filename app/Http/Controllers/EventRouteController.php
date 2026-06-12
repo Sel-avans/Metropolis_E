@@ -25,6 +25,7 @@ class EventRouteController extends Controller
             'success' => true,
             'routes' => $routes,
             'road_function_id' => $this->eventRouteService->roadFunctionId(),
+            'road_function_ids' => $this->eventRouteService->roadFunctionIds(),
         ]);
     }
 
@@ -32,8 +33,8 @@ class EventRouteController extends Controller
     {
         $validated = $request->validate([
             'event_id' => ['required', 'integer', 'exists:simulation_events,id'],
-            'row' => ['required', 'integer', 'min:1', 'max:4'],
-            'col' => ['required', 'integer', 'min:1', 'max:3'],
+            'row' => ['required', 'integer', 'min:1', 'max:3'],
+            'col' => ['required', 'integer', 'min:1', 'max:4'],
         ]);
 
         $event = SimulationEvent::findOrFail($validated['event_id']);

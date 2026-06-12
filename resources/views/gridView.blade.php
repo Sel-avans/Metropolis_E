@@ -147,26 +147,30 @@
             <section id="route-planner-panel" class="mb-4 p-4 rounded-lg border border-emerald-300 dark:border-emerald-700 bg-emerald-50 dark:bg-emerald-950/30"
                 aria-label="Visitor route planning">
                 <h2 class="text-sm font-bold uppercase tracking-wider text-emerald-800 dark:text-emerald-300 mb-3">Route Planning</h2>
-                <div class="flex flex-wrap gap-3 items-end">
-                    <div class="flex flex-col gap-1 min-w-[12rem] flex-1">
+                <div class="flex flex-nowrap gap-2 items-end w-full">
+                    <div class="flex flex-col gap-1 min-w-0 flex-1">
                         <label for="route-event-select" class="text-xs font-semibold text-gray-700 dark:text-gray-300">Event</label>
                         <select id="route-event-select"
-                            class="w-full px-3 py-2 text-sm rounded-md border border-gray-300 dark:border-gray-600 bg-white dark:bg-gray-900 text-gray-900 dark:text-white focus:outline-none focus:ring-2 focus:ring-emerald-500">
-                            <option value="">— Select event —</option>
+                            class="w-full min-w-0 px-2 py-1.5 text-xs rounded-md border border-gray-300 dark:border-gray-600 bg-white dark:bg-gray-900 text-gray-900 dark:text-white focus:outline-none focus:ring-2 focus:ring-emerald-500">
+                            <option value="">— Select —</option>
                         </select>
                     </div>
                     <button type="button" id="route-set-start-btn" disabled
-                        class="px-4 py-2 bg-emerald-600 text-white text-sm font-semibold rounded shadow hover:bg-emerald-700 transition focus:outline-none focus:ring-2 focus:ring-emerald-400 disabled:opacity-50 disabled:cursor-not-allowed"
-                        aria-pressed="false">
+                        class="flex-1 min-w-0 px-2 py-1.5 bg-emerald-600 text-white text-xs font-semibold rounded shadow hover:bg-emerald-700 transition focus:outline-none focus:ring-2 focus:ring-emerald-400 disabled:opacity-50 disabled:cursor-not-allowed whitespace-nowrap"
+                        aria-pressed="false"
+                        aria-describedby="route-planner-status"
+                        aria-label="Set start point on a Road cell in the City Grid">
                         Set start point
                     </button>
                     <button type="button" id="route-remove-start-btn" disabled
-                        class="px-4 py-2 bg-gray-500 text-white text-sm font-semibold rounded shadow hover:bg-gray-600 transition focus:outline-none focus:ring-2 focus:ring-gray-400 disabled:opacity-50 disabled:cursor-not-allowed">
+                        class="flex-1 min-w-0 px-2 py-1.5 bg-gray-500 text-white text-xs font-semibold rounded shadow hover:bg-gray-600 transition focus:outline-none focus:ring-2 focus:ring-gray-400 disabled:opacity-50 disabled:cursor-not-allowed whitespace-nowrap"
+                        aria-describedby="route-planner-status"
+                        aria-label="Remove the start point for the selected event">
                         Remove start point
                     </button>
                 </div>
-                <p id="route-planner-status" class="mt-3 text-sm text-white" role="status" aria-live="polite">
-                    Select an event to plan a visitor route.
+                <p id="route-planner-status" class="mt-3 text-sm text-white" role="status" aria-live="polite" aria-atomic="true">
+                    Choose an event from the list above to plan a visitor route.
                 </p>
             </section>
             @endif

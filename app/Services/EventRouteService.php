@@ -20,7 +20,7 @@ class EventRouteService
         $cell->loadMissing('function');
 
         return $cell->function
-            && strcasecmp($cell->function->name, self::MAIN_ACCESS_ROAD_NAME) === 0;
+            && strcasecmp(trim($cell->function->name), self::MAIN_ACCESS_ROAD_NAME) === 0;
     }
 
     public function findMainAccessRoadCell(int $row, int $col): ?GridCell
@@ -48,7 +48,7 @@ class EventRouteService
             return [
                 'success' => false,
                 'error' => 'invalid_start_point',
-                'message' => 'The start point must be a main access road (Road function) on the grid.',
+                'message' => 'This cell cannot be the start point. Select a cell that contains a Road function.',
             ];
         }
 
@@ -62,8 +62,19 @@ class EventRouteService
 
     public function roadFunctionId(): ?int
     {
+        return $this->roadFunctionIds()[0] ?? null;
+    }
+
+    /**
+     * @return list<int>
+     */
+    public function roadFunctionIds(): array
+    {
         return CityFunction::query()
-            ->whereRaw('LOWER(name) = ?', [strtolower(self::MAIN_ACCESS_ROAD_NAME)])
-            ->value('id');
+            ->whereRaw('LOWER(TRIM(name)) = ?', [strtolower(self::MAIN_ACCESS_ROAD_NAME)])
+            ->pluck('id')
+            ->map(fn ($id) => (int) $id)
+            ->values()
+            ->all();
     }
 }

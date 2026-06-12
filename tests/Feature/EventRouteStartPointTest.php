@@ -145,6 +145,32 @@ class EventRouteStartPointTest extends TestCase
         $response->assertSee('Set start point');
     }
 
+    public function test_start_point_can_be_set_in_column_four(): void
+    {
+        $planner = User::factory()->create(['role' => UserRole::City_planner]);
+        $road = $this->createRoadFunction();
+        $event = $this->createEvent();
+
+        GridCell::factory()->create([
+            'row' => 2,
+            'col' => 4,
+            'function_id' => $road->id,
+        ]);
+
+        $response = $this->actingAs($planner)->postJson('/event-routes/start-point', [
+            'event_id' => $event->id,
+            'row' => 2,
+            'col' => 4,
+        ]);
+
+        $response->assertOk();
+        $this->assertDatabaseHas('event_routes', [
+            'simulation_event_id' => $event->id,
+            'start_row' => 2,
+            'start_col' => 4,
+        ]);
+    }
+
     public function test_start_point_can_be_replaced_for_same_event(): void
     {
         $planner = User::factory()->create(['role' => UserRole::City_planner]);
