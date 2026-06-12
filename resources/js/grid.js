@@ -1147,12 +1147,87 @@ function initGridPage() {
             lastQoLEventIdsKey = null;
             applySimulationTime(getCurrentTime());
             updateQoL({ immediate: true });
+            updateUpcomingEventsDisplay(allEvents, getCurrentTime());
             saveSimulationState();
 
         } catch (err) {
             console.error("Fout bij ophalen events:", err);
         }
     }
+
+    /**
+ * Update the Upcoming Events display logic
+ * Filters events that start within 24 hours from current simulation time.
+ */
+    function updateUpcomingEventsDisplay(allEvents, currentSimMinutes) {
+        const eventsUl = document.getElementById('upcoming-events-list');
+        if (!eventsUl) return; 
+    
+        // 24 uur is exact 1440 minuten in jouw simulatie
+        const twentyFourHoursInMinutes = 24 * 60; 
+    
+        // Filter events that are in the future AND start within the next 24 hours.
+        const upcomingEvents = allEvents.filter(event => {
+            // Make sure we look at start_minutes
+            const timeDiff = event.start_minutes - currentSimMinutes;
+            
+            return timeDiff > 0 && timeDiff <= twentyFourHoursInMinutes;
+        });
+    
+        // Clear the current list
+        eventsUl.innerHTML = '';
+    
+        // Handle empty state
+        if (upcomingEvents.length === 0) {
+            eventsUl.innerHTML = '<li class="text-sm text-gray-500 italic">No upcoming events within 24 hours</li>';
+            return;
+        } 
+        
+        // Populate the list with upcoming events
+        upcomingEvents.forEach(event => {
+            const li = document.createElement('li');
+            li.className = "p-2 bg-slate-100 dark:bg-slate-700 rounded border-l-4 border-teal-500 shadow-sm mb-2";
+            
+            // Calculate how much longer it will take
+            const minutesDiff = event.start_minutes - currentSimMinutes;
+            
+            li.innerHTML = `
+                <div class="font-bold text-sm">${event.name}</div>
+                <div class="text-xs text-gray-500 dark:text-gray-400">Starts in: ${formatRemainingTime(minutesDiff)}</div>
+            `;
+            eventsUl.appendChild(li);
+        });
+    }
+    
+    /**
+     * Helper function to format the remaining time based on simulation minutes
+     */
+    function formatRemainingTime(totalMinutes) {
+        const hours = Math.floor(totalMinutes / 60);
+        const minutes = Math.floor(totalMinutes % 60);
+        
+        if (hours === 0) {
+            return `${minutes} minute${minutes !== 1 ? 's' : ''}`;
+        } else if (minutes === 0) {
+            return `${hours} hour${hours > 1 ? 's' : ''}`;
+        } else {
+            return `${hours} hr, ${minutes} min`;
+        }
+    }
+
+/**
+ * Helper function to format the remaining time
+ */
+function calculateTimeRemaining(startTime, currentTime) {
+    const diff = new Date(startTime).getTime() - new Date(currentTime).getTime();
+    const hours = Math.floor(diff / (1000 * 60 * 60));
+    
+    if (hours === 0) {
+        return "Less than an hour";
+    }
+    
+    return `${hours} hour${hours > 1 ? 's' : ''}`;
+}
 
     // =========================================================
     // GRID SAVE / MOVE

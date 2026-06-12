@@ -359,17 +359,14 @@
             {{-- QoL Breakdown --}}
             <div id="breakdown-qol-score" aria-live="polite" aria-atomic="true"></div>
 
-            {{-- All Events --}}
-            <div id="all-events-panel">
-                <h2 class="text-lg font-semibold mb-2 dark:text-teal-500">All Events</h2>
-                <ul id="all-events-detail-list" class="space-y-1 text-sm dark:text-white" aria-live="polite"
-                    aria-label="All simulation events">
-                    <li class="text-sm text-gray-500">Loading events...</li>
+{{-- Upcoming Events --}}
+<div id="upcoming-events-panel">
+                <h2 class="text-lg font-semibold mb-2 dark:text-teal-500">Upcoming Events</h2>
+                <ul id="upcoming-events-list" class="space-y-1 text-sm dark:text-white" aria-live="polite"
+                    aria-label="Upcoming simulation events">
+                    <li class="text-sm text-gray-500 italic">Loading events...</li>
                 </ul>
             </div>
-
-        </div>
-    </div>
 
     {{-- QoL popup --}}
     <div id="qol-popup" role="tooltip" aria-label="Cell QoL influence"
