@@ -8,15 +8,21 @@ return new class extends Migration
 {
     public function up(): void
     {
-        Schema::table('grid_cells', function (Blueprint $table) {
-            $table->boolean('is_approved')->default(false)->after('function_id');
-        });
+        
+        if (!Schema::hasColumn('grid_cells', 'is_approved')) {
+            Schema::table('grid_cells', function (Blueprint $table) {
+                $table->boolean('is_approved')->default(false)->after('function_id');
+            });
+        }
     }
 
     public function down(): void
     {
-        Schema::table('grid_cells', function (Blueprint $table) {
-            $table->dropColumn('is_approved');
-        });
+        
+        if (Schema::hasColumn('grid_cells', 'is_approved')) {
+            Schema::table('grid_cells', function (Blueprint $table) {
+                $table->dropColumn('is_approved');
+            });
+        }
     }
 };
