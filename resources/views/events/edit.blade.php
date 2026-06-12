@@ -10,7 +10,7 @@
             <div class="bg-white overflow-hidden shadow-sm sm:rounded-lg p-6">
                 
                 @if ($errors->any())
-                    <div class="bg-red-600 text-white p-4 mb-6 shadow-md rounded-md" role="alert">
+                    <div id="form_errors" class="bg-red-600 text-white p-4 mb-6 shadow-md rounded-md" role="alert">
                         <p class="font-bold text-lg mb-2">Please correct the following errors before proceeding:</p>
                         <ul class="list-disc list-inside font-medium space-y-1">
                             @foreach ($errors->all() as $error)
@@ -30,7 +30,7 @@
                                class="shadow appearance-none border rounded w-full py-2 px-3 text-gray-700 leading-tight focus:outline-none focus:shadow-outline @error('name') border-red-500 border-2 @enderror" 
                                required>
                         @error('name')
-                            <p class="text-red-500 text-xs italic mt-2">{{ $message }}</p>
+                            <p id="name_error" class="text-red-500 text-xs italic mt-2">{{ $message }}</p>
                         @enderror
                     </div>
 
@@ -217,7 +217,40 @@
             }
         }
         
+        function setupNameValidation() {
+            const input = document.getElementById('name');
+            if (!input) return;
+
+            const formErrors = document.getElementById('form_errors');
+
+            function handleName() {
+                const value = input.value.trim();
+
+                // Remove name error
+                const nameError = document.getElementById('name_error');
+                if (value !== '') {
+                    if (nameError) nameError.remove();
+
+                    // Remove any list items in the top error
+                    if (formErrors) {
+                        const ul = formErrors.querySelector('ul');
+                        if (ul) {
+                            Array.from(ul.children).forEach(li => {
+                                if (li.textContent.toLowerCase().includes('name')) li.remove();
+                            });
+                            if (ul.children.length === 0) formErrors.remove();
+                        }
+                    }
+
+                    input.classList.remove('border-red-500','border-2');
+                }
+            }
+
+            input.addEventListener('input', handleName);
+            handleName();
+        }
+
         // Initialize form view state on page load based on database data
-        document.addEventListener('DOMContentLoaded', toggleEventFields);
+        document.addEventListener('DOMContentLoaded', () => { toggleEventFields(); setupNameValidation(); });
     </script>
 </x-app-layout>

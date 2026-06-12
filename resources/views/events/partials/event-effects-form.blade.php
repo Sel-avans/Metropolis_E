@@ -14,7 +14,7 @@
         <p class="text-sm text-gray-500 mb-3">Choose at least one category and set its impact (-5 to +5).</p>
 
         @error('category_modifiers')
-            <p class="text-red-500 text-xs italic mb-2">{{ $message }}</p>
+            <p id="category_error" class="text-red-500 text-xs italic mb-2">{{ $message }}</p>
         @enderror
 
         <div class="flex flex-wrap gap-2 mb-3">
@@ -46,7 +46,7 @@
         <p class="text-sm text-gray-500 mb-3">Choose at least one affected city function.</p>
 
         @error('city_functions')
-            <p class="text-red-500 text-xs italic mb-2">{{ $message }}</p>
+            <p id="functions_error" class="text-red-500 text-xs italic mb-2">{{ $message }}</p>
         @enderror
 
         <div class="flex flex-wrap gap-2 mb-3">
@@ -184,11 +184,27 @@
             refreshFunctionPicker();
         }
 
+        function removeTopErrorMatching(keyword) {
+            const formErrors = document.getElementById('form_errors');
+            if (!formErrors) return;
+            const ul = formErrors.querySelector('ul');
+            if (!ul) return;
+            Array.from(ul.children).forEach(li => {
+                if (li.textContent.toLowerCase().includes(keyword)) li.remove();
+            });
+            if (ul.children.length === 0) formErrors.remove();
+        }
+
         function updateCategoriesDoneState() {
             if (categoriesDone && selectedCategories.size > 0) {
                 categoriesStatus.textContent = `${selectedCategories.size} categor${selectedCategories.size === 1 ? 'y' : 'ies'} selected.`;
                 categoriesStatus.classList.remove('hidden');
                 cityFunctionsSection.classList.remove('opacity-50', 'pointer-events-none');
+
+                // clear server/client validation messages for categories
+                const catError = document.getElementById('category_error');
+                if (catError) catError.remove();
+                removeTopErrorMatching('category');
             } else {
                 categoriesStatus.classList.add('hidden');
                 cityFunctionsSection.classList.add('opacity-50', 'pointer-events-none');
@@ -199,6 +215,11 @@
             if (functionsDone && selectedFunctions.size > 0) {
                 functionsStatus.textContent = `${selectedFunctions.size} city function${selectedFunctions.size === 1 ? '' : 's'} selected.`;
                 functionsStatus.classList.remove('hidden');
+
+                // clear server/client validation messages for functions
+                const fnError = document.getElementById('functions_error');
+                if (fnError) fnError.remove();
+                removeTopErrorMatching('function');
             } else {
                 functionsStatus.classList.add('hidden');
             }
