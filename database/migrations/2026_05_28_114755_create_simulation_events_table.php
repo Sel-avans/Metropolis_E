@@ -6,37 +6,37 @@ use Illuminate\Support\Facades\Schema;
 
 return new class extends Migration
 {
-    /**
-     * Run the migrations.
-     */
+    
     public function up(): void
     {
-        Schema::create('simulation_events', function (Blueprint $table) {
-            $table->id();
-            $table->string('name');
-            $table->text('description')->nullable();
+        
+        if (!Schema::hasTable('simulation_events')) {
+            Schema::create('simulation_events', function (Blueprint $table) {
+                $table->id();
+                $table->string('name');
+                $table->text('description')->nullable();
     
-            // Type can be 'one-off' or 'recurring'
-            $table->string('type')->default('one-off'); 
+                
+                $table->string('type')->default('one-off'); 
     
-            // Fields for one-off events
-            $table->dateTime('start_moment')->nullable();
-            $table->dateTime('end_moment')->nullable();
+               
+                $table->dateTime('start_moment')->nullable();
+                $table->dateTime('end_moment')->nullable();
     
-            // Fields for recurring events
-            $table->string('recurring_schedule')->nullable(); 
-            $table->date('recurring_start_date')->nullable();
-            $table->date('recurring_end_date')->nullable(); // Dit is de optionele (nullable) end date!
-            $table->time('recurring_start_time')->nullable();
-            $table->time('recurring_end_time')->nullable();
+                
+                $table->string('recurring_schedule')->nullable(); 
+                $table->date('recurring_start_date')->nullable();
+                $table->date('recurring_end_date')->nullable();
+                $table->time('recurring_start_time')->nullable();
+                $table->time('recurring_end_time')->nullable();
     
-            $table->timestamps();
-        });
+                $table->timestamps();
+            });
+        }
     }
 
-    /**
-     * Reverse the migrations.
-     */
+  
+     
     public function down(): void
     {
         Schema::dropIfExists('simulation_events');

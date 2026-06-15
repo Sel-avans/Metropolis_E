@@ -556,7 +556,8 @@ function initGridPage() {
             if (cellScore !== 0) {
                 const cellCls  = cellScore > 0 ? 'text-green-500' : 'text-red-500';
                 const cellSign = cellScore > 0 ? '+' : '';
-                html += `<div class="text-[10px] text-slate-400 mt-0.5">Base: <span class="${cellCls}">${cellSign}${cellScore}</span></div>`;
+                html += `<div class="text-[10px] text-slate-400 mt-0.5">Value
+                : <span class="${cellCls}">${cellSign}${cellScore}</span></div>`;
             }
             if (eventScore !== 0) {
                 const eventCls  = eventScore > 0 ? 'text-amber-400' : 'text-red-400';
