@@ -1089,6 +1089,7 @@ function initGridPage() {
                 const draft = {
                     id:                    e.id,
                     name:                  e.name,
+                    raw_data:              e,
                     type:                  e.type ?? 'one-off',
                     recurringSchedule:     e.recurring_schedule ?? null,
                     recurringStartDate:    e.recurring_start_date ?? null,
@@ -1096,6 +1097,7 @@ function initGridPage() {
                     modifiers:             e.modifiers ?? {},
                     affected_categories:   e.affected_categories ?? [],
                     affectedFunctionIds:   e.affected_function_ids ?? [],
+                    start_date:            e.start_at,
                     start_minutes:         e.start_minutes ?? datetimeToSimMinutes(e.start_at),
                     end_minutes:           e.end_minutes   ?? datetimeToSimMinutes(e.end_at),
                     durationMinutes:       e.duration_minutes ?? 0,
@@ -1163,37 +1165,46 @@ function initGridPage() {
         const eventsUl = document.getElementById('upcoming-events-list');
         if (!eventsUl) return; 
     
-        // 24 uur is exact 1440 minuten in jouw simulatie
-        const twentyFourHoursInMinutes = 24 * 60; 
+        // Use the exact current time as the reference point
+        const now = new Date().getTime();
+        const twentyFourHoursInMs = 24 * 60 * 60 * 1000; 
     
-        // Filter events that are in the future AND start within the next 24 hours.
+        // 1. DYNAMIC FILTER: Find events starting in more than 24 hours
         const upcomingEvents = allEvents.filter(event => {
-            // Make sure we look at start_minutes
-            const timeDiff = event.start_minutes - currentSimMinutes;
+            // Skip events without a valid start date
+            if (!event.start_date) return false;
+    
+            // Replace space with 'T' for cross-browser compatibility (Safari fix)
+            const safeDateString = event.start_date.replace(' ', 'T');
+            const eventTime = new Date(safeDateString).getTime();
+            const timeDiffMs = eventTime - now;
             
-            return timeDiff > 0 && timeDiff <= twentyFourHoursInMinutes;
+            // Requirement: Time difference must be strictly greater than 24 hours
+            return timeDiffMs > twentyFourHoursInMs;
         });
     
         // Clear the current list
         eventsUl.innerHTML = '';
     
-        // Handle empty state
+        // 2. DYNAMIC EMPTY STATUS
         if (upcomingEvents.length === 0) {
-            eventsUl.innerHTML = '<li class="text-sm text-gray-500 italic">No upcoming events within 24 hours</li>';
+            eventsUl.innerHTML = '<li class="text-sm text-gray-500 italic">No upcoming events after 24 hours</li>';
             return;
         } 
         
-        // Populate the list with upcoming events
+        // 3. DYNAMIC LIST
         upcomingEvents.forEach(event => {
             const li = document.createElement('li');
             li.className = "p-2 bg-slate-100 dark:bg-slate-700 rounded border-l-4 border-teal-500 shadow-sm mb-2";
             
-            // Calculate how much longer it will take
-            const minutesDiff = event.start_minutes - currentSimMinutes;
+            // Calculate remaining time for the UI
+            const safeDateString = event.start_date.replace(' ', 'T');
+            const eventTime = new Date(safeDateString).getTime();
+            const diffInMinutes = Math.floor((eventTime - now) / (1000 * 60));
             
             li.innerHTML = `
                 <div class="font-bold text-sm">${event.name}</div>
-                <div class="text-xs text-gray-500 dark:text-gray-400">Starts in: ${formatRemainingTime(minutesDiff)}</div>
+                <div class="text-xs text-gray-500 dark:text-gray-400">Starts in: ${formatRemainingTime(diffInMinutes)}</div>
             `;
             eventsUl.appendChild(li);
         });

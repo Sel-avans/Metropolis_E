@@ -208,6 +208,8 @@ class SimulationEventController extends Controller
                     'id'                  => $event->id,
                     'name'                => $event->name,
                     'type'                => $event->type,
+                    'start_at'            => $event->start_moment,
+                    'end_at'              => $event->end_moment,
                     'recurring_schedule'  => $event->recurring_schedule,
                     'recurring_start_date'=> $event->recurring_start_date,
                     'recurring_end_date'  => $event->recurring_end_date,
