@@ -53,6 +53,7 @@ Route::middleware('auth')->group(function () {
             Route::post('/event-routes/start-point', [EventRouteController::class, 'store'])->name('event-routes.start-point');
             Route::get('/event-routes/{event}/endpoint-context', [EventRouteController::class, 'endpointContext'])->name('event-routes.endpoint-context');
             Route::post('/event-routes/{event}/endpoint', [EventRouteController::class, 'setEndpoint'])->name('event-routes.endpoint');
+            Route::delete('/event-routes/{event}/endpoint', [EventRouteController::class, 'destroyEndpoint'])->name('event-routes.endpoint.destroy');
             Route::delete('/event-routes/{event}', [EventRouteController::class, 'destroy'])->name('event-routes.destroy');
         });
     });

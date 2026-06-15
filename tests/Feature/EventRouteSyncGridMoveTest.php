@@ -225,6 +225,70 @@ class EventRouteSyncGridMoveTest extends TestCase
         ]);
     }
 
+    public function test_swapping_endpoint_with_occupied_cell_keeps_endpoint_coordinates(): void
+    {
+        $road = $this->createRoad();
+        $bikePath = CityFunction::factory()->create(['name' => 'Bicycle path']);
+        $store = CityFunction::factory()->create(['name' => 'Store']);
+        $event = SimulationEvent::create([
+            'name' => 'City Event',
+            'description' => 'Test',
+            'type' => 'one-off',
+            'start_moment' => '2026-06-01 10:00:00',
+            'end_moment' => '2026-06-01 18:00:00',
+        ]);
+
+        EventEffect::create([
+            'simulation_event_id' => $event->id,
+            'city_function_id' => $bikePath->id,
+            'modifier' => 0,
+        ]);
+
+        GridCell::factory()->create(['row' => 2, 'col' => 3, 'function_id' => $road->id]);
+        GridCell::factory()->create(['row' => 1, 'col' => 4, 'function_id' => $bikePath->id]);
+        GridCell::factory()->create(['row' => 2, 'col' => 4, 'function_id' => $store->id]);
+
+        EventRoute::create([
+            'simulation_event_id' => $event->id,
+            'start_row' => 2,
+            'start_col' => 3,
+            'end_row' => 1,
+            'end_col' => 4,
+            'end_function_id' => $bikePath->id,
+        ]);
+
+        $planner = $this->planner();
+
+        GridCell::where('row', 1)->where('col', 4)->update(['function_id' => null]);
+        GridCell::where('row', 2)->where('col', 4)->update(['function_id' => $bikePath->id]);
+        GridCell::where('row', 1)->where('col', 4)->update(['function_id' => $store->id]);
+
+        $this->actingAs($planner)->postJson('/event-routes/sync-grid-move', [
+            'old_row' => 1,
+            'old_col' => 4,
+            'new_row' => 2,
+            'new_col' => 4,
+            'function_id' => $bikePath->id,
+        ])->assertOk();
+
+        $this->actingAs($planner)->postJson('/event-routes/sync-grid-move', [
+            'old_row' => 2,
+            'old_col' => 4,
+            'new_row' => 1,
+            'new_col' => 4,
+            'function_id' => $store->id,
+        ])->assertOk();
+
+        $this->assertDatabaseHas('event_routes', [
+            'simulation_event_id' => $event->id,
+            'start_row' => 2,
+            'start_col' => 3,
+            'end_row' => 2,
+            'end_col' => 4,
+            'end_function_id' => $bikePath->id,
+        ]);
+    }
+
     public function test_removing_endpoint_function_from_grid_clears_stored_coordinates(): void
     {
         $road = $this->createRoad();

@@ -188,6 +188,34 @@ class EventRouteService
     }
 
     /**
+     * @return array{success: bool, route?: EventRoute, error?: string, message?: string}
+     */
+    public function clearEndpoint(SimulationEvent $event): array
+    {
+        $route = EventRoute::where('simulation_event_id', $event->id)->first();
+
+        if (!$route || $route->start_row === null || $route->start_col === null) {
+            return [
+                'success' => false,
+                'error' => 'missing_start_point',
+                'message' => 'Set a start point before managing an end point.',
+            ];
+        }
+
+        if ($route->end_row === null && $route->end_function_id === null) {
+            return [
+                'success' => false,
+                'error' => 'missing_endpoint',
+                'message' => 'This event has no end point to delete.',
+            ];
+        }
+
+        $route->update($this->clearEndpointAttributes());
+
+        return ['success' => true, 'route' => $route->fresh()->load('endFunction')];
+    }
+
+    /**
      * Keep stored route points aligned after a grid function move.
      *
      * @return list<EventRoute>
@@ -215,7 +243,7 @@ class EventRouteService
                     if ((int) $route->end_function_id === $functionId) {
                         $updates['end_row'] = $newRow;
                         $updates['end_col'] = $newCol;
-                    } else {
+                    } elseif (!$this->endpointFunctionIsOnGridCell($route, $oldRow, $oldCol)) {
                         $updates = array_merge($updates, $this->clearEndpointCoordinates());
                     }
                 }
@@ -425,6 +453,21 @@ class EventRouteService
     private function routeHasPlannedEndpoint(EventRoute $route): bool
     {
         return $route->end_row !== null || $route->end_function_id !== null;
+    }
+
+    private function endpointFunctionIsOnGridCell(EventRoute $route, int $row, int $col): bool
+    {
+        if ($route->end_function_id === null) {
+            return false;
+        }
+
+        $cell = GridCell::query()
+            ->where('row', $row)
+            ->where('col', $col)
+            ->first();
+
+        return $cell !== null
+            && (int) $cell->function_id === (int) $route->end_function_id;
     }
 
     private function validateRouteCells(EventRoute $route): void

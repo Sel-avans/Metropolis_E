@@ -63,6 +63,17 @@ class GridController extends Controller
                     ->where('col', $actionCol)
                     ->first();
 
+        $targetCell = GridCell::where('row', $newRow)
+            ->where('col', $newCol)
+            ->first();
+
+        $displacedFunctionId = $targetCell?->function_id;
+        $isSwap = $oldRow !== null
+            && $oldCol !== null
+            && $displacedFunctionId !== null
+            && $functionId !== null
+            && (int) $displacedFunctionId !== (int) $functionId;
+
         // Capture previous function id for rollback if needed
         $previousFunctionId = $actionCell ? $actionCell->function_id : null;
         // Sla de UndoAction op, nu inclusief new_row en new_col!
@@ -73,10 +84,10 @@ class GridController extends Controller
             'new_row' => $oldRow !== null ? $newRow : null,
             'new_col' => $oldRow !== null ? $newCol : null,
             'previous_function_id' => $actionCell ? $actionCell->function_id : null,
-            'action_type' => $oldRow !== null 
-                ? 'move' 
-                : ($functionId === null 
-                    ? 'remove' 
+            'action_type' => $oldRow !== null
+                ? ($isSwap ? 'swap' : 'move')
+                : ($functionId === null
+                    ? 'remove'
                     : ($actionCell && $actionCell->function_id ? 'replace' : 'insert')),
         ]);
 
@@ -146,11 +157,21 @@ class GridController extends Controller
             }
         }
 
-        // 3. Update of maak de nieuwe cel aan
-        GridCell::updateOrCreate(
-            ['row' => $newRow, 'col' => $newCol],
-            ['function_id' => $function->id]
-        );
+        // 3. Update of maak de nieuwe cel aan (of swap twee gridcellen)
+        if ($isSwap) {
+            GridCell::where('row', $oldRow)
+                ->where('col', $oldCol)
+                ->update(['function_id' => $displacedFunctionId]);
+
+            GridCell::where('row', $newRow)
+                ->where('col', $newCol)
+                ->update(['function_id' => $function->id]);
+        } else {
+            GridCell::updateOrCreate(
+                ['row' => $newRow, 'col' => $newCol],
+                ['function_id' => $function->id]
+            );
+        }
 
 
         $freshQol = QoLController::recalculateQoL();

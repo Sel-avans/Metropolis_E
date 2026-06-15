@@ -16,6 +16,21 @@ const ROUTE_STATUS = {
     },
     selectChangeRoadCell: 'Starting point selection is on. Select a new Road cell on the City Grid below — click the cell or focus it and press Enter.',
     invalidCell: 'This cell cannot be the start point. Select a cell that contains a Road function.',
+    invalidStartPointCell: 'This cell is not a valid starting point option. Choose a highlighted Road cell on the City Grid.',
+    invalidDropOnEndPoint: 'You cannot drop a function on the end point. Use Change end point or drag the end point function to another cell.',
+    invalidDropOnStartPoint: 'You cannot drop a function on the starting point. Use Change starting point or select a highlighted Road cell.',
+    cannotRemoveRouteStartPoint: `This function is the route starting point and cannot be removed from the grid. Use ${CHANGE_START_LABEL} in the route planner first.`,
+    cannotRemoveRouteEndPoint: `This function is the route end point and cannot be removed from the grid. Use ${CHANGE_END_LABEL} in the route planner first.`,
+    chooseStartPointCell(options) {
+        const locations = options
+            .map((option) => `row ${option.row}, column ${option.col}`)
+            .join('; ');
+
+        return {
+            visual: 'Choose which Road cell should be the starting point on the City Grid.',
+            announce: `Choose which Road cell should be the starting point: ${locations}.`,
+        };
+    },
     startPointSet(row, col) {
         return {
             visual: 'Start point saved on the City Grid.',
@@ -35,6 +50,7 @@ const ROUTE_STATUS = {
         };
     },
     startPointRemoved: `Start point removed. Press ${SET_START_LABEL} and select a Road cell to choose a new one.`,
+    endPointRemoved: `End point removed. Press ${SET_END_LABEL} and choose an assigned function to set a new one.`,
     placeRoadOnGrid: `Place ${MAIN_ACCESS_ROAD_NAME} on the City Grid to set the start point.`,
     placeRoadOnGridToChange(row, col) {
         return {
@@ -51,6 +67,16 @@ const ROUTE_STATUS = {
         return {
             visual: `Choose which ${name} cell should be the end point on the City Grid.`,
             announce: `Choose which ${name} cell should be the end point: ${locations}.`,
+        };
+    },
+    chooseEndpointCellForChange(name, options) {
+        const locations = options
+            .map((option) => `row ${option.row}, column ${option.col}`)
+            .join('; ');
+
+        return {
+            visual: `Choose another ${name} cell for the end point, or select the current end point to drag it elsewhere on the City Grid.`,
+            announce: `Change end point mode is on. Choose another ${name} cell for the end point at ${locations}, or select the current end point to drag it elsewhere on the City Grid.`,
         };
     },
     endpointSet(name, row, col) {
@@ -83,8 +109,10 @@ const ROUTE_STATUS = {
     eventWithStartOnly: 'Start point is shown on the City Grid for the selected event.',
     saving: 'Saving start point…',
     removing: 'Removing start point…',
+    removingEnd: 'Removing end point…',
     saveFailed: 'Could not save the start point. Please try again.',
     removeFailed: 'Could not remove the start point. Please try again.',
+    removeEndFailed: 'Could not remove the end point. Please try again.',
 };
 
 let routePlannerEnabled = false;
@@ -93,6 +121,9 @@ let endPointMode = false;
 let endpointDragMode = false;
 let endpointCellChoiceMode = false;
 let endpointCellOptions = [];
+let endpointChangeSameFunctionChoice = false;
+let startPointCellChoiceMode = false;
+let startPointCellOptions = [];
 let waitingForFunctionId = null;
 let waitingForRoadPlacement = false;
 let waitingForRoadPlacementChange = false;
@@ -102,6 +133,11 @@ let selectedEventId = null;
 let eventRoutes = [];
 let roadFunctionIds = [];
 let routesFetchGeneration = 0;
+let onRouteGridRenderCallback = null;
+
+export function setRouteGridRenderCallback(callback) {
+    onRouteGridRenderCallback = callback;
+}
 const gridCellAriaBackup = new WeakMap();
 
 function csrfToken() {
@@ -162,6 +198,76 @@ function isRoutePointCell(cell) {
     return null;
 }
 
+function getRoutesForRemovalProtection() {
+    if (!routePlannerEnabled || eventRoutes.length === 0 || !selectedEventId) {
+        return [];
+    }
+
+    return eventRoutes.filter((route) => Number(route.event_id) === Number(selectedEventId));
+}
+
+function getRoutePointTypeForAnyRoute(cell) {
+    if (!routePlannerEnabled || !cell) {
+        return null;
+    }
+
+    const routes = getRoutesForRemovalProtection();
+    if (routes.length === 0) {
+        return null;
+    }
+
+    const row = Number(cell.dataset.row);
+    const col = Number(cell.dataset.col);
+    const img = cell.querySelector('.grid-function-icon');
+    const functionId = img ? Number(img.dataset.functionId) : null;
+
+    if (functionId === null || Number.isNaN(functionId)) {
+        return null;
+    }
+
+    for (const route of routes) {
+        if (
+            route.start_row != null
+            && route.start_col != null
+            && Number(route.start_row) === row
+            && Number(route.start_col) === col
+        ) {
+            return 'start';
+        }
+
+        if (
+            route.end_row != null
+            && route.end_col != null
+            && Number(route.end_row) === row
+            && Number(route.end_col) === col
+            && Number(route.end_function_id) === functionId
+        ) {
+            return 'end';
+        }
+    }
+
+    return null;
+}
+
+export function canRemoveGridFunction(cell) {
+    return getRoutePointTypeForAnyRoute(cell) === null;
+}
+
+export function handleBlockedRoutePointRemoval(cell) {
+    const routePoint = getRoutePointTypeForAnyRoute(cell);
+    if (!routePoint) {
+        return;
+    }
+
+    const message = routePoint === 'start'
+        ? ROUTE_STATUS.cannotRemoveRouteStartPoint
+        : ROUTE_STATUS.cannotRemoveRouteEndPoint;
+
+    setPairedStatus(message, 'info');
+    announceStatus(message);
+    renderRouteOnGrid();
+}
+
 export function canDragRouteCell(cell) {
     if (!routePlannerEnabled || !selectedEventId || !cell) {
         return true;
@@ -180,11 +286,81 @@ export function canDragRouteCell(cell) {
 }
 
 export function canDropOnRouteCell(cell) {
-    return isRoutePointCell(cell) === null;
+    if (!routePlannerEnabled || !selectedEventId || !cell) {
+        return true;
+    }
+
+    if (endpointDragMode) {
+        if (isRoutePointCell(cell) === 'start' || cell.classList.contains('route-start-point')) {
+            return false;
+        }
+
+        return true;
+    }
+
+    if (
+        cell.classList.contains('route-start-point')
+        || cell.classList.contains('route-end-point')
+    ) {
+        return false;
+    }
+
+    if (isRoutePointCell(cell) !== null) {
+        return false;
+    }
+
+    if (startPointCellChoiceMode || endpointCellChoiceMode) {
+        return false;
+    }
+
+    if (startPointMode || endPointMode) {
+        return false;
+    }
+
+    return true;
+}
+
+export function handleInvalidRouteCellDrop(cell) {
+    if (!routePlannerEnabled || !selectedEventId || !cell) {
+        return;
+    }
+
+    const row = Number(cell.dataset.row);
+    const col = Number(cell.dataset.col);
+
+    if (startPointCellChoiceMode) {
+        handleInvalidStartPointClick(row, col);
+        return;
+    }
+
+    if (endpointCellChoiceMode) {
+        handleInvalidEndpointClick(cell);
+        return;
+    }
+
+    const routePoint = isRoutePointCell(cell);
+    if (routePoint === 'end' || cell.classList.contains('route-end-point')) {
+        setPairedStatus(ROUTE_STATUS.invalidDropOnEndPoint, 'info');
+    } else if (routePoint === 'start' || cell.classList.contains('route-start-point')) {
+        setPairedStatus(ROUTE_STATUS.invalidDropOnStartPoint, 'info');
+    } else if (startPointMode) {
+        handleInvalidStartPointClick(row, col);
+        return;
+    } else if (endPointMode || endpointDragMode) {
+        handleInvalidEndpointClick(cell);
+        return;
+    } else {
+        setPairedStatus(ROUTE_STATUS.invalidDropOnEndPoint, 'info');
+    }
+
+    renderRouteOnGrid();
+    updateStartPointButtonState();
+    updateDeleteButtonStates();
+    updateEndpointControlsVisibility();
 }
 
 export function shouldBlockGridCellDrag() {
-    return startPointMode || endpointCellChoiceMode;
+    return startPointMode || endpointCellChoiceMode || startPointCellChoiceMode;
 }
 
 function syncRoutePointDraggability() {
@@ -269,6 +445,23 @@ function getRoadCellsOnGrid() {
     return placements;
 }
 
+function getSelectableRoadCellsForStartSet() {
+    const route = getSelectedEventRoute();
+
+    return getRoadCellsOnGrid().filter((placement) => {
+        if (
+            route?.end_row != null
+            && route?.end_col != null
+            && Number(route.end_row) === placement.row
+            && Number(route.end_col) === placement.col
+        ) {
+            return false;
+        }
+
+        return true;
+    });
+}
+
 function getSelectableRoadCellsForStartChange() {
     const route = getSelectedEventRoute();
 
@@ -297,6 +490,8 @@ function getSelectableRoadCellsForStartChange() {
 
 function clearStartPointModes() {
     startPointMode = false;
+    startPointCellChoiceMode = false;
+    startPointCellOptions = [];
     waitingForRoadPlacement = false;
     waitingForRoadPlacementChange = false;
 }
@@ -326,8 +521,8 @@ function isMainAccessRoadCell(cell) {
 
 function clearRouteMarkers() {
     document.querySelectorAll('.route-start-marker, .route-end-marker').forEach((marker) => marker.remove());
-    document.querySelectorAll('.grid-cell.route-start-point, .grid-cell.route-end-point, .grid-cell.route-endpoint-option').forEach((cell) => {
-        cell.classList.remove('route-start-point', 'route-end-point', 'route-endpoint-option');
+    document.querySelectorAll('.grid-cell.route-start-point, .grid-cell.route-end-point, .grid-cell.route-endpoint-option, .grid-cell.route-startpoint-option').forEach((cell) => {
+        cell.classList.remove('route-start-point', 'route-end-point', 'route-endpoint-option', 'route-startpoint-option');
         restoreGridCellAriaLabel(cell);
     });
 }
@@ -411,7 +606,7 @@ function restoreGridCellAriaLabel(cell) {
     gridCellAriaBackup.delete(cell);
 }
 
-function highlightEndpointCellOptions(options, functionName) {
+function highlightEndpointCellOptions(options, functionName, { changeSameFunction = false } = {}) {
     options.forEach((option) => {
         const cell = document.querySelector(
             `.grid-cell[data-row="${option.row}"][data-col="${option.col}"]`
@@ -420,11 +615,55 @@ function highlightEndpointCellOptions(options, functionName) {
 
         cell.classList.add('route-endpoint-option');
         backupGridCellAriaLabel(cell);
+        const isCurrentEnd = changeSameFunction && isCurrentEndpointCell(option.row, option.col);
+        if (isCurrentEnd) {
+            cell.setAttribute(
+                'aria-label',
+                `Current end point: ${functionName} at row ${option.row}, column ${option.col} on the City Grid. Click this cell to drag it to another location.`
+            );
+        } else {
+            cell.setAttribute(
+                'aria-label',
+                `${functionName} end point option at row ${option.row}, column ${option.col} on the City Grid.`
+            );
+        }
+    });
+}
+
+function highlightStartPointCellOptions(options) {
+    options.forEach((option) => {
+        const cell = document.querySelector(
+            `.grid-cell[data-row="${option.row}"][data-col="${option.col}"]`
+        );
+        if (!cell) return;
+
+        cell.classList.add('route-startpoint-option');
+        backupGridCellAriaLabel(cell);
         cell.setAttribute(
             'aria-label',
-            `${functionName} end point option at row ${option.row}, column ${option.col} on the City Grid.`
+            `Road starting point option at row ${option.row}, column ${option.col} on the City Grid.`
         );
     });
+}
+
+function isCurrentStartPoint(row, col) {
+    const route = getSelectedEventRoute();
+    return route?.start_row != null
+        && route?.start_col != null
+        && Number(route.start_row) === Number(row)
+        && Number(route.start_col) === Number(col);
+}
+
+function isValidNewStartPointCell(cell, row, col) {
+    if (isCurrentStartPoint(row, col)) {
+        return false;
+    }
+
+    if (!isMainAccessRoadCell(cell)) {
+        return false;
+    }
+
+    return isRoutePointCell(cell) !== 'end';
 }
 
 function isChangingStartPoint() {
@@ -432,35 +671,52 @@ function isChangingStartPoint() {
     return startPointMode && route?.start_row != null && route?.start_col != null;
 }
 
+function handleInvalidStartPointClick(row, col) {
+    startPointMode = true;
+    const message = startPointCellChoiceMode
+        ? ROUTE_STATUS.invalidStartPointCell
+        : ROUTE_STATUS.invalidCell;
+    setPairedStatus(message, 'info');
+    renderRouteOnGrid();
+    updateStartPointButtonState();
+    updateDeleteButtonStates();
+    updateEndpointControlsVisibility();
+}
+
 function renderRouteOnGrid() {
     clearRouteMarkers();
 
     const route = getSelectedEventRoute();
-    if (route) {
-        if (route.start_row != null && route.start_col != null) {
-            const startCell = document.querySelector(
-                `.grid-cell[data-row="${route.start_row}"][data-col="${route.start_col}"]`
-            );
-            if (startCell) {
-                applyStartPointMarker(startCell);
-                if (isChangingStartPoint()) {
-                    backupGridCellAriaLabel(startCell);
-                    startCell.setAttribute(
-                        'aria-label',
-                        `Current start point at row ${route.start_row}, column ${route.start_col} on the City Grid. Select a new Road cell to change the starting point.`
-                    );
-                } else {
-                    backupGridCellAriaLabel(startCell);
-                    startCell.setAttribute(
-                        'aria-label',
-                        `Start point at row ${route.start_row}, column ${route.start_col} on the City Grid. Use ${CHANGE_START_LABEL} to move it.`
-                    );
-                }
+
+    if (route?.start_row != null && route?.start_col != null) {
+        const startCell = document.querySelector(
+            `.grid-cell[data-row="${route.start_row}"][data-col="${route.start_col}"]`
+        );
+        if (startCell) {
+            applyStartPointMarker(startCell);
+            if (isChangingStartPoint()) {
+                backupGridCellAriaLabel(startCell);
+                startCell.setAttribute(
+                    'aria-label',
+                    `Current start point at row ${route.start_row}, column ${route.start_col} on the City Grid. Select a new Road cell to change the starting point.`
+                );
+            } else {
+                backupGridCellAriaLabel(startCell);
+                startCell.setAttribute(
+                    'aria-label',
+                    `Start point at row ${route.start_row}, column ${route.start_col} on the City Grid. Use ${CHANGE_START_LABEL} to move it.`
+                );
             }
         }
+    }
 
+    if (route) {
         if (endpointCellChoiceMode) {
-            highlightEndpointCellOptions(endpointCellOptions, getSelectedFunctionName(selectedEndpointFunctionId));
+            highlightEndpointCellOptions(
+                endpointCellOptions,
+                getSelectedFunctionName(selectedEndpointFunctionId),
+                { changeSameFunction: endpointChangeSameFunctionChoice }
+            );
         } else if (endpointDragMode && route.end_row != null && route.end_col != null) {
             const endCell = document.querySelector(
                 `.grid-cell[data-row="${route.end_row}"][data-col="${route.end_col}"]`
@@ -488,7 +744,12 @@ function renderRouteOnGrid() {
         }
     }
 
+    if (startPointCellChoiceMode) {
+        highlightStartPointCellOptions(startPointCellOptions);
+    }
+
     syncRoutePointDraggability();
+    onRouteGridRenderCallback?.();
 }
 
 function getSelectedEventRoute() {
@@ -505,20 +766,109 @@ function clearEndpointModes() {
     endpointDragMode = false;
     endpointCellChoiceMode = false;
     endpointCellOptions = [];
+    endpointChangeSameFunctionChoice = false;
     waitingForFunctionId = null;
     selectedEndpointFunctionId = null;
     assignedFunctions = [];
+}
+
+function isCurrentEndpointCell(row, col) {
+    const route = getSelectedEventRoute();
+    return route?.end_row != null
+        && route?.end_col != null
+        && Number(route.end_row) === Number(row)
+        && Number(route.end_col) === Number(col);
+}
+
+function enterEndpointDragMode(functionId = null) {
+    if (functionId != null) {
+        selectedEndpointFunctionId = Number(functionId);
+    }
+    waitingForFunctionId = null;
+    endpointCellChoiceMode = false;
+    endpointCellOptions = [];
+    endpointChangeSameFunctionChoice = false;
+    endpointDragMode = true;
+    endPointMode = true;
+    renderRouteOnGrid();
+    updateStartPointButtonState();
+    updateEndpointControlsVisibility();
+    setPairedStatus(
+        ROUTE_STATUS.dragEndpointToCell(getSelectedFunctionName(selectedEndpointFunctionId)),
+        'info'
+    );
+}
+
+function completeEndpointDragChange() {
+    const route = getSelectedEventRoute();
+    const functionName = route?.end_function_name
+        || getSelectedFunctionName(selectedEndpointFunctionId);
+    const endRow = route?.end_row;
+    const endCol = route?.end_col;
+
+    clearEndpointModes();
+    renderRouteOnGrid();
+    updateStartPointButtonState();
+    updateDeleteButtonStates();
+    updateEndpointControlsVisibility();
+
+    if (endRow != null && endCol != null) {
+        setPairedStatus(ROUTE_STATUS.endpointChanged(functionName, endRow, endCol), 'info');
+    } else {
+        updateStatusForSelectedEvent();
+    }
+}
+
+function updateRoutePlannerToolbarVisibility() {
+    const toolbar = document.getElementById('route-planner-toolbar');
+    const hasEvent = Boolean(selectedEventId);
+    const route = getSelectedEventRoute();
+    const hasStartPoint = Boolean(route?.start_row != null && route?.start_col != null);
+
+    document.querySelectorAll('.route-point-col').forEach((element) => {
+        element.classList.toggle('hidden', !hasEvent);
+    });
+
+    document.querySelectorAll('.route-end-col').forEach((element) => {
+        element.classList.toggle('hidden', !hasEvent || !hasStartPoint);
+    });
+
+    if (!toolbar) {
+        return;
+    }
+
+    toolbar.classList.remove(
+        'grid-cols-1',
+        'grid-cols-[minmax(0,1fr)_9.5rem]',
+        'grid-cols-[minmax(0,1fr)_9.5rem_9.5rem]'
+    );
+
+    if (!hasEvent) {
+        toolbar.classList.add('grid-cols-1');
+        return;
+    }
+
+    if (hasStartPoint) {
+        toolbar.classList.add('grid-cols-[minmax(0,1fr)_9.5rem_9.5rem]');
+        return;
+    }
+
+    toolbar.classList.add('grid-cols-[minmax(0,1fr)_9.5rem]');
 }
 
 function updateEndpointControlsVisibility() {
     const controls = document.getElementById('route-endpoint-controls');
     const functionSelect = document.getElementById('route-endpoint-function-select');
     const endBtn = document.getElementById('route-set-end-btn');
+    const removeEndBtn = document.getElementById('route-remove-end-btn');
     const route = getSelectedEventRoute();
     const hasStartPoint = Boolean(route?.start_row != null && route?.start_col != null);
+    const hasEndPoint = Boolean(
+        (route?.end_row != null && route?.end_col != null)
+        || route?.end_function_id != null
+    );
 
     if (endBtn) {
-        endBtn.hidden = !hasStartPoint;
         endBtn.disabled = !selectedEventId || !hasStartPoint || startPointMode;
         endBtn.textContent = route?.end_row != null ? CHANGE_END_LABEL : SET_END_LABEL;
         endBtn.setAttribute('aria-pressed', endPointMode ? 'true' : 'false');
@@ -530,8 +880,10 @@ function updateEndpointControlsVisibility() {
                     ? 'Change end point for the selected event'
                     : 'Set end point for the selected event')
         );
-        endBtn.classList.toggle('ring-2', endPointMode);
-        endBtn.classList.toggle('ring-sky-400', endPointMode);
+    }
+
+    if (removeEndBtn) {
+        removeEndBtn.disabled = !hasEndPoint || startPointMode || endPointMode;
     }
 
     if (!controls || !functionSelect) return;
@@ -576,19 +928,28 @@ function updateStartPointButtonState() {
                 ? 'Change starting point on a Road cell in the City Grid'
                 : 'Set start point on a Road cell in the City Grid')
     );
-    btn.classList.toggle('ring-2', startPointMode);
-    btn.classList.toggle('ring-emerald-400', startPointMode);
 
+    updateRoutePlannerToolbarVisibility();
     updateEndpointControlsVisibility();
 }
 
-function updateRemoveButtonState() {
-    const btn = document.getElementById('route-remove-start-btn');
-    if (!btn) return;
-
+function updateDeleteButtonStates() {
+    const removeStartBtn = document.getElementById('route-remove-start-btn');
+    const removeEndBtn = document.getElementById('route-remove-end-btn');
     const route = getSelectedEventRoute();
     const hasStartPoint = Boolean(route?.start_row != null && route?.start_col != null);
-    btn.disabled = !hasStartPoint || endPointMode;
+    const hasEndPoint = Boolean(
+        (route?.end_row != null && route?.end_col != null)
+        || route?.end_function_id != null
+    );
+
+    if (removeStartBtn) {
+        removeStartBtn.disabled = !hasStartPoint || endPointMode;
+    }
+
+    if (removeEndBtn) {
+        removeEndBtn.disabled = !hasEndPoint || startPointMode || endPointMode;
+    }
 }
 
 function updateStatusForSelectedEvent() {
@@ -607,13 +968,22 @@ function updateStatusForSelectedEvent() {
         return;
     }
 
+    if (startPointCellChoiceMode) {
+        setStatus(ROUTE_STATUS.chooseStartPointCell(startPointCellOptions).visual);
+        return;
+    }
+
     if (endpointCellChoiceMode) {
-        setStatus(
-            ROUTE_STATUS.chooseEndpointCell(
+        const status = endpointChangeSameFunctionChoice
+            ? ROUTE_STATUS.chooseEndpointCellForChange(
                 getSelectedFunctionName(selectedEndpointFunctionId),
                 endpointCellOptions
-            ).visual
-        );
+            )
+            : ROUTE_STATUS.chooseEndpointCell(
+                getSelectedFunctionName(selectedEndpointFunctionId),
+                endpointCellOptions
+            );
+        setStatus(status.visual);
         return;
     }
 
@@ -663,7 +1033,7 @@ function populateEventSelect(events) {
     if (!select) return;
 
     const currentValue = select.value;
-    select.innerHTML = '<option value="">— Select —</option>';
+    select.innerHTML = '<option value="">— Event —</option>';
 
     events.forEach((event) => {
         const option = document.createElement('option');
@@ -709,7 +1079,7 @@ async function fetchEventRoutes() {
         roadFunctionIds = roadFunctionIds.map((id) => Number(id)).filter((id) => !Number.isNaN(id));
         renderRouteOnGrid();
         updateStartPointButtonState();
-        updateRemoveButtonState();
+        updateDeleteButtonStates();
         updateStatusForSelectedEvent();
     } catch (error) {
         if (generation !== routesFetchGeneration) return;
@@ -738,6 +1108,17 @@ async function saveEndpoint(functionId, row = null, col = null, { isAuto = false
 
     const routeBefore = getSelectedEventRoute();
     const hadEndpoint = Boolean(routeBefore?.end_row != null && routeBefore?.end_col != null);
+    const isSameEndpoint = hadEndpoint
+        && row != null
+        && col != null
+        && Number(routeBefore.end_row) === Number(row)
+        && Number(routeBefore.end_col) === Number(col)
+        && Number(routeBefore.end_function_id) === Number(functionId);
+
+    if (isSameEndpoint && (endpointCellChoiceMode || endPointMode) && !endpointDragMode) {
+        enterEndpointDragMode(functionId);
+        return false;
+    }
 
     try {
         const payload = { function_id: functionId };
@@ -798,11 +1179,12 @@ async function saveEndpoint(functionId, row = null, col = null, { isAuto = false
         waitingForFunctionId = null;
         endpointCellChoiceMode = false;
         endpointCellOptions = [];
+        endpointChangeSameFunctionChoice = false;
         endpointDragMode = false;
         endPointMode = false;
         renderRouteOnGrid();
         updateStartPointButtonState();
-        updateRemoveButtonState();
+        updateDeleteButtonStates();
 
         let status;
         if (hadEndpoint) {
@@ -839,6 +1221,7 @@ async function processSelectedFunction(functionEntry, { changing = false } = {})
     waitingForFunctionId = null;
     endpointCellChoiceMode = false;
     endpointCellOptions = [];
+    endpointChangeSameFunctionChoice = false;
     endpointDragMode = false;
     endPointMode = true;
 
@@ -859,11 +1242,17 @@ async function processSelectedFunction(functionEntry, { changing = false } = {})
     }
 
     if (isSameFunctionAsCurrentEndpoint) {
-        endpointDragMode = true;
+        if (placements.length <= 1) {
+            enterEndpointDragMode(functionEntry.id);
+            announceStatus(ROUTE_STATUS.dragEndpointToCell(functionEntry.name));
+            return;
+        }
+
+        endpointCellChoiceMode = true;
+        endpointChangeSameFunctionChoice = true;
+        endpointCellOptions = placements;
         renderRouteOnGrid();
-        const message = ROUTE_STATUS.dragEndpointToCell(functionEntry.name);
-        setStatus(message);
-        announceStatus(message);
+        setPairedStatus(ROUTE_STATUS.chooseEndpointCellForChange(functionEntry.name, placements));
         return;
     }
 
@@ -885,6 +1274,63 @@ async function processSelectedFunction(functionEntry, { changing = false } = {})
     setPairedStatus(ROUTE_STATUS.chooseEndpointCell(functionEntry.name, placements));
 }
 
+async function activateStartPointMode() {
+    if (!selectedEventId || endPointMode) return;
+
+    if (startPointMode) {
+        clearStartPointModes();
+        updateStartPointButtonState();
+        renderRouteOnGrid();
+        updateStatusForSelectedEvent();
+        return;
+    }
+
+    startPointMode = true;
+    clearEndpointModes();
+    startPointCellChoiceMode = false;
+    startPointCellOptions = [];
+    updateStartPointButtonState();
+    renderRouteOnGrid();
+
+    const route = getSelectedEventRoute();
+    const isChanging = Boolean(route?.start_row != null && route?.start_col != null);
+    const placements = isChanging
+        ? getSelectableRoadCellsForStartChange()
+        : getSelectableRoadCellsForStartSet();
+
+    if (placements.length === 0) {
+        waitingForRoadPlacement = true;
+        waitingForRoadPlacementChange = isChanging;
+        const status = isChanging
+            ? ROUTE_STATUS.placeRoadOnGridToChange(route.start_row, route.start_col)
+            : ROUTE_STATUS.placeRoadOnGrid;
+        setPairedStatus(status);
+        return;
+    }
+
+    waitingForRoadPlacement = false;
+    waitingForRoadPlacementChange = false;
+
+    if (placements.length === 1) {
+        void saveStartPoint(placements[0].row, placements[0].col, { isAuto: !isChanging });
+        return;
+    }
+
+    startPointCellChoiceMode = true;
+    startPointCellOptions = placements;
+    renderRouteOnGrid();
+
+    if (isChanging) {
+        setPairedStatus({
+            visual: ROUTE_STATUS.chooseStartPointCell(placements).visual,
+            announce: `Change starting point mode is on. The current start point is at row ${route.start_row}, column ${route.start_col}. ${ROUTE_STATUS.chooseStartPointCell(placements).announce}`,
+        });
+        return;
+    }
+
+    setPairedStatus(ROUTE_STATUS.chooseStartPointCell(placements));
+}
+
 async function activateEndPointMode() {
     if (!selectedEventId || !getSelectedEventRoute()) return;
 
@@ -894,7 +1340,7 @@ async function activateEndPointMode() {
         clearEndpointModes();
         renderRouteOnGrid();
         updateStartPointButtonState();
-        updateRemoveButtonState();
+        updateDeleteButtonStates();
         updateStatusForSelectedEvent();
         return;
     }
@@ -915,7 +1361,7 @@ async function activateEndPointMode() {
 
         populateEndpointFunctionSelect(assignedFunctions);
         updateStartPointButtonState();
-        updateRemoveButtonState();
+        updateDeleteButtonStates();
 
         if (assignedFunctions.length === 1) {
             const route = getSelectedEventRoute();
@@ -942,6 +1388,11 @@ async function saveStartPoint(row, col, { isAuto = false } = {}) {
     const routeBefore = getSelectedEventRoute();
     const hadStartPoint = Boolean(routeBefore?.start_row != null && routeBefore?.start_col != null);
 
+    if (isCurrentStartPoint(row, col)) {
+        handleInvalidStartPointClick(row, col);
+        return false;
+    }
+
     try {
         const response = await fetch('/event-routes/start-point', {
             method: 'POST',
@@ -960,6 +1411,17 @@ async function saveStartPoint(row, col, { isAuto = false } = {}) {
 
         if (!response.ok || !data.success) {
             announceAndSetStatus(data.message || ROUTE_STATUS.invalidCell, 'info');
+            handleInvalidStartPointClick(row, col);
+            return false;
+        }
+
+        const unchangedStartPoint = hadStartPoint
+            && Number(routeBefore.start_row) === Number(data.route.start_row)
+            && Number(routeBefore.start_col) === Number(data.route.start_col);
+
+        if (unchangedStartPoint) {
+            upsertSelectedRoute(routeBefore);
+            handleInvalidStartPointClick(row, col);
             return false;
         }
 
@@ -968,7 +1430,7 @@ async function saveStartPoint(row, col, { isAuto = false } = {}) {
         clearEndpointModes();
         updateStartPointButtonState();
         renderRouteOnGrid();
-        updateRemoveButtonState();
+        updateDeleteButtonStates();
         let status;
         if (hadStartPoint) {
             status = ROUTE_STATUS.startPointChanged(data.route.start_row, data.route.start_col);
@@ -982,7 +1444,59 @@ async function saveStartPoint(row, col, { isAuto = false } = {}) {
     } catch (error) {
         console.error('Failed to save start point:', error);
         announceAndSetStatus(ROUTE_STATUS.saveFailed, 'info');
+        handleInvalidStartPointClick(row, col);
         return false;
+    }
+}
+
+async function removeEndPoint() {
+    if (!selectedEventId) return;
+
+    const route = getSelectedEventRoute();
+    if (!route || (route.end_row == null && route.end_function_id == null)) return;
+
+    invalidateRoutesFetch();
+    clearEndpointModes();
+
+    upsertSelectedRoute({
+        ...route,
+        end_row: null,
+        end_col: null,
+        end_function_id: null,
+        end_function_name: null,
+    });
+
+    clearRouteMarkers();
+    updateStartPointButtonState();
+    updateDeleteButtonStates();
+    setStatus(ROUTE_STATUS.removingEnd);
+
+    try {
+        const response = await fetch(`/event-routes/${selectedEventId}/endpoint`, {
+            method: 'DELETE',
+            credentials: 'same-origin',
+            headers: {
+                'X-CSRF-TOKEN': csrfToken(),
+                Accept: 'application/json',
+            },
+        });
+
+        const data = await response.json().catch(() => ({}));
+        if (!response.ok || !data.success) {
+            await fetchEventRoutes();
+            announceAndSetStatus(data.message || ROUTE_STATUS.removeEndFailed, 'info');
+            return;
+        }
+
+        upsertSelectedRoute(data.route);
+        renderRouteOnGrid();
+        updateStartPointButtonState();
+        updateDeleteButtonStates();
+        announceAndSetStatus(ROUTE_STATUS.endPointRemoved, 'info');
+    } catch (error) {
+        console.error('Failed to remove end point:', error);
+        await fetchEventRoutes();
+        announceAndSetStatus(ROUTE_STATUS.removeEndFailed, 'info');
     }
 }
 
@@ -1000,7 +1514,7 @@ async function removeStartPoint() {
     clearRouteMarkers();
     clearStartPointForCell(removedRow, removedCol);
     updateStartPointButtonState();
-    updateRemoveButtonState();
+    updateDeleteButtonStates();
     setStatus(ROUTE_STATUS.removing);
 
     try {
@@ -1022,7 +1536,7 @@ async function removeStartPoint() {
 
         renderRouteOnGrid();
         updateStartPointButtonState();
-        updateRemoveButtonState();
+        updateDeleteButtonStates();
         announceAndSetStatus(ROUTE_STATUS.startPointRemoved, 'info');
     } catch (error) {
         console.error('Failed to remove start point:', error);
@@ -1033,6 +1547,12 @@ async function removeStartPoint() {
 
 function isEndpointOptionCell(row, col) {
     return endpointCellOptions.some(
+        (option) => Number(option.row) === row && Number(option.col) === col
+    );
+}
+
+function isStartPointOptionCell(row, col) {
+    return startPointCellOptions.some(
         (option) => Number(option.row) === row && Number(option.col) === col
     );
 }
@@ -1150,7 +1670,7 @@ export async function handleGridFunctionRemoved(row, col, functionId) {
         applyRoutePointRemovalState(removalImpact);
         renderRouteOnGrid();
         updateStartPointButtonState();
-        updateRemoveButtonState();
+        updateDeleteButtonStates();
         updateEndpointControlsVisibility();
 
         if (removalImpact.end && endPointMode && waitingForFunctionId) {
@@ -1158,7 +1678,7 @@ export async function handleGridFunctionRemoved(row, col, functionId) {
             return;
         }
 
-        if (!endPointMode && !startPointMode && !waitingForFunctionId && !waitingForRoadPlacement && !endpointDragMode) {
+        if (!endPointMode && !startPointMode && !waitingForFunctionId && !waitingForRoadPlacement && !endpointDragMode && !startPointCellChoiceMode) {
             updateStatusForSelectedEvent();
         }
     } catch (error) {
@@ -1202,10 +1722,10 @@ export async function handleGridFunctionMoved(oldRow, oldCol, newRow, newCol, fu
         eventRoutes = data.routes ?? [];
         renderRouteOnGrid();
         updateStartPointButtonState();
-        updateRemoveButtonState();
+        updateDeleteButtonStates();
         updateEndpointControlsVisibility();
 
-        if (!endPointMode && !startPointMode && !waitingForFunctionId && !waitingForRoadPlacement && !endpointDragMode) {
+        if (!endPointMode && !startPointMode && !waitingForFunctionId && !waitingForRoadPlacement && !endpointDragMode && !startPointCellChoiceMode) {
             updateStatusForSelectedEvent();
         }
     } catch (error) {
@@ -1241,18 +1761,7 @@ export function handleGridFunctionPlaced(cell, functionId) {
     const route = getSelectedEventRoute();
 
     if (endpointDragMode) {
-        if (
-            route?.end_row != null
-            && route?.end_col != null
-            && Number(route.end_row) === row
-            && Number(route.end_col) === col
-        ) {
-            setStatus(ROUTE_STATUS.dragEndpointToCell(getSelectedFunctionName(normalizedFunctionId)));
-            announceStatus(ROUTE_STATUS.dragEndpointToCell(getSelectedFunctionName(normalizedFunctionId)));
-            return;
-        }
-
-        saveEndpoint(normalizedFunctionId, row, col);
+        completeEndpointDragChange();
         return;
     }
 
@@ -1271,11 +1780,30 @@ export function handleRouteCellClick(cell) {
 
     if (endpointCellChoiceMode) {
         if (isEndpointOptionCell(row, col)) {
+            const route = getSelectedEventRoute();
+            const clickingCurrentEnd = isCurrentEndpointCell(row, col)
+                && Number(route?.end_function_id) === Number(selectedEndpointFunctionId);
+
+            if (clickingCurrentEnd) {
+                enterEndpointDragMode();
+                return true;
+            }
+
             saveEndpoint(selectedEndpointFunctionId, row, col);
             return true;
         }
 
         handleInvalidEndpointClick(cell);
+        return true;
+    }
+
+    if (startPointCellChoiceMode) {
+        if (isStartPointOptionCell(row, col)) {
+            saveStartPoint(row, col);
+            return true;
+        }
+
+        handleInvalidStartPointClick(row, col);
         return true;
     }
 
@@ -1299,25 +1827,8 @@ export function handleRouteCellClick(cell) {
         return false;
     }
 
-    if (!isMainAccessRoadCell(cell)) {
-        announceAndSetStatus(ROUTE_STATUS.invalidCell, 'info');
-        renderRouteOnGrid();
-        updateStartPointButtonState();
-        return true;
-    }
-
-    const routePoint = isRoutePointCell(cell);
-    if (routePoint === 'start') {
-        announceAndSetStatus(ROUTE_STATUS.invalidCell, 'info');
-        renderRouteOnGrid();
-        updateStartPointButtonState();
-        return true;
-    }
-
-    if (routePoint === 'end') {
-        announceAndSetStatus(ROUTE_STATUS.invalidCell, 'info');
-        renderRouteOnGrid();
-        updateStartPointButtonState();
+    if (!isValidNewStartPointCell(cell, row, col)) {
+        handleInvalidStartPointClick(row, col);
         return true;
     }
 
@@ -1332,7 +1843,7 @@ export function syncRoutePlannerEvents(events) {
     populateEventSelect(events);
     renderRouteOnGrid();
     updateStartPointButtonState();
-    updateRemoveButtonState();
+    updateDeleteButtonStates();
     updateStatusForSelectedEvent();
 }
 
@@ -1348,6 +1859,7 @@ export function initRoutePlanner() {
     const setEndBtn = document.getElementById('route-set-end-btn');
     const functionSelect = document.getElementById('route-endpoint-function-select');
     const removeStartBtn = document.getElementById('route-remove-start-btn');
+    const removeEndBtn = document.getElementById('route-remove-end-btn');
 
     eventSelect?.addEventListener('change', () => {
         selectedEventId = eventSelect.value ? Number(eventSelect.value) : null;
@@ -1355,48 +1867,12 @@ export function initRoutePlanner() {
         clearEndpointModes();
         renderRouteOnGrid();
         updateStartPointButtonState();
-        updateRemoveButtonState();
+        updateDeleteButtonStates();
         updateStatusForSelectedEvent();
     });
 
     setStartBtn?.addEventListener('click', () => {
-        if (!selectedEventId || endPointMode) return;
-
-        if (startPointMode) {
-            clearStartPointModes();
-            updateStartPointButtonState();
-            renderRouteOnGrid();
-            updateStatusForSelectedEvent();
-            return;
-        }
-
-        startPointMode = true;
-        clearEndpointModes();
-        updateStartPointButtonState();
-        renderRouteOnGrid();
-
-        const route = getSelectedEventRoute();
-        const isChanging = Boolean(route?.start_row != null && route?.start_col != null);
-        const needsRoadPlacement = isChanging
-            ? getSelectableRoadCellsForStartChange().length === 0
-            : getRoadCellsOnGrid().length === 0;
-
-        if (needsRoadPlacement) {
-            waitingForRoadPlacement = true;
-            waitingForRoadPlacementChange = isChanging;
-            const status = isChanging
-                ? ROUTE_STATUS.placeRoadOnGridToChange(route.start_row, route.start_col)
-                : ROUTE_STATUS.placeRoadOnGrid;
-            setPairedStatus(status);
-            return;
-        }
-
-        waitingForRoadPlacement = false;
-        waitingForRoadPlacementChange = false;
-        const status = isChanging
-            ? ROUTE_STATUS.changeStartPoint(route.start_row, route.start_col)
-            : ROUTE_STATUS.selectRoadCell;
-        setPairedStatus(status);
+        activateStartPointMode();
     });
 
     setEndBtn?.addEventListener('click', () => {
@@ -1430,6 +1906,11 @@ export function initRoutePlanner() {
         removeStartPoint();
     });
 
+    removeEndBtn?.addEventListener('click', () => {
+        removeEndPoint();
+    });
+
     fetchEventRoutes();
+    updateRoutePlannerToolbarVisibility();
     setStatus(ROUTE_STATUS.selectEvent);
 }

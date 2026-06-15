@@ -194,5 +194,51 @@ class EventRouteEndpointTest extends TestCase
 
         $response->assertOk();
         $response->assertSee('Set end point');
+        $response->assertSee('Delete end point');
+        $response->assertSee('Delete start point');
+    }
+
+    public function test_city_planner_can_delete_endpoint(): void
+    {
+        $road = CityFunction::factory()->create(['name' => 'Road', 'category' => 'mobility']);
+        $store = CityFunction::factory()->create(['name' => 'Store']);
+        $event = SimulationEvent::create([
+            'name' => 'City Event',
+            'description' => 'Test',
+            'type' => 'one-off',
+            'start_moment' => '2026-06-01 10:00:00',
+            'end_moment' => '2026-06-01 18:00:00',
+        ]);
+
+        EventEffect::create([
+            'simulation_event_id' => $event->id,
+            'city_function_id' => $store->id,
+            'modifier' => 0,
+        ]);
+
+        GridCell::factory()->create(['row' => 2, 'col' => 3, 'function_id' => $road->id]);
+        GridCell::factory()->create(['row' => 2, 'col' => 4, 'function_id' => $store->id]);
+
+        EventRoute::create([
+            'simulation_event_id' => $event->id,
+            'start_row' => 2,
+            'start_col' => 3,
+            'end_row' => 2,
+            'end_col' => 4,
+            'end_function_id' => $store->id,
+        ]);
+
+        $response = $this->actingAs($this->planner())
+            ->deleteJson("/event-routes/{$event->id}/endpoint");
+
+        $response->assertOk();
+        $this->assertDatabaseHas('event_routes', [
+            'simulation_event_id' => $event->id,
+            'start_row' => 2,
+            'start_col' => 3,
+            'end_row' => null,
+            'end_col' => null,
+            'end_function_id' => null,
+        ]);
     }
 }

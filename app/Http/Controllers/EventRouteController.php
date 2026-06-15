@@ -142,6 +142,20 @@ class EventRouteController extends Controller
         ]);
     }
 
+    public function destroyEndpoint(SimulationEvent $event): JsonResponse
+    {
+        $result = $this->eventRouteService->clearEndpoint($event);
+
+        if (!$result['success']) {
+            return response()->json($result, 422);
+        }
+
+        return response()->json([
+            'success' => true,
+            'route' => $this->formatRoute($result['route']),
+        ]);
+    }
+
     public function destroy(SimulationEvent $event): JsonResponse
     {
         $deleted = EventRoute::where('simulation_event_id', $event->id)->delete() > 0;

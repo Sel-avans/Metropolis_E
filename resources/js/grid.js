@@ -22,7 +22,7 @@ import {
 } from './regulation.js';
 import { resetDayNightIndicatorState } from './day-night-indicator.js';
 import { initLibraryPreview, closePreview } from './library-preview.js';
-import { initRoutePlanner, handleRouteCellClick, handleGridFunctionPlaced, handleGridFunctionMoved, handleGridFunctionRemoved, syncRoutePlannerEvents, canDragRouteCell, canDropOnRouteCell, shouldBlockGridCellDrag } from './route-planner.js';
+import { initRoutePlanner, handleRouteCellClick, handleGridFunctionPlaced, handleGridFunctionMoved, handleGridFunctionRemoved, syncRoutePlannerEvents, canDragRouteCell, canDropOnRouteCell, shouldBlockGridCellDrag, handleInvalidRouteCellDrop, canRemoveGridFunction, handleBlockedRoutePointRemoval, setRouteGridRenderCallback } from './route-planner.js';
 
 const SIM_STATE_KEY = 'metropolis_simulation_state';
 
@@ -46,6 +46,25 @@ function createDeleteBtn(functionName, row = '', col = '') {
     return btn;
 }
 
+function syncGridCellDeleteButtons() {
+    document.querySelectorAll('.grid-cell').forEach((cell) => {
+        const img = cell.querySelector('.grid-function-icon');
+        if (!img || cell.classList.contains('is-locked')) {
+            return;
+        }
+
+        const deleteBtn = cell.querySelector('.delete-btn');
+        if (!canRemoveGridFunction(cell)) {
+            deleteBtn?.remove();
+            return;
+        }
+
+        if (!deleteBtn) {
+            cell.appendChild(createDeleteBtn(img.alt, cell.dataset.row, cell.dataset.col));
+        }
+    });
+}
+
 // =========================================================
 // HULPFUNCTIE: herstel een cel met functie-inhoud
 // Gecentraliseerd zodat alle restore-paden (undo, conflict-fallback)
@@ -64,7 +83,9 @@ function restoreCellContent(cell, functionId, functionName, functionImage) {
 
     const row = cell.dataset.row ?? '';
     const col = cell.dataset.col ?? '';
-    cell.appendChild(createDeleteBtn(functionName, row, col));
+    if (canRemoveGridFunction(cell)) {
+        cell.appendChild(createDeleteBtn(functionName, row, col));
+    }
     cell.setAttribute('draggable', 'true');
 
     // WCAG 4.1.2: aria-label bijwerken na restore
@@ -82,6 +103,7 @@ function initGridPage() {
     try { initLibraryFilter(); } catch (e) { /* ignore if not present */ }
     try { initLibraryPreview(); } catch (e) { /* ignore if not present */ }
     try { initRoutePlanner(); } catch (e) { /* ignore if not present */ }
+    try { setRouteGridRenderCallback(syncGridCellDeleteButtons); } catch (e) { /* ignore if not present */ }
 
     // =========================================================
     // VARIABELEN
@@ -91,6 +113,7 @@ function initGridPage() {
     let isDragging  = false;
     let sourceCell  = null;
     let dropOccurred = false;
+    let blockedRouteDropTarget = null;
     let old_score;
     let lastAction = null;
 
@@ -263,7 +286,7 @@ function initGridPage() {
         lockIndicator.setAttribute('aria-hidden', 'true');
         lockExplanation.classList.add('hidden');
 
-        if (img && !cell.querySelector('.delete-btn')) {
+        if (img && !cell.querySelector('.delete-btn') && canRemoveGridFunction(cell)) {
             const deleteBtn = createDeleteBtn(img.alt, cell.dataset.row, cell.dataset.col);
             cell.appendChild(deleteBtn);
         }
@@ -1214,15 +1237,22 @@ function initGridPage() {
             const img = cell.querySelector(".grid-function-icon");
             if (!img) return;
             isDragging = true; dropOccurred = false;
+            blockedRouteDropTarget = null;
             draggedItem = { id: Number(img.dataset.functionId), name: img.alt, image: img.src };
             e.dataTransfer.setDragImage(img, 16, 16);
             sourceCell = cell; cell.classList.add("drag-source");
         });
 
         cell.addEventListener("dragover", e => {
-            if (isLockedCell(cell) || !canDropOnRouteCell(cell)) {
+            if (isLockedCell(cell)) {
                 return;
             }
+            if (!canDropOnRouteCell(cell)) {
+                e.preventDefault();
+                blockedRouteDropTarget = cell;
+                return;
+            }
+            blockedRouteDropTarget = null;
             e.preventDefault();
             cell.classList.add("drag-over");
         });
@@ -1244,15 +1274,20 @@ function initGridPage() {
                 isDragging = false;
                 dropOccurred = true;
                 if (sourceCell) sourceCell.classList.remove('drag-source');
+                handleInvalidRouteCellDrop(cell);
                 draggedItem = null;
                 sourceCell = null;
+                blockedRouteDropTarget = null;
                 return;
             }
 
             isDragging = false;
             dropOccurred = true;
 
-            if (cell.querySelector("img") && !window.confirm("Are you sure you want to replace this feature?")) {
+            const targetImg = cell.querySelector('.grid-function-icon');
+            const isGridSwap = Boolean(sourceCell && targetImg);
+
+            if (targetImg && !window.confirm("Are you sure you want to replace this feature?")) {
                 if (sourceCell) sourceCell.classList.remove("drag-source");
                 return;
             }
@@ -1260,14 +1295,40 @@ function initGridPage() {
             const newRow = cell.dataset.row, newCol = cell.dataset.col;
             let oldRow = null, oldCol = null;
             const originalSourceCell = sourceCell;
+            const displacedItem = isGridSwap
+                ? {
+                    id: Number(targetImg.dataset.functionId),
+                    name: targetImg.dataset.functionName || targetImg.alt,
+                    image: targetImg.src,
+                }
+                : null;
+
+            const restoreSwapCells = () => {
+                if (originalSourceCell && draggedItem) {
+                    restoreCellContent(
+                        originalSourceCell,
+                        draggedItem.id,
+                        draggedItem.name,
+                        draggedItem.image
+                    );
+                }
+                if (displacedItem) {
+                    restoreCellContent(cell, displacedItem.id, displacedItem.name, displacedItem.image);
+                } else {
+                    cell.innerHTML = "";
+                    cell.removeAttribute('draggable');
+                }
+            };
 
             if (sourceCell) {
                 oldRow = sourceCell.dataset.row; oldCol = sourceCell.dataset.col;
-                sourceCell.innerHTML = ""; sourceCell.removeAttribute("draggable");
+                sourceCell.innerHTML = "";
+                sourceCell.removeAttribute("draggable");
                 sourceCell.classList.remove("drag-source");
             }
 
-            sourceCell = null; cell.innerHTML = "";
+            sourceCell = null;
+            cell.innerHTML = "";
             const img = document.createElement("img");
             img.src = draggedItem.image; img.alt = draggedItem.name;
             img.dataset.functionId = draggedItem.id;
@@ -1282,6 +1343,19 @@ function initGridPage() {
             deleteBtn.append("✖");
             cell.appendChild(deleteBtn);
             cell.setAttribute("draggable", "true");
+            if (!canRemoveGridFunction(cell)) {
+                deleteBtn.remove();
+            }
+
+            if (displacedItem && originalSourceCell) {
+                restoreCellContent(
+                    originalSourceCell,
+                    displacedItem.id,
+                    displacedItem.name,
+                    displacedItem.image
+                );
+            }
+
             activateCell(cell);
 
             lastAction = { oldRow, oldCol, newRow, newCol, functionId: draggedItem.id };
@@ -1302,24 +1376,23 @@ function initGridPage() {
                 if (window.confirm("Placement is forbidden by adjacency rules. Force placement anyway?")) {
                     const res2 = await saveMove(oldRow, oldCol, newRow, newCol, true);
                     if (!res2 || !res2.ok) {
-                        if (originalSourceCell) {
-                            originalSourceCell.innerHTML = `<img src="${draggedItem.image}" alt="${draggedItem.name}" data-function-id="${draggedItem.id}" data-function-name="${draggedItem.name}" class="grid-function-icon object-contain"><button class="delete-btn absolute top-[2px] right-[2px] bg-red-600/80 text-white w-5 h-5 text-[14px] rounded cursor-pointer flex items-center justify-center">✖</button>`;
-                            originalSourceCell.setAttribute('draggable', 'true');
-                        }
-                        cell.innerHTML = ""; cell.removeAttribute('draggable'); updateQoL(); return;
+                        restoreSwapCells();
+                        updateQoL();
+                        return;
                     }
                 } else {
-                    if (originalSourceCell) {
-                        originalSourceCell.innerHTML = `<img src="${draggedItem.image}" alt="${draggedItem.name}" data-function-id="${draggedItem.id}" data-function-name="${draggedItem.name}" class="grid-function-icon object-contain"><button class="delete-btn absolute top-[2px] right-[2px] bg-red-600/80 text-white w-5 h-5 text-[14px] rounded cursor-pointer flex items-center justify-center">✖</button>`;
-                        originalSourceCell.setAttribute('draggable', 'true');
-                    }
-                    cell.innerHTML = ""; cell.removeAttribute('draggable'); updateQoL(); return;
+                    restoreSwapCells();
+                    updateQoL();
+                    return;
                 }
             }
 
             updateCellHighlights();
             updateQoL();
             await handleGridFunctionMoved(oldRow, oldCol, newRow, newCol, draggedItem.id);
+            if (displacedItem) {
+                await handleGridFunctionMoved(newRow, newCol, oldRow, oldCol, displacedItem.id);
+            }
             handleGridFunctionPlaced(cell, draggedItem.id);
         });
 
@@ -1472,10 +1545,18 @@ function initGridPage() {
             // Do not allow deletion on locked cells
             return;
         }
+        if (!canRemoveGridFunction(cell)) {
+            e.preventDefault();
+            e.stopPropagation();
+            handleBlockedRoutePointRemoval(cell);
+            return;
+        }
         const row = cell.dataset.row;
         const col = cell.dataset.col;
         const img = cell.querySelector('.grid-function-icon');
         const functionId = img?.dataset.functionId ?? null;
+        const functionName = img?.dataset.functionName || img?.alt || 'function';
+        const functionImage = img?.src ?? '';
         cell.innerHTML = "";
         cell.removeAttribute("draggable");
         // WCAG 4.1.2: aria-label bijwerken naar lege cel na verwijdering
@@ -1483,11 +1564,36 @@ function initGridPage() {
         activateCell(cell);
 
         try {
-            await fetch(`/grid/cell/${cell.dataset.id}/function`, {
+            const response = await fetch(`/grid/cell/${cell.dataset.id}/function`, {
                 method: "DELETE",
                 headers: { "X-CSRF-TOKEN": document.querySelector('meta[name="csrf-token"]').content }
             });
-        } catch (err) { console.error("Fout bij verwijderen functie:", err); }
+
+            if (!response.ok) {
+                if (functionId && functionImage) {
+                    restoreCellContent(cell, functionId, functionName, functionImage);
+                }
+
+                if (response.status === 422) {
+                    const data = await response.json().catch(() => ({}));
+                    if (!canRemoveGridFunction(cell)) {
+                        handleBlockedRoutePointRemoval(cell);
+                    } else if (data.message) {
+                        alert(data.message);
+                    }
+                }
+
+                updateCellHighlights();
+                return;
+            }
+        } catch (err) {
+            console.error("Fout bij verwijderen functie:", err);
+            if (functionId && functionImage) {
+                restoreCellContent(cell, functionId, functionName, functionImage);
+            }
+            updateCellHighlights();
+            return;
+        }
         await handleGridFunctionRemoved(row, col, functionId);
         updateCellHighlights();
         setTimeout(() => updateQoL(), 10);
@@ -1498,16 +1604,54 @@ function initGridPage() {
     // =========================================================
 
     document.addEventListener("dragend", async (e) => {
-        if (!draggedItem || !sourceCell) return;
-        if (dropOccurred) { dropOccurred = false; return; }
+        const activeSourceCell = sourceCell;
+        const activeDraggedItem = draggedItem;
+
+        if (!activeDraggedItem || !activeSourceCell) {
+            blockedRouteDropTarget = null;
+            return;
+        }
+
+        if (dropOccurred) {
+            dropOccurred = false;
+            blockedRouteDropTarget = null;
+            return;
+        }
+
         const rect = document.querySelector(".city-grid").getBoundingClientRect();
-        if (e.pageX >= rect.left && e.pageX <= rect.right && e.pageY >= rect.top && e.pageY <= rect.bottom) return;
-        const removedRow = sourceCell.dataset.row;
-        const removedCol = sourceCell.dataset.col;
-        const removedFunctionId = draggedItem?.id ?? null;
-        sourceCell.innerHTML = ""; sourceCell.removeAttribute("draggable"); activateCell(sourceCell);
+        const insideGrid = e.pageX >= rect.left && e.pageX <= rect.right
+            && e.pageY >= rect.top && e.pageY <= rect.bottom;
+
+        if (insideGrid) {
+            if (blockedRouteDropTarget && !canDropOnRouteCell(blockedRouteDropTarget)) {
+                handleInvalidRouteCellDrop(blockedRouteDropTarget);
+            }
+            activeSourceCell.classList.remove('drag-source');
+            draggedItem = null;
+            sourceCell = null;
+            blockedRouteDropTarget = null;
+            isDragging = false;
+            return;
+        }
+
+        if (!canRemoveGridFunction(activeSourceCell)) {
+            handleBlockedRoutePointRemoval(activeSourceCell);
+            activeSourceCell.classList.remove('drag-source');
+            draggedItem = null;
+            sourceCell = null;
+            blockedRouteDropTarget = null;
+            isDragging = false;
+            return;
+        }
+
+        const removedRow = activeSourceCell.dataset.row;
+        const removedCol = activeSourceCell.dataset.col;
+        const removedFunctionId = activeDraggedItem?.id ?? null;
+        activeSourceCell.innerHTML = "";
+        activeSourceCell.removeAttribute("draggable");
+        activateCell(activeSourceCell);
         try {
-            await fetch(`/grid/cell/${sourceCell.dataset.id}/function`, {
+            await fetch(`/grid/cell/${activeSourceCell.dataset.id}/function`, {
                 method: "DELETE",
                 headers: { "X-CSRF-TOKEN": document.querySelector('meta[name="csrf-token"]').content }
             });

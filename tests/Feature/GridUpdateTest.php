@@ -31,4 +31,34 @@ class GridUpdateTest extends TestCase
             'function_id' => $func->id
         ]);
     }
+
+    public function test_it_swaps_two_grid_functions_instead_of_deleting_the_displaced_one(): void
+    {
+        $functionA = CityFunction::factory()->create(['name' => 'School A']);
+        $functionB = CityFunction::factory()->create(['name' => 'Park B']);
+
+        GridCell::factory()->create(['row' => 1, 'col' => 1, 'function_id' => $functionA->id]);
+        GridCell::factory()->create(['row' => 2, 'col' => 2, 'function_id' => $functionB->id]);
+
+        $response = $this->postJson('/grid/update', [
+            'old_row' => 1,
+            'old_col' => 1,
+            'new_row' => 2,
+            'new_col' => 2,
+            'function_id' => $functionA->id,
+        ]);
+
+        $response->assertOk()->assertJson(['success' => true]);
+
+        $this->assertDatabaseHas('grid_cells', [
+            'row' => 2,
+            'col' => 2,
+            'function_id' => $functionA->id,
+        ]);
+        $this->assertDatabaseHas('grid_cells', [
+            'row' => 1,
+            'col' => 1,
+            'function_id' => $functionB->id,
+        ]);
+    }
 }
