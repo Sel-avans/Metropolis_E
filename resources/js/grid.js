@@ -847,15 +847,30 @@ function initGridPage() {
         li.innerHTML = `
             <div class="flex items-start justify-between gap-2">
                 <div class="flex-1 min-w-0">
-                    <div class="font-semibold text-slate-200 truncate">${event.name || 'Nameless Event'}</div>
+                    <div class="flex justify-between items-start">
+                        <div class="font-semibold text-slate-200 truncate">${event.name || 'Nameless Event'}</div>
+                        
+                        ${isActive && !isWaiting ? `
+                            <button onclick="console.log('De-activate'); return false;" 
+                                    class="px-2 py-0.5 bg-red-600 hover:bg-red-700 text-white text-[9px] font-bold uppercase rounded shadow shrink-0 ml-2">
+                                De-activate
+                            </button>
+                        ` : ''}
+                    </div>
+
+                    ${isActive && !isWaiting ? '<div class="status-active-label mt-1 inline-block">Active now</div>' : ''}
+
                     <div class="text-[11px] text-gray-400 mt-0.5">${durationLabel}</div>
-                    ${isActive && !isWaiting ? '<div class="text-[10px] text-amber-400 mt-1 font-semibold uppercase tracking-wide">Active now</div>' : ''}
+                    
                     ${isWaiting ? '<div class="text-[10px] text-sky-400 mt-1 font-semibold uppercase tracking-wide">Manually activated · starts at ' + startLabel + '</div>' : ''}
                     ${isLongEvent && event.activatedForCycle && !isActive && isSimulationAtDayStart(simTime) ? '<div class="text-[10px] text-sky-400 mt-1 font-semibold uppercase tracking-wide">Starts on play</div>' : ''}
                     ${isLongEvent && event.activatedForCycle && isActive ? '<div class="text-[10px] text-sky-400 mt-1 font-semibold uppercase tracking-wide">Active until end of cycle</div>' : ''}
                     ${modifiersHtml}
                 </div>
                 ${toggleButton}
+            </div>`;
+` : ''}
+              
             </div>`;
 
         return li;
