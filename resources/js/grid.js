@@ -27,11 +27,6 @@ const SIM_STATE_KEY = 'metropolis_simulation_state';
 
 // Library filter/preview will be initialized when the grid page initializes
 
-// =========================================================
-// HULPFUNCTIE: maak een toegankelijke delete-knop
-// WCAG 4.1.2: altijd aria-label meegeven zodat screen readers de knop kunnen benoemen,
-// ook als de knop dynamisch aangemaakt wordt via JavaScript.
-// =========================================================
 function createDeleteBtn(functionName, row = '', col = '') {
     const btn = document.createElement('button');
     btn.type = 'button';
@@ -45,11 +40,6 @@ function createDeleteBtn(functionName, row = '', col = '') {
     return btn;
 }
 
-// =========================================================
-// HULPFUNCTIE: herstel een cel met functie-inhoud
-// Gecentraliseerd zodat alle restore-paden (undo, conflict-fallback)
-// altijd dezelfde toegankelijke markup genereren.
-// =========================================================
 function restoreCellContent(cell, functionId, functionName, functionImage) {
     cell.innerHTML = '';
 
@@ -85,8 +75,8 @@ function initGridPage() {
     // =========================================================
 
     let draggedItem = null;
-    let isDragging  = false;
-    let sourceCell  = null;
+    let isDragging = false;
+    let sourceCell = null;
     let dropOccurred = false;
     let old_score;
     let lastAction = null;
@@ -103,6 +93,7 @@ function initGridPage() {
     let lastQoLEventIdsKey = null;
     let saveStateTimer = null;
     let lastActiveEventSignature = '';
+
 
     // =========================================================
     // SESSION STATE
@@ -156,13 +147,28 @@ function initGridPage() {
     let eventBoundaryTimeouts = [];
     const EVENT_POLL_MS = 1000;
     const MAX_SCHEDULE_MS = 24 * 60 * 60 * 1000;
+
     // =========================================================
-    // HULPFUNCTIES
+    // HELPFUNCTIONS
     // =========================================================
 
     function activateCell(cell, additive = false) {
         if (!additive) document.querySelectorAll(".grid-cell").forEach(c => c.classList.remove("selected"));
         cell.classList.add("selected");
+    }
+
+    function announceToScreenReader(message) {
+        let liveEl = document.getElementById('sr-live-region');
+        if (!liveEl) {
+            liveEl = document.createElement('div');
+            liveEl.id = 'sr-live-region';
+            liveEl.setAttribute('aria-live', 'assertive');
+            liveEl.setAttribute('aria-atomic', 'true');
+            liveEl.className = 'sr-only';
+            document.body.appendChild(liveEl);
+        }
+        liveEl.textContent = '';
+        requestAnimationFrame(() => { liveEl.textContent = message; });
     }
 
     // --- LOCK / APPROVE HELPERS ---
@@ -269,7 +275,7 @@ function initGridPage() {
     function formatModifiers(modifiers) {
         if (!modifiers || typeof modifiers !== 'object') return '';
         const items = Object.entries(modifiers).map(([category, value]) => {
-            const num  = Number(value);
+            const num = Number(value);
             const sign = num >= 0 ? '+' : '';
             const label = category.charAt(0).toUpperCase() + category.slice(1);
             return `<li class="text-amber-400">- ${label}: ${sign}${num}</li>`;
@@ -364,7 +370,7 @@ function initGridPage() {
 
     function isEventActiveAtSimTime(event, simTime) {
         const start = Number(event.start_minutes);
-        const end   = Number(event.end_minutes);
+        const end = Number(event.end_minutes);
         if (Number.isNaN(start) || Number.isNaN(end)) return false;
         if (end > 1440) return simTime >= start;
         return simTime >= start && simTime <= end;
@@ -458,8 +464,8 @@ function initGridPage() {
         if (!allEvents.length) return;
 
         const signature = buildEventSignature(allEvents, simTime);
-        const idsKey    = buildQoLActiveIdsKey(simTime);
-        const uiChanged  = signature !== lastActiveEventSignature;
+        const idsKey = buildQoLActiveIdsKey(simTime);
+        const uiChanged = signature !== lastActiveEventSignature;
         const qolChanged = lastQoLEventIdsKey === null || idsKey !== lastQoLEventIdsKey;
 
         if (!uiChanged && !qolChanged) return;
@@ -496,13 +502,13 @@ function initGridPage() {
         html += '<ul class="space-y-1 list-none pl-0 text-sm">';
         for (const [category, info] of Object.entries(data.categories)) {
             const score = Number(info.total);
-            const cls   = score > 0 ? 'text-green-600' : score < 0 ? 'text-red-600' : 'text-slate-400';
-            const sign  = score > 0 ? '+' : '';
+            const cls = score > 0 ? 'text-green-600' : score < 0 ? 'text-red-600' : 'text-slate-400';
+            const sign = score > 0 ? '+' : '';
             html += `<li class="font-semibold dark:text-teal-600">- ${category}: <span class="${cls}">${sign}${score}</span></li>`;
         }
         html += '</ul>';
         const total = Number(data.total_score);
-        const tcls  = total > 0 ? 'text-green-600' : total < 0 ? 'text-red-600' : 'text-slate-400';
+        const tcls = total > 0 ? 'text-green-600' : total < 0 ? 'text-red-600' : 'text-slate-400';
         const tsign = total > 0 ? '+' : '';
         html += `<p class="font-bold mt-4 dark:text-teal-600">Total QoL: <span class="${tcls}">${tsign}${total}</span></p>`;
         return html;
@@ -512,7 +518,7 @@ function initGridPage() {
         const popupEl = document.getElementById('qol-popup');
         if (!popupEl) return;
         popupEl.style.left = `${x}px`;
-        popupEl.style.top  = `${y}px`;
+        popupEl.style.top = `${y}px`;
     }
 
     function renderNeighborsList(data) {
@@ -520,7 +526,7 @@ function initGridPage() {
         if (!listEl) return;
         listEl.innerHTML = '';
 
-        const categories   = data?.categories ?? {};
+        const categories = data?.categories ?? {};
         const eventModifiers = data?.event_modifiers ?? {};
         const categoryKeys = {
             Safety: 'safety', Recreation: 'recreation', Environment: 'environment',
@@ -537,14 +543,14 @@ function initGridPage() {
         let hasInfluence = false;
 
         for (const [categoryName, info] of entries) {
-            const cellScore    = Number(info?.total ?? 0);
-            const eventScore   = Number(eventModifiers[categoryKeys[categoryName]] ?? 0);
+            const cellScore = Number(info?.total ?? 0);
+            const eventScore = Number(eventModifiers[categoryKeys[categoryName]] ?? 0);
             const displayScore = cellScore + eventScore;
 
             if (displayScore === 0 && eventScore === 0 && cellScore === 0) continue;
             hasInfluence = true;
 
-            const cls  = displayScore > 0 ? 'text-green-600' : displayScore < 0 ? 'text-red-600' : 'text-slate-400';
+            const cls = displayScore > 0 ? 'text-green-600' : displayScore < 0 ? 'text-red-600' : 'text-slate-400';
             const sign = displayScore > 0 ? '+' : '';
 
             html += `<div class="mb-2 last:mb-0 w-full">
@@ -554,12 +560,12 @@ function initGridPage() {
                 </div>`;
 
             if (cellScore !== 0) {
-                const cellCls  = cellScore > 0 ? 'text-green-500' : 'text-red-500';
+                const cellCls = cellScore > 0 ? 'text-green-500' : 'text-red-500';
                 const cellSign = cellScore > 0 ? '+' : '';
                 html += `<div class="text-[10px] text-slate-400 mt-0.5">Base: <span class="${cellCls}">${cellSign}${cellScore}</span></div>`;
             }
             if (eventScore !== 0) {
-                const eventCls  = eventScore > 0 ? 'text-amber-400' : 'text-red-400';
+                const eventCls = eventScore > 0 ? 'text-amber-400' : 'text-red-400';
                 const eventSign = eventScore > 0 ? '+' : '';
                 html += `<div class="text-[10px] text-slate-400 mt-0.5">Event: <span class="${eventCls}">${eventSign}${eventScore}</span></div>`;
             }
@@ -572,7 +578,7 @@ function initGridPage() {
         }
 
         const cellTotal = Number(data?.total_score ?? 0);
-        const tcls  = cellTotal > 0 ? 'text-green-600' : cellTotal < 0 ? 'text-red-600' : 'text-slate-400';
+        const tcls = cellTotal > 0 ? 'text-green-600' : cellTotal < 0 ? 'text-red-600' : 'text-slate-400';
         const tsign = cellTotal > 0 ? '+' : '';
         html += `<div class="flex justify-between items-center mt-3 pt-2 border-t border-slate-600/50 w-full">
             <span class="text-slate-300 font-bold text-xs uppercase tracking-wider">Total QoL:</span>
@@ -614,23 +620,23 @@ function initGridPage() {
 
         const executeFetch = async () => {
             qolFetchGeneration += 1;
-            const generation  = qolFetchGeneration;
+            const generation = qolFetchGeneration;
             const queryString = `?active_event_ids=${getActiveEventIdsForQoL().join(',')}`;
 
             qolFetchInFlight = true;
             try {
-                const scoreEl     = document.getElementById('qol-score-value');
+                const scoreEl = document.getElementById('qol-score-value');
                 const breakdownEl = document.getElementById('breakdown-qol-score');
-                const oldScoreEl  = document.getElementById('old-qol-score');
-                const response    = await fetch(`/qol/details${queryString}`, {
+                const oldScoreEl = document.getElementById('old-qol-score');
+                const response = await fetch(`/qol/details${queryString}`, {
                     credentials: 'same-origin',
                     headers: { 'Accept': 'application/json' },
                 });
                 if (!response.ok || generation !== qolFetchGeneration) return;
                 const data = await response.json();
                 if (generation !== qolFetchGeneration) return;
-                if (scoreEl)     scoreEl.textContent  = data.total_score;
-                if (oldScoreEl)  oldScoreEl.innerHTML = compareScores(data);
+                if (scoreEl) scoreEl.textContent = data.total_score;
+                if (oldScoreEl) oldScoreEl.innerHTML = compareScores(data);
                 if (breakdownEl) breakdownEl.innerHTML = renderQoLBreakdown(data);
             } catch (err) {
                 console.error("Fout bij ophalen QoL:", err);
@@ -686,7 +692,7 @@ function initGridPage() {
             if (!response.ok) {
                 let errorMessage = 'PDF export failed';
                 const contentType = response.headers.get('content-type');
-                
+
                 if (contentType && contentType.includes('application/json')) {
                     try {
                         const errorData = await response.json();
@@ -701,7 +707,7 @@ function initGridPage() {
                         errorMessage = 'Server error: Check console for details';
                     }
                 }
-                
+
                 console.error('PDF export failed with status', response.status, errorMessage);
                 setExportMessage(errorMessage, true);
                 button.disabled = false;
@@ -709,7 +715,7 @@ function initGridPage() {
             }
 
             const blob = await response.blob();
-            const filename = `simulation-report-${new Date().toISOString().slice(0,19).replace(/[:T-]/g, '-')}.pdf`;
+            const filename = `simulation-report-${new Date().toISOString().slice(0, 19).replace(/[:T-]/g, '-')}.pdf`;
             const fileUrl = URL.createObjectURL(blob);
             const anchor = document.createElement('a');
             anchor.href = fileUrl;
@@ -801,8 +807,8 @@ function initGridPage() {
             type="button"
             class="event-toggle-btn flex-shrink-0 px-2 py-1 text-xs font-semibold rounded transition
                 ${showDeactivate
-                    ? 'bg-amber-500 hover:bg-amber-600 text-white'
-                    : 'bg-slate-600 hover:bg-teal-600 hover:text-white text-slate-200'}"
+                ? 'bg-amber-500 hover:bg-amber-600 text-white'
+                : 'bg-slate-600 hover:bg-teal-600 hover:text-white text-slate-200'}"
             data-event-id="${event.id}">
             ${showDeactivate ? 'Deactivate' : 'Activate'}
         </button>`;
@@ -814,12 +820,12 @@ function initGridPage() {
         li.dataset.eventId = event.id;
 
         const modifiersHtml = formatModifiers(event.modifiers);
-        const simTime    = getCurrentTime();
-        const isActive   = event.isActive;
-        const isWaiting  = event.activatedEarly && isBeforeEventStart(event, simTime);
+        const simTime = getCurrentTime();
+        const isActive = event.isActive;
+        const isWaiting = event.activatedEarly && isBeforeEventStart(event, simTime);
         const isLongEvent = !event.fitsInCycle;
         const startLabel = minutesToHHMM(event.start_minutes);
-        const endLabel   = minutesToHHMM(event.end_minutes);
+        const endLabel = minutesToHHMM(event.end_minutes);
 
         let toggleButton = '';
         if (isLongEvent && panel === 'active' && event.activatedForCycle) {
@@ -893,7 +899,7 @@ function initGridPage() {
         e.stopPropagation();
 
         const eventId = Number(btn.dataset.eventId);
-        const event   = allEvents.find(ev => Number(ev.id) === eventId);
+        const event = allEvents.find(ev => Number(ev.id) === eventId);
         if (!event) return;
 
         const simTime = getCurrentTime();
@@ -975,9 +981,9 @@ function initGridPage() {
     // DAG / NACHT DUUR INPUTS
     // =========================================================
 
-    const dayInput   = document.getElementById('day-hours-input');
+    const dayInput = document.getElementById('day-hours-input');
     const nightInput = document.getElementById('night-hours-input');
-    const validMsg   = document.getElementById('duration-validation-msg');
+    const validMsg = document.getElementById('duration-validation-msg');
 
     /**
      * Pas duur aan, update gekoppeld veld, herbereken timeline en simulatie.
@@ -1069,7 +1075,7 @@ function initGridPage() {
             if (!data || !data.events) return;
 
             simulationReferenceDate = data.simulation_reference_date ?? null;
-            const persisted  = loadSimulationState();
+            const persisted = loadSimulationState();
             const storedById = {};
             (persisted?.events ?? []).forEach(e => { storedById[e.id] = e; });
             const storedConfigs = persisted?.eventConfigs ?? {};
@@ -1087,21 +1093,21 @@ function initGridPage() {
                 const stored = storedById[e.id];
                 const memory = prevState[e.id];
                 const draft = {
-                    id:                    e.id,
-                    name:                  e.name,
-                    type:                  e.type ?? 'one-off',
-                    recurringSchedule:     e.recurring_schedule ?? null,
-                    recurringStartDate:    e.recurring_start_date ?? null,
-                    recurringEndDate:      e.recurring_end_date ?? null,
-                    modifiers:             e.modifiers ?? {},
-                    affected_categories:   e.affected_categories ?? [],
-                    affectedFunctionIds:   e.affected_function_ids ?? [],
-                    start_minutes:         e.start_minutes ?? datetimeToSimMinutes(e.start_at),
-                    end_minutes:           e.end_minutes   ?? datetimeToSimMinutes(e.end_at),
-                    durationMinutes:       e.duration_minutes ?? 0,
+                    id: e.id,
+                    name: e.name,
+                    type: e.type ?? 'one-off',
+                    recurringSchedule: e.recurring_schedule ?? null,
+                    recurringStartDate: e.recurring_start_date ?? null,
+                    recurringEndDate: e.recurring_end_date ?? null,
+                    modifiers: e.modifiers ?? {},
+                    affected_categories: e.affected_categories ?? [],
+                    affectedFunctionIds: e.affected_function_ids ?? [],
+                    start_minutes: e.start_minutes ?? datetimeToSimMinutes(e.start_at),
+                    end_minutes: e.end_minutes ?? datetimeToSimMinutes(e.end_at),
+                    durationMinutes: e.duration_minutes ?? 0,
                     calendarDurationMinutes: e.calendar_duration_minutes ?? e.duration_minutes ?? 0,
-                    fitsInCycle:           e.fits_in_cycle ?? true,
-                    isActive:              false,
+                    fitsInCycle: e.fits_in_cycle ?? true,
+                    isActive: false,
                 };
                 const configKey = buildEventConfigFingerprint(draft);
                 const configChanged = storedConfigs[e.id] != null && storedConfigs[e.id] !== configKey;
@@ -1207,7 +1213,7 @@ function initGridPage() {
             sourceCell = cell; cell.classList.add("drag-source");
         });
 
-        cell.addEventListener("dragover",  e => { e.preventDefault(); cell.classList.add("drag-over"); });
+        cell.addEventListener("dragover", e => { e.preventDefault(); cell.classList.add("drag-over"); });
         cell.addEventListener("dragleave", () => cell.classList.remove("drag-over"));
 
         cell.addEventListener("drop", async e => {
@@ -1291,7 +1297,7 @@ function initGridPage() {
             updateQoL();
         });
 
-        cell.addEventListener("click",   (e) => { 
+        cell.addEventListener("click", (e) => {
             if (isDragging) return;
             if (isLockedCell(cell) && !canSelectLockedCell(cell)) {
                 e.preventDefault();
@@ -1317,13 +1323,99 @@ function initGridPage() {
                 activateCell(cell, false);
             }
         });
-        cell.addEventListener("keydown", e  => { if (!isDragging && (e.key === "Enter" || e.key === " ")) activateCell(cell); });
+        cell.addEventListener("keydown", e => { if (!isDragging && (e.key === "Enter" || e.key === " ")) activateCell(cell); });
         cell.addEventListener('mouseenter', (event) => {
             const row = parseInt(cell.dataset.row), col = parseInt(cell.dataset.col);
             clearTimeout(hoverTimer);
             hoverTimer = setTimeout(() => handleTileHover(row, col, event), HOVER_DELAY_MS);
         });
         cell.addEventListener('mouseleave', () => { clearTimeout(hoverTimer); hidePopup(); });
+    });
+
+    // =========================================================
+    // KEYBOARD: library item selecteren met Enter
+    // =========================================================
+    let keyboardSelectedItem = null;
+
+    document.querySelectorAll('.library-item').forEach(item => {
+        item.addEventListener('keydown', (e) => {
+            if (e.key !== 'Enter' && e.key !== ' ') return;
+            e.preventDefault();
+
+            // Deselect vorige
+            document.querySelectorAll('.library-item').forEach(i => {
+                i.classList.remove('library-item-selected');
+                i.setAttribute('aria-pressed', 'false');
+            });
+
+            keyboardSelectedItem = {
+                id: Number(item.dataset.functionId),
+                name: item.dataset.functionName,
+                image: item.dataset.image,
+            };
+
+            item.classList.add('library-item-selected');
+            item.setAttribute('aria-pressed', 'true');
+
+            // Scherm lezer melding
+            announceToScreenReader(`${item.dataset.functionName} selected. Navigate to a grid cell and press Enter to place it.`);
+        });
+    });
+
+    // =========================================================
+    // KEYBOARD: functie plaatsen in cel met Enter
+    // =========================================================
+    document.querySelectorAll('.grid-cell').forEach(cell => {
+        cell.addEventListener('keydown', async (e) => {
+            if (e.key !== 'Enter' && e.key !== ' ') return;
+            if (!keyboardSelectedItem) return;
+            e.preventDefault();
+
+            if (isLockedCell(cell)) {
+                announceToScreenReader('This area is locked and cannot be changed.');
+                flashLockExplanation(cell);
+                return;
+            }
+
+            const existingImg = cell.querySelector('.grid-function-icon');
+            if (existingImg) {
+                const confirmed = window.confirm(`Replace ${existingImg.alt} with ${keyboardSelectedItem.name}?`);
+                if (!confirmed) return;
+            }
+
+            const row = cell.dataset.row;
+            const col = cell.dataset.col;
+
+            // Sla op via bestaande saveMove — zet draggedItem tijdelijk
+            draggedItem = keyboardSelectedItem;
+
+            const res = await saveMove(null, null, row, col, false);
+
+            if (res && res.status === 403) {
+                const data = await res.json().catch(() => ({}));
+                announceToScreenReader(data.message ?? "You don't have permission to modify the grid.");
+                draggedItem = null;
+                return;
+            }
+
+            // Update cel visueel
+            restoreCellContent(cell, keyboardSelectedItem.id, keyboardSelectedItem.name, keyboardSelectedItem.image);
+            cell.setAttribute('draggable', 'true');
+            activateCell(cell);
+
+            announceToScreenReader(`${keyboardSelectedItem.name} placed in row ${row}, column ${col}.`);
+
+            // Reset selectie
+            document.querySelectorAll('.library-item').forEach(i => {
+                i.classList.remove('library-item-selected');
+                i.setAttribute('aria-pressed', 'false');
+            });
+            keyboardSelectedItem = null;
+            draggedItem = null;
+
+            updateCellHighlights();
+            updateQoL();
+        });
     });
 
     // --- APPROVE / LOCK LOGIC ---
@@ -1490,23 +1582,23 @@ function initGridPage() {
                 method: 'POST',
                 headers: { 'X-CSRF-TOKEN': document.querySelector('meta[name="csrf-token"]').content, 'Content-Type': 'application/json' }
             })
-            .then(res => res.json())
-            .then(data => {
-                if (!data.success) return;
-                const targetCell = document.querySelector(`[data-row="${data.cell.row}"][data-col="${data.cell.col}"]`);
-                if (targetCell) {
-                    if (data.cell.function_id) {
-                        targetCell.innerHTML = `<img src="${data.cell.image}" class="grid-function-icon object-contain" data-function-id="${data.cell.function_id}"><button class="delete-btn absolute top-[2px] right-[2px] bg-red-600/80 text-white w-5 h-5 text-[14px] rounded cursor-pointer flex items-center justify-center">✖</button>`;
-                        targetCell.setAttribute("draggable", "true");
-                    } else { targetCell.innerHTML = ""; targetCell.removeAttribute("draggable"); }
-                    activateCell(targetCell);
-                }
-                if (data.cleared) {
-                    const clearedCell = document.querySelector(`[data-row="${data.cleared.row}"][data-col="${data.cleared.col}"]`);
-                    if (clearedCell) { clearedCell.innerHTML = ""; clearedCell.removeAttribute("draggable"); clearedCell.classList.remove("selected"); }
-                }
-                updateCellHighlights(); setTimeout(() => updateQoL(), 50);
-            });
+                .then(res => res.json())
+                .then(data => {
+                    if (!data.success) return;
+                    const targetCell = document.querySelector(`[data-row="${data.cell.row}"][data-col="${data.cell.col}"]`);
+                    if (targetCell) {
+                        if (data.cell.function_id) {
+                            targetCell.innerHTML = `<img src="${data.cell.image}" class="grid-function-icon object-contain" data-function-id="${data.cell.function_id}"><button class="delete-btn absolute top-[2px] right-[2px] bg-red-600/80 text-white w-5 h-5 text-[14px] rounded cursor-pointer flex items-center justify-center">✖</button>`;
+                            targetCell.setAttribute("draggable", "true");
+                        } else { targetCell.innerHTML = ""; targetCell.removeAttribute("draggable"); }
+                        activateCell(targetCell);
+                    }
+                    if (data.cleared) {
+                        const clearedCell = document.querySelector(`[data-row="${data.cleared.row}"][data-col="${data.cleared.col}"]`);
+                        if (clearedCell) { clearedCell.innerHTML = ""; clearedCell.removeAttribute("draggable"); clearedCell.classList.remove("selected"); }
+                    }
+                    updateCellHighlights(); setTimeout(() => updateQoL(), 50);
+                });
         });
     }
 
