@@ -11,10 +11,18 @@ class EventRoute extends Model
         'simulation_event_id',
         'start_row',
         'start_col',
+        'end_row',
+        'end_col',
+        'end_function_id',
     ];
 
     public function simulationEvent(): BelongsTo
     {
         return $this->belongsTo(SimulationEvent::class);
+    }
+
+    public function endFunction(): BelongsTo
+    {
+        return $this->belongsTo(CityFunction::class, 'end_function_id');
     }
 }

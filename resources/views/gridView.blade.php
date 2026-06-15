@@ -155,23 +155,41 @@
                             <option value="">— Select —</option>
                         </select>
                     </div>
-                    <button type="button" id="route-set-start-btn" disabled
-                        class="flex-1 min-w-0 px-2 py-1.5 bg-emerald-600 text-white text-xs font-semibold rounded shadow hover:bg-emerald-700 transition focus:outline-none focus:ring-2 focus:ring-emerald-400 disabled:opacity-50 disabled:cursor-not-allowed whitespace-nowrap"
-                        aria-pressed="false"
-                        aria-describedby="route-planner-status"
-                        aria-label="Set start point on a Road cell in the City Grid">
-                        Set start point
-                    </button>
+                    <div class="flex flex-shrink-0 gap-1">
+                        <button type="button" id="route-set-start-btn" disabled
+                            class="w-full px-2 py-1.5 bg-emerald-600 text-white text-xs font-semibold rounded shadow hover:bg-emerald-700 transition focus:outline-none focus:ring-2 focus:ring-emerald-400 disabled:opacity-50 disabled:cursor-not-allowed whitespace-nowrap"
+                            aria-pressed="false"
+                            aria-describedby="route-planner-status"
+                            aria-label="Set start point on a Road cell in the City Grid">
+                            Set start point
+                        </button>
+                        <button type="button" id="route-set-end-btn" disabled hidden
+                            class="w-full px-2 py-1.5 bg-sky-600 text-white text-xs font-semibold rounded shadow hover:bg-sky-700 transition focus:outline-none focus:ring-2 focus:ring-sky-400 disabled:opacity-50 disabled:cursor-not-allowed whitespace-nowrap"
+                            aria-pressed="false"
+                            aria-describedby="route-planner-status route-endpoint-controls"
+                            aria-label="Set end point for the selected event">
+                            Set end point
+                        </button>
+                    </div>
                     <button type="button" id="route-remove-start-btn" disabled
-                        class="flex-1 min-w-0 px-2 py-1.5 bg-gray-500 text-white text-xs font-semibold rounded shadow hover:bg-gray-600 transition focus:outline-none focus:ring-2 focus:ring-gray-400 disabled:opacity-50 disabled:cursor-not-allowed whitespace-nowrap"
+                        class="flex-shrink-0 px-2 py-1.5 bg-gray-500 text-white text-xs font-semibold rounded shadow hover:bg-gray-600 transition focus:outline-none focus:ring-2 focus:ring-gray-400 disabled:opacity-50 disabled:cursor-not-allowed whitespace-nowrap"
                         aria-describedby="route-planner-status"
                         aria-label="Remove the start point for the selected event">
                         Remove start point
                     </button>
                 </div>
-                <p id="route-planner-status" class="mt-3 text-sm text-white" role="status" aria-live="polite" aria-atomic="true">
+                <div id="route-endpoint-controls" class="hidden mt-2">
+                    <label for="route-endpoint-function-select" class="text-xs font-semibold text-gray-700 dark:text-gray-300">Endpoint function</label>
+                    <select id="route-endpoint-function-select"
+                        class="mt-1 w-full px-2 py-1.5 text-xs rounded-md border border-gray-300 dark:border-gray-600 bg-white dark:bg-gray-900 text-gray-900 dark:text-white focus:outline-none focus:ring-2 focus:ring-sky-500"
+                        aria-describedby="route-planner-status">
+                        <option value="">— Select assigned function —</option>
+                    </select>
+                </div>
+                <p id="route-planner-status" class="mt-3 text-sm !text-white" aria-live="off">
                     Choose an event from the list above to plan a visitor route.
                 </p>
+                <p id="route-planner-announcements" class="sr-only" role="status" aria-live="polite" aria-atomic="true"></p>
             </section>
             @endif
 

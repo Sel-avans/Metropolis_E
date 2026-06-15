@@ -47,8 +47,12 @@ Route::middleware('auth')->group(function () {
         Route::delete('/grid/cell/{cell}/function', [GridController::class, 'removeFunction'])->middleware('can:CanPlaceFunctions,' . PagePolicy::class);
 
         Route::middleware('can:CanManageEventRoutes,' . PagePolicy::class)->group(function () {
+            Route::post('/event-routes/sync-grid-move', [EventRouteController::class, 'syncGridMove'])->name('event-routes.sync-grid-move');
+            Route::post('/event-routes/sync-grid-remove', [EventRouteController::class, 'syncGridRemove'])->name('event-routes.sync-grid-remove');
             Route::get('/event-routes', [EventRouteController::class, 'index'])->name('event-routes.index');
             Route::post('/event-routes/start-point', [EventRouteController::class, 'store'])->name('event-routes.start-point');
+            Route::get('/event-routes/{event}/endpoint-context', [EventRouteController::class, 'endpointContext'])->name('event-routes.endpoint-context');
+            Route::post('/event-routes/{event}/endpoint', [EventRouteController::class, 'setEndpoint'])->name('event-routes.endpoint');
             Route::delete('/event-routes/{event}', [EventRouteController::class, 'destroy'])->name('event-routes.destroy');
         });
     });

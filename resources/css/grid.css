@@ -1,7 +1,35 @@
+.grid-cell.route-end-point {
+    outline: 3px solid #2563eb;
+    outline-offset: -3px;
+    box-shadow: inset 0 0 0 2px rgba(37, 99, 235, 0.35);
+}
+
+.grid-cell.route-endpoint-option {
+    outline: 3px dashed #2563eb;
+    outline-offset: -3px;
+    box-shadow: inset 0 0 0 2px rgba(37, 99, 235, 0.35);
+    cursor: pointer;
+}
+
+.dark .grid-cell.route-end-point,
+.dark .grid-cell.route-endpoint-option {
+    outline-color: #60a5fa;
+    box-shadow: inset 0 0 0 2px rgba(96, 165, 250, 0.35);
+}
+
 .grid-cell.route-start-point {
     outline: 3px solid #059669;
     outline-offset: -3px;
     box-shadow: inset 0 0 0 2px rgba(5, 150, 105, 0.35);
+}
+
+.grid-cell.route-start-point[draggable="false"],
+.grid-cell.route-end-point[draggable="false"] {
+    cursor: not-allowed;
+}
+
+.grid-cell.route-end-point[draggable="true"] {
+    cursor: grab;
 }
 
 .dark .grid-cell.route-start-point {
