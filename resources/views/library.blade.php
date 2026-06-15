@@ -83,7 +83,7 @@
 </div>
 
 <script>
-// Filter functionaliteit
+// Filter functionality 
 document.getElementById('searchInput').addEventListener('input', function() {
     const input = this.value.toLowerCase();
     document.querySelectorAll('.library-item').forEach(item => {
