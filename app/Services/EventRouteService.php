@@ -19,8 +19,16 @@ class EventRouteService
 
         $cell->loadMissing('function');
 
-        return $cell->function
-            && strcasecmp(trim($cell->function->name), self::MAIN_ACCESS_ROAD_NAME) === 0;
+        if (!$cell->function) {
+            return false;
+        }
+
+        // Be tolerant with function naming (e.g. "Main Road", "Road 1", etc.).
+        // We only need a "road"-like function for start point selection.
+        $name = strtolower(trim($cell->function->name ?? ''));
+        $road = strtolower(self::MAIN_ACCESS_ROAD_NAME);
+
+        return str_contains($name, $road);
     }
 
     public function findMainAccessRoadCell(int $row, int $col): ?GridCell
@@ -331,8 +339,10 @@ class EventRouteService
      */
     public function roadFunctionIds(): array
     {
+        $road = strtolower(self::MAIN_ACCESS_ROAD_NAME);
+
         return CityFunction::query()
-            ->whereRaw('LOWER(TRIM(name)) = ?', [strtolower(self::MAIN_ACCESS_ROAD_NAME)])
+            ->whereRaw('LOWER(TRIM(name)) LIKE ?', ['%' . $road . '%'])
             ->pluck('id')
             ->map(fn ($id) => (int) $id)
             ->values()

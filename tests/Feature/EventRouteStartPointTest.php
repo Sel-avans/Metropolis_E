@@ -102,6 +102,38 @@ class EventRouteStartPointTest extends TestCase
         $this->assertDatabaseCount('event_routes', 0);
     }
 
+    public function test_city_planner_can_set_start_point_on_road_function_variant_name(): void
+    {
+        $planner = User::factory()->create(['role' => UserRole::City_planner]);
+
+        $roadVariant = CityFunction::factory()->create([
+            'name' => 'Main Road',
+            'category' => 'mobility',
+        ]);
+
+        $event = $this->createEvent();
+
+        GridCell::factory()->create([
+            'row' => 1,
+            'col' => 1,
+            'function_id' => $roadVariant->id,
+        ]);
+
+        $response = $this->actingAs($planner)->postJson('/event-routes/start-point', [
+            'event_id' => $event->id,
+            'row' => 1,
+            'col' => 1,
+        ]);
+
+        $response->assertOk();
+
+        $this->assertDatabaseHas('event_routes', [
+            'simulation_event_id' => $event->id,
+            'start_row' => 1,
+            'start_col' => 1,
+        ]);
+    }
+
     public function test_policy_maker_cannot_manage_event_routes(): void
     {
         $policyMaker = User::factory()->create(['role' => UserRole::Municipal_Policy_Maker]);

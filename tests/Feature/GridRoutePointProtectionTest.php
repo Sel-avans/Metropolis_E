@@ -69,4 +69,90 @@ class GridRoutePointProtectionTest extends TestCase
             'function_id' => null,
         ]);
     }
+
+    public function test_grid_function_can_be_removed_after_start_point_deleted(): void
+    {
+        $road = CityFunction::factory()->create(['name' => 'Road', 'category' => 'mobility']);
+        $event = SimulationEvent::create([
+            'name' => 'City Event',
+            'description' => 'Test',
+            'type' => 'one-off',
+            'start_moment' => '2026-06-01 10:00:00',
+            'end_moment' => '2026-06-01 18:00:00',
+        ]);
+
+        $startCell = GridCell::factory()->create(['row' => 2, 'col' => 3, 'function_id' => $road->id]);
+
+        EventRoute::create([
+            'simulation_event_id' => $event->id,
+            'start_row' => 2,
+            'start_col' => 3,
+        ]);
+
+        // Delete the start point via the route planner API
+        $this->actingAs($this->planner())
+            ->deleteJson("/event-routes/{$event->id}")
+            ->assertOk()
+            ->assertJson(['success' => true]);
+
+        $this->assertDatabaseCount('event_routes', 0);
+
+        // Now the grid function should be removable again
+        $this->actingAs($this->planner())
+            ->deleteJson("/grid/cell/{$startCell->id}/function")
+            ->assertOk()
+            ->assertJson(['success' => true]);
+
+        $this->assertDatabaseHas('grid_cells', [
+            'id' => $startCell->id,
+            'function_id' => null,
+        ]);
+    }
+
+    public function test_grid_function_can_be_removed_after_endpoint_deleted(): void
+    {
+        $road = CityFunction::factory()->create(['name' => 'Road', 'category' => 'mobility']);
+        $store = CityFunction::factory()->create(['name' => 'Store']);
+        $event = SimulationEvent::create([
+            'name' => 'City Event',
+            'description' => 'Test',
+            'type' => 'one-off',
+            'start_moment' => '2026-06-01 10:00:00',
+            'end_moment' => '2026-06-01 18:00:00',
+        ]);
+
+        $startCell = GridCell::factory()->create(['row' => 2, 'col' => 3, 'function_id' => $road->id]);
+        $endCell = GridCell::factory()->create(['row' => 2, 'col' => 4, 'function_id' => $store->id]);
+
+        EventRoute::create([
+            'simulation_event_id' => $event->id,
+            'start_row' => 2,
+            'start_col' => 3,
+            'end_row' => 2,
+            'end_col' => 4,
+            'end_function_id' => $store->id,
+        ]);
+
+        $this->actingAs($this->planner())
+            ->deleteJson("/event-routes/{$event->id}/endpoint")
+            ->assertOk()
+            ->assertJson(['success' => true]);
+
+        $this->assertDatabaseHas('event_routes', [
+            'simulation_event_id' => $event->id,
+            'end_row' => null,
+            'end_col' => null,
+            'end_function_id' => null,
+        ]);
+
+        $this->actingAs($this->planner())
+            ->deleteJson("/grid/cell/{$endCell->id}/function")
+            ->assertOk()
+            ->assertJson(['success' => true]);
+
+        $this->assertDatabaseHas('grid_cells', [
+            'id' => $endCell->id,
+            'function_id' => null,
+        ]);
+    }
 }

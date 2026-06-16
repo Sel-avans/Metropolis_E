@@ -22,7 +22,7 @@ import {
 } from './regulation.js';
 import { resetDayNightIndicatorState } from './day-night-indicator.js';
 import { initLibraryPreview, closePreview } from './library-preview.js';
-import { initRoutePlanner, handleRouteCellClick, handleGridFunctionPlaced, handleGridFunctionMoved, handleGridFunctionRemoved, syncRoutePlannerEvents, canDragRouteCell, canDropOnRouteCell, shouldBlockGridCellDrag, handleInvalidRouteCellDrop, canRemoveGridFunction, handleBlockedRoutePointRemoval, setRouteGridRenderCallback } from './route-planner.js';
+import { initRoutePlanner, handleRouteCellClick, handleGridFunctionPlaced, handleGridFunctionMoved, handleGridFunctionRemoved, syncRoutePlannerEvents, canDragRouteCell, canDragLibraryFunction, canDropOnRouteCell, shouldBlockGridCellDrag, handleInvalidLibraryDrag, handleInvalidRouteCellDrop, canRemoveGridFunction, handleBlockedRoutePointRemoval, setRouteGridRenderCallback } from './route-planner.js';
 
 const SIM_STATE_KEY = 'metropolis_simulation_state';
 
@@ -1209,8 +1209,18 @@ function initGridPage() {
 
     document.querySelectorAll(".library-item").forEach(item => {
         item.addEventListener("dragstart", e => {
+            const nextDraggedItem = {
+                id: Number(item.dataset.functionId),
+                name: item.dataset.functionName,
+                image: item.dataset.image,
+            };
+            if (!canDragLibraryFunction(nextDraggedItem)) {
+                e.preventDefault();
+                handleInvalidLibraryDrag(nextDraggedItem);
+                return;
+            }
             isDragging = true; dropOccurred = false;
-            draggedItem = { id: Number(item.dataset.functionId), name: item.dataset.functionName, image: item.dataset.image };
+            draggedItem = nextDraggedItem;
             e.dataTransfer.setDragImage(item.querySelector("img"), 16, 16);
         });
     });
@@ -1247,7 +1257,7 @@ function initGridPage() {
             if (isLockedCell(cell)) {
                 return;
             }
-            if (!canDropOnRouteCell(cell)) {
+            if (!canDropOnRouteCell(cell, draggedItem, Boolean(sourceCell))) {
                 e.preventDefault();
                 blockedRouteDropTarget = cell;
                 return;
@@ -1270,11 +1280,11 @@ function initGridPage() {
                 return;
             }
 
-            if (!canDropOnRouteCell(cell)) {
+            if (!canDropOnRouteCell(cell, draggedItem, Boolean(sourceCell))) {
                 isDragging = false;
                 dropOccurred = true;
                 if (sourceCell) sourceCell.classList.remove('drag-source');
-                handleInvalidRouteCellDrop(cell);
+                handleInvalidRouteCellDrop(cell, draggedItem, Boolean(sourceCell));
                 draggedItem = null;
                 sourceCell = null;
                 blockedRouteDropTarget = null;
@@ -1393,11 +1403,12 @@ function initGridPage() {
             if (displacedItem) {
                 await handleGridFunctionMoved(newRow, newCol, oldRow, oldCol, displacedItem.id);
             }
-            handleGridFunctionPlaced(cell, draggedItem.id);
+            await handleGridFunctionPlaced(cell, draggedItem.id);
         });
 
         cell.addEventListener("click",   (e) => { 
             if (isDragging) return;
+            if (e.target.closest('.delete-btn')) return;
             if (handleRouteCellClick(cell)) {
                 e.preventDefault();
                 e.stopPropagation();
@@ -1538,8 +1549,9 @@ function initGridPage() {
     // =========================================================
 
     document.addEventListener("click", async (e) => {
-        if (!e.target.classList.contains("delete-btn")) return;
-        const cell = e.target.closest(".grid-cell");
+        const deleteButton = e.target.closest(".delete-btn");
+        if (!deleteButton) return;
+        const cell = deleteButton.closest(".grid-cell");
         if (!cell) return;
         if (isLockedCell(cell)) {
             // Do not allow deletion on locked cells
@@ -1623,8 +1635,8 @@ function initGridPage() {
             && e.pageY >= rect.top && e.pageY <= rect.bottom;
 
         if (insideGrid) {
-            if (blockedRouteDropTarget && !canDropOnRouteCell(blockedRouteDropTarget)) {
-                handleInvalidRouteCellDrop(blockedRouteDropTarget);
+            if (blockedRouteDropTarget && !canDropOnRouteCell(blockedRouteDropTarget, activeDraggedItem, Boolean(activeSourceCell))) {
+                handleInvalidRouteCellDrop(blockedRouteDropTarget, activeDraggedItem, Boolean(activeSourceCell));
             }
             activeSourceCell.classList.remove('drag-source');
             draggedItem = null;
