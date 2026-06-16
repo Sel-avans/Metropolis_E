@@ -29,7 +29,7 @@ function createDeleteBtn(functionName, row = '', col = '') {
     const btn = document.createElement('button');
     btn.type = 'button';
     btn.className = 'delete-btn absolute top-[2px] right-[2px] bg-red-600/80 text-white w-5 h-5 text-[14px] rounded cursor-pointer flex items-center justify-center focus:outline-none focus:ring-2 focus:ring-red-400';
-    btn.setAttribute('tabindex', '0');  // ← dit was er niet
+    btn.setAttribute('tabindex', '0');
     const locationLabel = row && col ? ` in grid cell ${row},${col}` : ' from grid cell';
     btn.setAttribute('aria-label', `Remove ${functionName}${locationLabel}`);
     const icon = document.createElement('span');
@@ -54,7 +54,6 @@ function restoreCellContent(cell, functionId, functionName, functionImage) {
     cell.appendChild(createDeleteBtn(functionName, row, col));
     cell.setAttribute('draggable', 'true');
 
-    // WCAG 4.1.2: aria-label bijwerken na restore
     cell.setAttribute('aria-label', `Cell ${row},${col} contains ${functionName}. Press Enter to select.`);
 }
 
@@ -317,13 +316,6 @@ function initGridPage() {
         return /^\d{4}-\d{2}-\d{2}$/.test(str) ? str : null;
     }
 
-    /**
-     * Recurring events in simulation replay a representative city day.
-     * The daily time window (e.g. 18:00–22:00) drives activation — not whether
-     * simulationReferenceDate equals recurring_start_date (a future policy start
-     * should still be previewable on the grid).
-     * Only block after recurring_end_date has passed.
-     */
     function matchesRecurringSchedule(event, referenceDate) {
         if (event.type !== 'recurring') return true;
 
@@ -606,6 +598,109 @@ function initGridPage() {
         const data = await getNeighborsWithQoL(row, col);
         renderNeighborsList(data);
         showPopup();
+    }
+
+    // =========================================================
+    // MOBIELE TOUCH-TO-PLACE FLOW
+    // =========================================================
+
+    let touchSelectedItem = null;
+    let touchSourceCell = null;
+
+    function isTouchDevice() {
+        return window.matchMedia('(pointer: coarse)').matches;
+    }
+
+    function ensureMobileBanner() {
+        let banner = document.getElementById('mobile-place-banner');
+        if (!banner) {
+            // Inject benodigde stijlen eenmalig
+            if (!document.getElementById('mobile-touch-styles')) {
+                const style = document.createElement('style');
+                style.id = 'mobile-touch-styles';
+                style.textContent = `
+                    .touch-drag-source {
+                        outline: 2px solid #f59e0b !important;
+                        outline-offset: -2px;
+                        box-shadow: 0 0 0 3px rgba(245,158,11,0.35) !important;
+                    }
+                    .library-item-selected {
+                        border-color: #3b82f6 !important;
+                        box-shadow: 0 0 0 2px rgba(59,130,246,0.4);
+                        background-color: rgba(59,130,246,0.08);
+                    }
+                `;
+                document.head.appendChild(style);
+            }
+            banner = document.createElement('div');
+            banner.id = 'mobile-place-banner';
+            banner.setAttribute('aria-live', 'polite');
+            banner.setAttribute('role', 'status');
+            banner.style.cssText = [
+                'display:none',
+                'position:fixed',
+                'bottom:16px',
+                'left:50%',
+                'transform:translateX(-50%)',
+                'z-index:9999',
+                'background:var(--color-background-secondary, #1e293b)',
+                'border:1px solid rgba(255,255,255,0.15)',
+                'border-radius:10px',
+                'padding:10px 14px',
+                'font-size:14px',
+                'color:var(--color-text-primary, #f1f5f9)',
+                'box-shadow:0 4px 20px rgba(0,0,0,0.35)',
+                'align-items:center',
+                'gap:8px',
+                'max-width:90vw',
+                'white-space:nowrap',
+            ].join(';');
+
+            banner.innerHTML = `
+                <span style="font-size:18px;line-height:1" aria-hidden="true">👆</span>
+                <span id="mobile-place-name" style="font-weight:500;overflow:hidden;text-overflow:ellipsis;max-width:40vw"></span>
+                <span id="mobile-place-action" style="opacity:0.6;font-size:13px">— tap a cell to place</span>
+                <button type="button" id="mobile-place-cancel"
+                    style="margin-left:6px;padding:3px 10px;border:1px solid rgba(255,255,255,0.25);
+                           border-radius:6px;background:transparent;color:inherit;
+                           cursor:pointer;font-size:12px;flex-shrink:0;"
+                    aria-label="Cancel placement">
+                    Cancel
+                </button>
+            `;
+            document.body.appendChild(banner);
+
+            document.getElementById('mobile-place-cancel').addEventListener('click', () => {
+                clearTouchSelection();
+            });
+        }
+        return banner;
+    }
+
+    function showMobileBanner(name, action = '— tap a cell to place') {
+        const banner = ensureMobileBanner();
+        document.getElementById('mobile-place-name').textContent = name;
+        const actionEl = document.getElementById('mobile-place-action');
+        if (actionEl) actionEl.textContent = action;
+        banner.style.display = 'flex';
+    }
+
+    function hideMobileBanner() {
+        const banner = document.getElementById('mobile-place-banner');
+        if (banner) banner.style.display = 'none';
+    }
+
+    function clearTouchSelection() {
+        touchSelectedItem = null;
+        if (touchSourceCell) {
+            touchSourceCell.classList.remove('touch-drag-source');
+            touchSourceCell = null;
+        }
+        hideMobileBanner();
+        document.querySelectorAll('.library-item').forEach(i => {
+            i.classList.remove('library-item-selected');
+            i.setAttribute('aria-pressed', 'false');
+        });
     }
 
     // =========================================================
@@ -980,10 +1075,6 @@ function initGridPage() {
     const nightInput = document.getElementById('night-hours-input');
     const validMsg = document.getElementById('duration-validation-msg');
 
-    /**
-     * Pas duur aan, update gekoppeld veld, herbereken timeline en simulatie.
-     * Wordt maximaal 1x per animatieframe uitgevoerd (debounce via rAF).
-     */
     let _durationRafPending = false;
     function _applyDurationChange(dayHours) {
         if (_durationRafPending) return;
@@ -1189,6 +1280,42 @@ function initGridPage() {
             draggedItem = { id: Number(item.dataset.functionId), name: item.dataset.functionName, image: item.dataset.image };
             e.dataTransfer.setDragImage(item.querySelector("img"), 16, 16);
         });
+
+        // ── Mobiele tap-to-select flow ──
+        item.addEventListener('click', () => {
+            if (!isTouchDevice()) return;
+
+            const isSame = touchSelectedItem?.id === Number(item.dataset.functionId);
+            if (isSame) {
+                clearTouchSelection();
+                return;
+            }
+
+            // Wis eventuele keyboard-selectie en grid-broncel zodat flows niet botsen
+            keyboardSelectedItem = null;
+            if (touchSourceCell) {
+                touchSourceCell.classList.remove('touch-drag-source');
+                touchSourceCell = null;
+            }
+            document.querySelectorAll('.library-item').forEach(i => {
+                i.classList.remove('library-item-selected');
+                i.setAttribute('aria-pressed', 'false');
+            });
+
+            touchSelectedItem = {
+                id: Number(item.dataset.functionId),
+                name: item.dataset.functionName,
+                image: item.dataset.image,
+            };
+
+            item.classList.add('library-item-selected');
+            item.setAttribute('aria-pressed', 'true');
+
+            showMobileBanner(item.dataset.functionName);
+            announceToScreenReader(
+                `${item.dataset.functionName} selected. Tap a grid cell to place it.`
+            );
+        });
     });
 
     document.querySelectorAll(".grid-cell").forEach(cell => {
@@ -1291,8 +1418,154 @@ function initGridPage() {
             updateQoL();
         });
 
-        cell.addEventListener("click", (e) => {
+        cell.addEventListener("click", async (e) => {
             if (isDragging) return;
+
+            // ── Mobiele touch: functie binnen grid verplaatsen ──
+            // Fase 2: er is al een broncel geselecteerd → verplaats naar deze cel
+            if (touchSourceCell) {
+                if (cell === touchSourceCell) {
+                    // Tik op dezelfde cel → annuleer
+                    clearTouchSelection();
+                    return;
+                }
+
+                if (isLockedCell(cell)) {
+                    showLockedPlacementMessage(cell);
+                    flashLockExplanation(cell);
+                    return;
+                }
+
+                const sourceImg = touchSourceCell.querySelector('.grid-function-icon');
+                if (!sourceImg) { clearTouchSelection(); return; }
+
+                const itemToMove = {
+                    id: Number(sourceImg.dataset.functionId),
+                    name: sourceImg.alt,
+                    image: sourceImg.src,
+                };
+
+                const existingImg = cell.querySelector('.grid-function-icon');
+                if (existingImg) {
+                    if (!window.confirm(`Replace ${existingImg.alt} with ${itemToMove.name}?`)) return;
+                }
+
+                const oldRow = touchSourceCell.dataset.row;
+                const oldCol = touchSourceCell.dataset.col;
+                const newRow = cell.dataset.row;
+                const newCol = cell.dataset.col;
+
+                const res = await saveMove(oldRow, oldCol, newRow, newCol, false, itemToMove.id);
+
+                if (res && res.status === 403) {
+                    const data = await res.json().catch(() => ({}));
+                    alert(data.message ?? "You don't have permission to modify the grid.");
+                    clearTouchSelection();
+                    return;
+                }
+
+                if (res && res.status === 409) {
+                    if (!window.confirm('Placement is forbidden by adjacency rules. Force placement anyway?')) {
+                        announceToScreenReader('Placement cancelled.');
+                        clearTouchSelection();
+                        return;
+                    }
+                    const res2 = await saveMove(oldRow, oldCol, newRow, newCol, true, itemToMove.id);
+                    if (!res2 || !res2.ok) {
+                        announceToScreenReader('Placement failed. Please try again.');
+                        clearTouchSelection();
+                        return;
+                    }
+                }
+
+                // Broncel leegmaken
+                touchSourceCell.innerHTML = '';
+                touchSourceCell.removeAttribute('draggable');
+                touchSourceCell.setAttribute('aria-label',
+                    `Empty cell ${oldRow},${oldCol}. Press Enter to select.`
+                );
+
+                restoreCellContent(cell, itemToMove.id, itemToMove.name, itemToMove.image);
+                cell.setAttribute('draggable', 'true');
+                activateCell(cell);
+                updateCellHighlights();
+                updateQoL();
+
+                announceToScreenReader(
+                    `${itemToMove.name} moved to row ${newRow}, column ${newCol}.`
+                );
+                clearTouchSelection();
+                return;
+            }
+
+            // ── Mobiele touch: item uit library plaatsen ──
+            if (touchSelectedItem) {
+                if (isLockedCell(cell)) {
+                    showLockedPlacementMessage(cell);
+                    flashLockExplanation(cell);
+                    return;
+                }
+
+                const existingImg = cell.querySelector('.grid-function-icon');
+                if (existingImg) {
+                    if (!window.confirm(`Replace ${existingImg.alt} with ${touchSelectedItem.name}?`)) return;
+                }
+
+                const newRow = cell.dataset.row;
+                const newCol = cell.dataset.col;
+
+                const res = await saveMove(null, null, newRow, newCol, false, touchSelectedItem.id);
+
+                if (res && res.status === 403) {
+                    const data = await res.json().catch(() => ({}));
+                    alert(data.message ?? "You don't have permission to modify the grid.");
+                    return;
+                }
+
+                if (res && res.status === 409) {
+                    if (!window.confirm('Placement is forbidden by adjacency rules. Force placement anyway?')) {
+                        announceToScreenReader('Placement cancelled.');
+                        return;
+                    }
+                    const res2 = await saveMove(null, null, newRow, newCol, true, touchSelectedItem.id);
+                    if (!res2 || !res2.ok) {
+                        announceToScreenReader('Placement failed. Please try again.');
+                        return;
+                    }
+                }
+
+                restoreCellContent(cell, touchSelectedItem.id, touchSelectedItem.name, touchSelectedItem.image);
+                cell.setAttribute('draggable', 'true');
+                activateCell(cell);
+                updateCellHighlights();
+                updateQoL();
+
+                announceToScreenReader(
+                    `${touchSelectedItem.name} placed in row ${newRow}, column ${newCol}.`
+                );
+                clearTouchSelection();
+                return;
+            }
+
+            // ── Mobiele touch: cel met functie aantikken → oppakken voor verplaatsing ──
+            if (isTouchDevice()) {
+                const existingImg = cell.querySelector('.grid-function-icon');
+                if (existingImg && !isLockedCell(cell)) {
+                    // Wis keyboard-selectie zodat flows niet botsen
+                    keyboardSelectedItem = null;
+
+                    touchSourceCell = cell;
+                    cell.classList.add('touch-drag-source');
+
+                    showMobileBanner(existingImg.alt, '— tap a cell to move here');
+                    announceToScreenReader(
+                        `${existingImg.alt} selected. Tap another cell to move it there, or tap this cell again to cancel.`
+                    );
+                    return;
+                }
+            }
+
+            // ── Bestaande desktop click-logica ──
             if (isLockedCell(cell) && !canSelectLockedCell(cell)) {
                 e.preventDefault();
                 flashLockExplanation(cell);
@@ -1314,6 +1587,7 @@ function initGridPage() {
         });
 
         cell.addEventListener('mouseenter', (event) => {
+            if (isTouchDevice()) return; // geen hover-popup op touch
             const row = parseInt(cell.dataset.row), col = parseInt(cell.dataset.col);
             clearTimeout(hoverTimer);
             hoverTimer = setTimeout(() => handleTileHover(row, col, event), HOVER_DELAY_MS);
@@ -1348,6 +1622,10 @@ function initGridPage() {
                 i.setAttribute('aria-pressed', 'false');
             });
 
+            // Wis touch-selectie zodat de flows niet botsen
+            touchSelectedItem = null;
+            hideMobileBanner();
+
             keyboardSelectedItem = {
                 id: Number(item.dataset.functionId),
                 name: item.dataset.functionName,
@@ -1365,9 +1643,6 @@ function initGridPage() {
             if (firstCell) firstCell.focus();
         });
 
-        // Voorkom dat de browser bij Enter/Space automatisch een click-event
-        // genereert op dit role="button" element. Zonder deze fix opent
-        // de preview ook bij Enter, terwijl dat alleen bij "i" moet gebeuren.
         item.addEventListener('keyup', (e) => {
             if (e.key === 'Enter' || e.key === ' ') {
                 e.preventDefault();
@@ -1592,7 +1867,6 @@ function initGridPage() {
         const col = cell.dataset.col;
         cell.innerHTML = "";
         cell.removeAttribute("draggable");
-        // WCAG 4.1.2: aria-label bijwerken naar lege cel na verwijdering
         cell.setAttribute('aria-label', `Empty cell ${row},${col}. Press Enter to select.`);
         activateCell(cell);
 
