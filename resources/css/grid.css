@@ -227,3 +227,23 @@
     display: inline-block;
     border: 1px solid #16a34a;
 }
+
+
+@media (max-width: 640px) {
+    .grid-cell {
+
+        width: 22vw !important;
+        height: 22vw !important;
+        
+
+        margin: 0 !important;
+    }
+
+
+    .grid-cell.is-locked .area-lock-explanation {
+        font-size: 0.6rem; /* Nog kleiner lettertype */
+        padding: 0.3rem;
+        inset-inline: 2px;
+        bottom: 2px;
+    }
+}
