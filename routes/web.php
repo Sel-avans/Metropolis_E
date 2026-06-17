@@ -54,6 +54,7 @@ Route::middleware('auth')->group(function () {
             Route::get('/event-routes/{event}/endpoint-context', [EventRouteController::class, 'endpointContext'])->name('event-routes.endpoint-context');
             Route::post('/event-routes/{event}/endpoint', [EventRouteController::class, 'setEndpoint'])->name('event-routes.endpoint');
             Route::delete('/event-routes/{event}/endpoint', [EventRouteController::class, 'destroyEndpoint'])->name('event-routes.endpoint.destroy');
+            Route::post('/event-routes/{event}/validate-path-cell', [EventRouteController::class, 'validatePathCell'])->name('event-routes.validate-path-cell');
             Route::post('/event-routes/{event}/generate', [EventRouteController::class, 'generate'])->name('event-routes.generate');
             Route::post('/event-routes/{event}/path', [EventRouteController::class, 'storePath'])->name('event-routes.path.store');
             Route::delete('/event-routes/{event}/path', [EventRouteController::class, 'destroyPath'])->name('event-routes.path.destroy');

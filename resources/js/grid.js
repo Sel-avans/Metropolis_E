@@ -22,7 +22,7 @@ import {
 } from './regulation.js';
 import { resetDayNightIndicatorState } from './day-night-indicator.js';
 import { initLibraryPreview, closePreview } from './library-preview.js';
-import { initRoutePlanner, handleRouteCellClick, handleGridFunctionPlaced, handleGridFunctionMoved, handleGridFunctionRemoved, syncRoutePlannerEvents, refreshRouteActivationDisplay, canDragRouteCell, canDragLibraryFunction, canDropOnRouteCell, shouldBlockGridCellDrag, handleInvalidLibraryDrag, handleInvalidRouteCellDrop, canRemoveGridFunction, handleBlockedRoutePointRemoval, setRouteGridRenderCallback } from './route-planner.js';
+import { initRoutePlanner, handleRouteCellClick, handleRouteCellKeydown, handleGridFunctionPlaced, handleGridFunctionMoved, handleGridFunctionRemoved, syncRoutePlannerEvents, refreshRouteActivationDisplay, canDragRouteCell, canDragLibraryFunction, canDropOnRouteCell, shouldBlockGridCellDrag, handleInvalidLibraryDrag, handleInvalidRouteCellDrop, canRemoveGridFunction, handleBlockedRoutePointRemoval, setRouteGridRenderCallback } from './route-planner.js';
 
 const SIM_STATE_KEY = 'metropolis_simulation_state';
 
@@ -1517,6 +1517,9 @@ function initGridPage() {
         });
         cell.addEventListener("keydown", e => {
             if (isDragging) return;
+            if (handleRouteCellKeydown(cell, e)) {
+                return;
+            }
             if ((e.key === "Enter" || e.key === " ") && handleRouteCellClick(cell)) {
                 e.preventDefault();
                 return;

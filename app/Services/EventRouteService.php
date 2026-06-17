@@ -242,6 +242,25 @@ class EventRouteService
     }
 
     /**
+     * @return array{valid: bool, error?: string, message?: string}
+     */
+    public function validatePathCell(
+        int $fromRow,
+        int $fromCol,
+        int $toRow,
+        int $toCol,
+        ?int $expectedFunctionId = null
+    ): array {
+        return $this->pathfindingService->validateRoutePathStep(
+            $fromRow,
+            $fromCol,
+            $toRow,
+            $toCol,
+            $expectedFunctionId
+        );
+    }
+
+    /**
      * @return array{can_create: bool, error?: string, message?: string}
      */
     public function assessRouteCreation(?EventRoute $route): array
@@ -265,13 +284,22 @@ class EventRouteService
         );
 
         if ($result['success']) {
-            return ['can_create' => true];
+            return [
+                'can_create' => true,
+                'can_generate' => true,
+                'can_draw' => true,
+            ];
         }
+
+        $error = $result['error'] ?? 'route_blocked';
+        $message = $result['message'] ?? 'The route cannot be created for this event.';
 
         return [
             'can_create' => false,
-            'error' => $result['error'] ?? 'route_blocked',
-            'message' => $result['message'] ?? 'The route cannot be created for this event.',
+            'can_generate' => false,
+            'can_draw' => false,
+            'error' => $error,
+            'message' => $message,
         ];
     }
 

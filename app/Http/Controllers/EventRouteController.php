@@ -166,6 +166,27 @@ class EventRouteController extends Controller
         ]);
     }
 
+    public function validatePathCell(Request $request, SimulationEvent $event): JsonResponse
+    {
+        $validated = $request->validate([
+            'from_row' => ['required', 'integer', 'min:1', 'max:3'],
+            'from_col' => ['required', 'integer', 'min:1', 'max:4'],
+            'row' => ['required', 'integer', 'min:1', 'max:3'],
+            'col' => ['required', 'integer', 'min:1', 'max:4'],
+            'function_id' => ['nullable', 'integer', 'exists:city_functions,id'],
+        ]);
+
+        $result = $this->eventRouteService->validatePathCell(
+            (int) $validated['from_row'],
+            (int) $validated['from_col'],
+            (int) $validated['row'],
+            (int) $validated['col'],
+            isset($validated['function_id']) ? (int) $validated['function_id'] : null,
+        );
+
+        return response()->json($result, ($result['valid'] ?? false) ? 200 : 422);
+    }
+
     public function generate(SimulationEvent $event): JsonResponse
     {
         $result = $this->eventRouteService->generateRoute($event);

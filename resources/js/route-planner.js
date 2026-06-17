@@ -136,7 +136,12 @@ const ROUTE_STATUS = {
     endpointFailed: 'Could not set the end point. Please try again.',
     noAssignedFunctions: 'This event has no assigned city functions to use as an end point.',
     eventWithFullRoute: 'Start and end points are set. Press Generate route or Draw route to create a visitor path.',
-    routeCreationBlocked: 'The route cannot be created. Adjust the grid, start point, or end point and try again.',
+    routeGenerateForbidden:
+        'No visitor route can be created through occupied grid cells between the start and end points.',
+    routeGenerateUnreachable:
+        'No visitor route can be created through occupied grid cells between the start and end points.',
+    routeCreationBlocked:
+        'No visitor route can be created through occupied grid cells between the start and end points.',
     eventWithStartOnly: 'Start point is shown on the City Grid for the selected event.',
     saving: 'Saving start point…',
     removing: 'Removing start point…',
@@ -146,9 +151,18 @@ const ROUTE_STATUS = {
     removeEndFailed: 'Could not remove the end point. Please try again.',
     routeGenerated: 'Visitor route generated and shown on the City Grid for 5 seconds.',
     routeDrawMode: 'Draw route mode is on. The start point is focused on the City Grid. Tab to adjacent cells and press Enter to add each step.',
+    routeDrawReachedEnd: {
+        visual: 'End point reached. Press Save route to finish the drawn visitor route.',
+        announce:
+            'Route reached the end point on the City Grid. Press Shift+Tab to move to Save route, then press Enter to save the drawn route.',
+    },
     routeDrawAdjacentOnly: 'Each step of the drawn route must be on a cell next to the previous one.',
     routeDrawOccupiedOnly: 'The route may only pass through grid cells that contain a city function.',
+    routeDrawEmptyCell: 'The route may only pass through grid cells that contain a city function.',
     routeDrawNoBacktrack: 'You cannot return to a cell that is already part of the drawn route.',
+    routeDrawCellInvalid: 'This cell cannot be part of the visitor route.',
+    routeDrawForbiddenNeighbour:
+        'The route cannot pass through this forbidden function.',
     routeDrawSaved: 'Drawn visitor route saved and shown on the City Grid for 5 seconds.',
     routeRemoved: 'Visitor route removed. Generate or draw a new route when ready.',
     routeGenerateFailed: 'Could not generate the route. Please try again.',
@@ -894,7 +908,7 @@ function highlightRouteDrawPosition() {
     if (atEnd) {
         cell.setAttribute(
             'aria-label',
-            `Route reached the end point at row ${last.row}, column ${last.col} on the City Grid. Use Save route in the route planner to finish.`
+            `Route reached the end point at row ${last.row}, column ${last.col} on the City Grid. Press Shift+Tab to move to Save route.`
         );
         return;
     }
@@ -1493,12 +1507,139 @@ function hasPlannedRouteEndpoints(route) {
     );
 }
 
+function isRouteGenerateBlocked(route) {
+    if (!hasPlannedRouteEndpoints(route)) {
+        return false;
+    }
+
+    const routeCreation = route?.route_creation;
+    if (routeCreation?.can_generate === false) {
+        return true;
+    }
+
+    return routeCreation?.can_create === false;
+}
+
+function isRouteDrawBlocked(route) {
+    if (!hasPlannedRouteEndpoints(route)) {
+        return false;
+    }
+
+    const routeCreation = route?.route_creation;
+    if (routeCreation?.can_draw === false) {
+        return true;
+    }
+
+    return routeCreation?.can_create === false;
+}
+
 function isRouteCreationBlocked(route) {
-    return hasPlannedRouteEndpoints(route) && route?.route_creation?.can_create === false;
+    return isRouteGenerateBlocked(route);
+}
+
+function getRouteGenerateBlockMessage(route) {
+    const routeCreation = route?.route_creation;
+    if (routeCreation?.message && routeCreation?.error === 'forbidden_on_route') {
+        return routeCreation.message;
+    }
+
+    if (routeCreation?.message && routeCreation?.error === 'unreachable_event_location') {
+        return routeCreation.message;
+    }
+
+    if (routeCreation?.error === 'forbidden_on_route') {
+        return ROUTE_STATUS.routeGenerateForbidden;
+    }
+
+    if (routeCreation?.error === 'unreachable_event_location') {
+        return ROUTE_STATUS.routeGenerateUnreachable;
+    }
+
+    return routeCreation?.message || ROUTE_STATUS.routeCreationBlocked;
+}
+
+function getRouteDrawBlockMessage(route) {
+    return getRouteCreationBlockMessage(route);
 }
 
 function getRouteCreationBlockMessage(route) {
-    return route?.route_creation?.message || ROUTE_STATUS.routeCreationBlocked;
+    return getRouteGenerateBlockMessage(route);
+}
+
+function applyRouteCreationFeedback(route, { successStatus = null } = {}) {
+    updatePathControlsVisibility();
+
+    if (isRouteCreationBlocked(route)) {
+        lastRoutePlannerError = getRouteCreationBlockMessage(route);
+        updateStatusForSelectedEvent();
+        return;
+    }
+
+    lastRoutePlannerError = null;
+
+    if (successStatus) {
+        setPairedStatus(successStatus, 'info');
+        return;
+    }
+
+    updateStatusForSelectedEvent();
+}
+
+function notifyRoutePlanningAfterGridChange() {
+    if (!selectedEventId) {
+        return;
+    }
+
+    exitDrawModeIfRouteCreationBlocked();
+    applyRouteCreationFeedback(getSelectedEventRoute());
+}
+
+async function validatePathCellForDraw(fromRow, fromCol, row, col, expectedFunctionId = null) {
+    if (!selectedEventId) {
+        return { valid: true };
+    }
+
+    try {
+        const response = await fetch(`/event-routes/${selectedEventId}/validate-path-cell`, {
+            method: 'POST',
+            credentials: 'same-origin',
+            headers: {
+                'Content-Type': 'application/json',
+                'X-CSRF-TOKEN': csrfToken(),
+                Accept: 'application/json',
+            },
+            body: JSON.stringify({
+                from_row: fromRow,
+                from_col: fromCol,
+                row,
+                col,
+                function_id: expectedFunctionId,
+            }),
+        });
+
+        const data = await response.json().catch(() => ({}));
+        if (!response.ok || data.valid === false) {
+            let fallbackMessage = ROUTE_STATUS.routeDrawCellInvalid;
+            if (data.error === 'forbidden_on_route') {
+                fallbackMessage = ROUTE_STATUS.routeDrawForbiddenNeighbour;
+            } else if (data.error === 'empty_cell') {
+                fallbackMessage = ROUTE_STATUS.routeDrawEmptyCell;
+            }
+
+            return {
+                valid: false,
+                message: data.message || fallbackMessage,
+            };
+        }
+
+        return { valid: true };
+    } catch (error) {
+        console.error('Failed to validate route cell:', error);
+        return {
+            valid: false,
+            message: ROUTE_STATUS.routeDrawCellInvalid,
+        };
+    }
 }
 
 function exitDrawModeIfRouteCreationBlocked() {
@@ -1507,12 +1648,12 @@ function exitDrawModeIfRouteCreationBlocked() {
     }
 
     const route = getSelectedEventRoute();
-    if (!isRouteCreationBlocked(route)) {
+    if (!isRouteDrawBlocked(route)) {
         return false;
     }
 
     clearPathDrawingMode();
-    lastRoutePlannerError = getRouteCreationBlockMessage(route);
+    lastRoutePlannerError = getRouteDrawBlockMessage(route);
     return true;
 }
 
@@ -1525,7 +1666,8 @@ function updatePathControlsVisibility() {
     const removePathBtn = document.getElementById('route-remove-path-btn');
     const route = getSelectedEventRoute();
     const hasFullRoute = hasPlannedRouteEndpoints(route);
-    const routeCreationBlocked = isRouteCreationBlocked(route);
+    const routeCreationGenerateBlocked = isRouteGenerateBlocked(route);
+    const routeCreationDrawBlocked = isRouteDrawBlocked(route);
     const hasStoredPath = routeHasStoredPath(route);
     const draftReachesEnd = Boolean(
         pathDrawingMode
@@ -1539,16 +1681,16 @@ function updatePathControlsVisibility() {
     controls?.classList.toggle('hidden', !hasFullRoute);
 
     if (generateBtn) {
-        generateBtn.disabled = !hasFullRoute || routeModesBusy || pathDrawingMode || hasStoredPath || routeCreationBlocked;
+        generateBtn.disabled = !hasFullRoute || routeModesBusy || pathDrawingMode || hasStoredPath || routeCreationGenerateBlocked;
     }
 
     if (drawBtn) {
-        drawBtn.disabled = !hasFullRoute || routeModesBusy || hasStoredPath || routeCreationBlocked;
+        drawBtn.disabled = !hasFullRoute || routeModesBusy || hasStoredPath || routeCreationDrawBlocked;
         drawBtn.setAttribute('aria-pressed', pathDrawingMode ? 'true' : 'false');
         drawBtn.setAttribute(
             'aria-label',
-            routeCreationBlocked
-                ? `Draw route is unavailable. ${getRouteCreationBlockMessage(route)}`
+            routeCreationDrawBlocked
+                ? `Draw route is unavailable. ${getRouteDrawBlockMessage(route)}`
                 : 'Draw a route manually on the City Grid, starting from the access road'
         );
     }
@@ -1678,7 +1820,14 @@ function updateStatusForSelectedEvent() {
         return;
     }
 
-    if (lastRoutePlannerError) {
+    const route = getSelectedEventRoute();
+    if (route && hasPlannedRouteEndpoints(route) && isRouteCreationBlocked(route)) {
+        lastRoutePlannerError = getRouteCreationBlockMessage(route);
+        setStatus(lastRoutePlannerError, 'error');
+        return;
+    }
+
+    if (lastRoutePlannerError && !pathDrawingMode) {
         setStatus(lastRoutePlannerError, 'error');
         return;
     }
@@ -1713,7 +1862,6 @@ function updateStatusForSelectedEvent() {
     }
 
     if (waitingForRoadPlacement) {
-        const route = getSelectedEventRoute();
         if (waitingForRoadPlacementChange && route?.start_row != null && route?.start_col != null) {
             setStatus(ROUTE_STATUS.placeRoadOnGridToChange(route.start_row, route.start_col).visual);
         } else {
@@ -1732,7 +1880,6 @@ function updateStatusForSelectedEvent() {
         return;
     }
 
-    const route = getSelectedEventRoute();
     if (route) {
         if (startPointMode) {
             if (route.start_row != null && route.start_col != null) {
@@ -1749,10 +1896,6 @@ function updateStatusForSelectedEvent() {
                         ? ROUTE_STATUS.eventWithFullRouteAndPath
                         : ROUTE_STATUS.eventWithPath
                 );
-                return;
-            }
-            if (isRouteCreationBlocked(route)) {
-                setStatus(getRouteCreationBlockMessage(route), 'error');
                 return;
             }
             setStatus(ROUTE_STATUS.eventWithFullRoute);
@@ -1830,7 +1973,7 @@ async function fetchEventRoutes() {
         updateStartPointButtonState();
         updateDeleteButtonStates();
         updatePathControlsVisibility();
-        updateStatusForSelectedEvent();
+        notifyRoutePlanningAfterGridChange();
     } catch (error) {
         if (generation !== routesFetchGeneration) return;
         console.error('Failed to load event routes:', error);
@@ -1964,10 +2107,9 @@ async function saveEndpoint(functionId, row = null, col = null, { isAuto = false
         }
 
         if (isRouteCreationBlocked(data.route)) {
-            lastRoutePlannerError = getRouteCreationBlockMessage(data.route);
-            updateStatusForSelectedEvent();
+            applyRouteCreationFeedback(data.route);
         } else {
-            setPairedStatus(status, 'info');
+            applyRouteCreationFeedback(data.route, { successStatus: status });
         }
         return true;
     } catch (error) {
@@ -2240,7 +2382,7 @@ async function saveStartPoint(row, col, { isAuto = false } = {}) {
         } else {
             status = ROUTE_STATUS.startPointSet(data.route.start_row, data.route.start_col);
         }
-        setPairedStatus(status, 'info');
+        applyRouteCreationFeedback(data.route, { successStatus: status });
         return true;
     } catch (error) {
         console.error('Failed to save start point:', error);
@@ -2304,12 +2446,14 @@ function activatePathDrawingMode() {
         return;
     }
 
-    if (isRouteCreationBlocked(route)) {
-        lastRoutePlannerError = getRouteCreationBlockMessage(route);
+    if (isRouteDrawBlocked(route)) {
+        lastRoutePlannerError = getRouteDrawBlockMessage(route);
         updatePathControlsVisibility();
         updateStatusForSelectedEvent();
         return;
     }
+
+    lastRoutePlannerError = null;
 
     if (pathDrawingMode) {
         clearPathDrawingMode();
@@ -2415,8 +2559,9 @@ async function removeStoredPath() {
         upsertSelectedRoute(data.route);
         renderRouteOnGrid();
         updateDeleteButtonStates();
-        updatePathControlsVisibility();
-        setPairedStatus(ROUTE_STATUS.routeRemoved, 'info');
+        applyRouteCreationFeedback(data.route, {
+            successStatus: ROUTE_STATUS.routeRemoved,
+        });
     } catch (error) {
         console.error('Failed to remove route:', error);
         announceAndSetStatus(ROUTE_STATUS.routeRemoveFailed, 'info');
@@ -2427,12 +2572,12 @@ async function removeStoredPath() {
 function handlePathDrawingClick(row, col) {
     const route = getSelectedEventRoute();
     if (!route || draftPathCells.length === 0) {
-        return true;
+        return Promise.resolve(true);
     }
 
     const last = draftPathCells[draftPathCells.length - 1];
     if (Number(last.row) === Number(row) && Number(last.col) === Number(col)) {
-        return true;
+        return Promise.resolve(true);
     }
 
     const isAlreadyOnPath = draftPathCells.some(
@@ -2441,32 +2586,46 @@ function handlePathDrawingClick(row, col) {
     if (isAlreadyOnPath) {
         setPairedStatus(ROUTE_STATUS.routeDrawNoBacktrack, 'info');
         renderRouteOnGrid();
-        return true;
+        return Promise.resolve(true);
     }
 
     if (Math.abs(Number(last.row) - Number(row)) + Math.abs(Number(last.col) - Number(col)) !== 1) {
         setPairedStatus(ROUTE_STATUS.routeDrawAdjacentOnly, 'info');
         renderRouteOnGrid();
-        return true;
+        return Promise.resolve(true);
     }
 
     const isEnd = Number(route.end_row) === Number(row) && Number(route.end_col) === Number(col);
     if (!isEnd && !isOccupiedCellAt(row, col)) {
         setPairedStatus(ROUTE_STATUS.routeDrawOccupiedOnly, 'info');
         renderRouteOnGrid();
+        return Promise.resolve(true);
+    }
+
+    return validatePathCellForDraw(
+        last.row,
+        last.col,
+        row,
+        col,
+        isEnd ? route.end_function_id : null
+    ).then((validation) => {
+        if (!validation.valid) {
+            setPairedStatus(validation.message, 'info');
+            renderRouteOnGrid();
+            return true;
+        }
+
+        draftPathCells.push({ row, col });
+        renderRouteOnGrid();
+        focusGridCell(row, col);
+        updatePathControlsVisibility();
+
+        if (isEnd) {
+            setPairedStatus(ROUTE_STATUS.routeDrawReachedEnd, 'info');
+        }
+
         return true;
-    }
-
-    draftPathCells.push({ row, col });
-    renderRouteOnGrid();
-    focusGridCell(row, col);
-    updatePathControlsVisibility();
-
-    if (isEnd) {
-        setPairedStatus(ROUTE_STATUS.routeDrawMode, 'info');
-    }
-
-    return true;
+    });
 }
 
 async function removeEndPoint() {
@@ -2710,9 +2869,7 @@ export async function handleGridFunctionRemoved(row, col, functionId) {
             return;
         }
 
-        if (!endPointMode && !startPointMode && !waitingForFunctionId && !waitingForRoadPlacement && !endpointDragMode && !startPointCellChoiceMode) {
-            updateStatusForSelectedEvent();
-        }
+        notifyRoutePlanningAfterGridChange();
     } catch (error) {
         console.error('Failed to sync routes after grid function removal:', error);
         renderRouteOnGrid();
@@ -2758,10 +2915,7 @@ export async function handleGridFunctionMoved(oldRow, oldCol, newRow, newCol, fu
         updateDeleteButtonStates();
         updateEndpointControlsVisibility();
         updatePathControlsVisibility();
-
-        if (!endPointMode && !startPointMode && !waitingForFunctionId && !waitingForRoadPlacement && !endpointDragMode && !startPointCellChoiceMode) {
-            updateStatusForSelectedEvent();
-        }
+        notifyRoutePlanningAfterGridChange();
     } catch (error) {
         console.error('Failed to sync routes after grid move:', error);
         renderRouteOnGrid();
@@ -2798,6 +2952,36 @@ export async function handleGridFunctionPlaced(cell, functionId) {
     await saveEndpoint(normalizedFunctionId, row, col, {
         isAuto: waitingForFunctionId ? !hadEndpoint : false,
     });
+}
+
+export function handleRouteCellKeydown(cell, event) {
+    if (!pathDrawingMode || !selectedEventId || event.key !== 'Tab' || !event.shiftKey) {
+        return false;
+    }
+
+    if (!cell.classList.contains('route-path-draw-position')) {
+        return false;
+    }
+
+    const route = getSelectedEventRoute();
+    const last = draftPathCells[draftPathCells.length - 1];
+    if (
+        !route
+        || !last
+        || Number(last.row) !== Number(route.end_row)
+        || Number(last.col) !== Number(route.end_col)
+    ) {
+        return false;
+    }
+
+    const saveBtn = document.getElementById('route-save-path-btn');
+    if (!saveBtn || saveBtn.disabled || saveBtn.classList.contains('hidden')) {
+        return false;
+    }
+
+    event.preventDefault();
+    saveBtn.focus();
+    return true;
 }
 
 export function handleRouteCellClick(cell) {

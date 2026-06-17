@@ -23,43 +23,94 @@ class GridPathfindingService
     /** @var list<int> */
     private array $roadFunctionIds = [];
 
+    /** @var list<int>|null */
+    private ?array $routeForbiddenFunctionIds = null;
+
     /**
      * @return array{valid: bool, error?: string, message?: string}
      */
     public function validateEventEndpoint(int $row, int $col, int $functionId): array
     {
+        return $this->validateRoutePathCell($row, $col, $functionId);
+    }
+
+    /**
+     * Validate a route step from one cell to the next (draw mode).
+     *
+     * @return array{valid: bool, error?: string, message?: string}
+     */
+    public function validateRoutePathStep(
+        int $fromRow,
+        int $fromCol,
+        int $toRow,
+        int $toCol,
+        ?int $expectedFunctionId = null
+    ): array {
         $this->loadGrid();
 
-        if ((int) ($this->functionAt($row, $col) ?? 0) !== $functionId) {
+        if (!$this->cellsAreAdjacent($fromRow, $fromCol, $toRow, $toCol)) {
+            return [
+                'valid' => false,
+                'error' => 'invalid_path',
+                'message' => 'Each step of the drawn route must be on an adjacent grid cell.',
+            ];
+        }
+
+        $cellValidation = $this->validateRoutePathCell($toRow, $toCol, $expectedFunctionId);
+        if (!$cellValidation['valid']) {
+            return $cellValidation;
+        }
+
+        return ['valid' => true];
+    }
+
+    /**
+     * @return array{valid: bool, error?: string, message?: string}
+     */
+    public function validateRoutePathCell(int $row, int $col, ?int $expectedFunctionId = null): array
+    {
+        $cellValidation = $this->validateRouteCellBasics($row, $col, $expectedFunctionId);
+        if (!$cellValidation['valid']) {
+            return $cellValidation;
+        }
+
+        if ($this->routePassesThroughForbiddenFunction($row, $col)) {
+            return $this->forbiddenOnRouteCellFailure();
+        }
+
+        return ['valid' => true];
+    }
+
+    /**
+     * @return array{valid: bool, error?: string, message?: string}
+     */
+    public function validateOccupiedCellForRoute(int $row, int $col, ?int $expectedFunctionId = null): array
+    {
+        $this->loadGrid();
+
+        return $this->validateRoutePathCell($row, $col, $expectedFunctionId);
+    }
+
+    /**
+     * @return array{valid: bool, error?: string, message?: string}
+     */
+    private function validateRouteCellBasics(int $row, int $col, ?int $expectedFunctionId = null): array
+    {
+        $functionId = $this->functionAt($row, $col);
+        if ($functionId === null) {
+            return [
+                'valid' => false,
+                'error' => 'empty_cell',
+                'message' => 'The route may only pass through grid cells that contain a city function.',
+            ];
+        }
+
+        if ($expectedFunctionId !== null && (int) $functionId !== (int) $expectedFunctionId) {
             return [
                 'valid' => false,
                 'error' => 'invalid_endpoint_cell',
                 'message' => 'The event location is not on the selected grid cell.',
             ];
-        }
-
-        foreach ($this->neighbors($row, $col) as [$neighborRow, $neighborCol]) {
-            $neighborFunctionId = $this->functionAt($neighborRow, $neighborCol);
-            if ($neighborFunctionId === null) {
-                continue;
-            }
-
-            $type = $this->adjacencyType($functionId, $neighborFunctionId);
-            if ($type === 'forbidden') {
-                return [
-                    'valid' => false,
-                    'error' => 'invalid_event_location',
-                    'message' => 'The event location is invalid because it has a forbidden neighbour combination.',
-                ];
-            }
-
-            if ($type === 'penalty') {
-                return [
-                    'valid' => false,
-                    'error' => 'invalid_event_location',
-                    'message' => 'The event location is invalid because it has a penalty neighbour combination.',
-                ];
-            }
         }
 
         return ['valid' => true];
@@ -99,6 +150,15 @@ class GridPathfindingService
             ];
         }
 
+        $startValidation = $this->validateRoutePathCell($startRow, $startCol);
+        if (!$startValidation['valid']) {
+            return [
+                'success' => false,
+                'error' => $startValidation['error'] ?? 'invalid_event_location',
+                'message' => $startValidation['message'] ?? 'The route start point is invalid.',
+            ];
+        }
+
         if ($startRow === $endRow && $startCol === $endCol) {
             return [
                 'success' => false,
@@ -107,9 +167,26 @@ class GridPathfindingService
             ];
         }
 
-        $path = $this->runAStar($startRow, $startCol, $endRow, $endCol);
+        $path = $this->runAStar($startRow, $startCol, $endRow, $endCol, $endFunctionId);
 
         if ($path === null) {
+            $pathIgnoringForbidden = $this->runAStar(
+                $startRow,
+                $startCol,
+                $endRow,
+                $endCol,
+                $endFunctionId,
+                enforceForbiddenRules: false
+            );
+
+            if ($pathIgnoringForbidden !== null) {
+                return [
+                    'success' => false,
+                    'error' => 'forbidden_on_route',
+                    'message' => 'No visitor route can be created through occupied grid cells between the start and end points.',
+                ];
+            }
+
             return [
                 'success' => false,
                 'error' => 'unreachable_event_location',
@@ -195,11 +272,17 @@ class GridPathfindingService
             $cell = $normalized[$index];
             $isEnd = $index === count($normalized) - 1;
 
-            if (!$isEnd && $this->functionAt($cell['row'], $cell['col']) === null) {
+            $cellValidation = $this->validateRoutePathCell(
+                $cell['row'],
+                $cell['col'],
+                $isEnd ? $endFunctionId : null
+            );
+
+            if (!$cellValidation['valid']) {
                 return [
                     'success' => false,
-                    'error' => 'invalid_path',
-                    'message' => 'The route may only pass through grid cells that contain a city function.',
+                    'error' => $cellValidation['error'] ?? 'invalid_path',
+                    'message' => $cellValidation['message'] ?? 'The drawn route is invalid.',
                 ];
             }
 
@@ -233,6 +316,31 @@ class GridPathfindingService
             ->map(fn ($id) => (int) $id)
             ->values()
             ->all();
+
+        $this->routeForbiddenFunctionIds = null;
+    }
+
+    /**
+     * Functions that may not appear on a visitor route when the route passes through them.
+     *
+     * @return list<int>
+     */
+    private function routeForbiddenFunctionIds(): array
+    {
+        if ($this->routeForbiddenFunctionIds !== null) {
+            return $this->routeForbiddenFunctionIds;
+        }
+
+        $ids = [];
+
+        foreach (AdjacencyRule::query()->where('type', 'forbidden')->get(['function_a', 'function_b']) as $rule) {
+            $ids[] = (int) $rule->function_a;
+            $ids[] = (int) $rule->function_b;
+        }
+
+        $this->routeForbiddenFunctionIds = array_values(array_unique($ids));
+
+        return $this->routeForbiddenFunctionIds;
     }
 
     /**
@@ -277,10 +385,60 @@ class GridPathfindingService
         return $functionId !== null && in_array($functionId, $this->roadFunctionIds, true);
     }
 
-    private function isTraversable(int $row, int $col, int $endRow, int $endCol): bool
+    private function routePassesThroughForbiddenFunction(int $row, int $col): bool
     {
-        // Only the start point must be on a Road. Routes may cross any occupied grid cell.
-        return $this->functionAt($row, $col) !== null || ($row === $endRow && $col === $endCol);
+        $functionId = $this->functionAt($row, $col);
+
+        return $functionId !== null
+            && in_array($functionId, $this->routeForbiddenFunctionIds(), true);
+    }
+
+    /**
+     * @return array{valid: false, error: string, message: string}
+     */
+    private function forbiddenOnRouteCellFailure(): array
+    {
+        return [
+            'valid' => false,
+            'error' => 'forbidden_on_route',
+            'message' => 'The route cannot pass through this forbidden function.',
+        ];
+    }
+
+    private function canStepOnRoute(
+        int $fromRow,
+        int $fromCol,
+        int $toRow,
+        int $toCol,
+        int $endRow,
+        int $endCol,
+        ?int $endFunctionId,
+        bool $enforceForbiddenRules = true
+    ): bool {
+        $toFunctionId = $this->functionAt($toRow, $toCol);
+
+        if ($toFunctionId === null) {
+            return $toRow === $endRow && $toCol === $endCol;
+        }
+
+        if (
+            $toRow === $endRow
+            && $toCol === $endCol
+            && $endFunctionId !== null
+            && (int) $toFunctionId !== (int) $endFunctionId
+        ) {
+            return false;
+        }
+
+        if (!$enforceForbiddenRules) {
+            return true;
+        }
+
+        if ($this->routePassesThroughForbiddenFunction($toRow, $toCol)) {
+            return false;
+        }
+
+        return true;
     }
 
     private function cellsAreAdjacent(int $rowA, int $colA, int $rowB, int $colB): bool
@@ -291,8 +449,14 @@ class GridPathfindingService
     /**
      * @return list<array{row: int, col: int}>|null
      */
-    private function runAStar(int $startRow, int $startCol, int $endRow, int $endCol): ?array
-    {
+    private function runAStar(
+        int $startRow,
+        int $startCol,
+        int $endRow,
+        int $endCol,
+        ?int $endFunctionId = null,
+        bool $enforceForbiddenRules = true
+    ): ?array {
         $startKey = $this->cellKey($startRow, $startCol);
         $endKey = $this->cellKey($endRow, $endCol);
 
@@ -312,7 +476,16 @@ class GridPathfindingService
             [$currentRow, $currentCol] = array_map('intval', explode(':', $currentKey));
 
             foreach ($this->neighbors($currentRow, $currentCol) as [$neighborRow, $neighborCol]) {
-                if (!$this->isTraversable($neighborRow, $neighborCol, $endRow, $endCol)) {
+                if (!$this->canStepOnRoute(
+                    $currentRow,
+                    $currentCol,
+                    $neighborRow,
+                    $neighborCol,
+                    $endRow,
+                    $endCol,
+                    $endFunctionId,
+                    $enforceForbiddenRules
+                )) {
                     continue;
                 }
 
@@ -403,6 +576,6 @@ class GridPathfindingService
 
     private function unreachableMessage(int $startRow, int $startCol, int $endRow, int $endCol): string
     {
-        return 'No route could be found from the access road to the event location.';
+        return 'No route could be found from the access road to the event location through occupied grid cells.';
     }
 }

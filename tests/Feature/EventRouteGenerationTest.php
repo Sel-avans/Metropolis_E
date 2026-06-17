@@ -5,6 +5,7 @@ namespace Tests\Feature;
 use App\Enums\UserRole;
 use App\Models\AdjacencyRule;
 use App\Models\CityFunction;
+use App\Models\Condition;
 use App\Models\EventEffect;
 use App\Models\EventRoute;
 use App\Models\GridCell;
@@ -122,6 +123,84 @@ class EventRouteGenerationTest extends TestCase
         $response->assertJsonPath('error', 'unreachable_event_location');
     }
 
+    public function test_route_cannot_be_drawn_when_detour_requires_empty_cells(): void
+    {
+        $road = $this->createRoad();
+        $gas = CityFunction::factory()->create(['name' => 'Gas Station']);
+        $hospital = CityFunction::factory()->create(['name' => 'Hospital']);
+        $cinema = CityFunction::factory()->create(['name' => 'Cinema']);
+        $park = CityFunction::factory()->create(['name' => 'Park']);
+        $mall = CityFunction::factory()->create(['name' => 'Mall']);
+        $event = $this->createEventWithFunction($mall->id);
+
+        AdjacencyRule::create([
+            'function_a' => min($gas->id, $hospital->id),
+            'function_b' => max($gas->id, $hospital->id),
+            'type' => 'forbidden',
+            'value' => 0,
+        ]);
+
+        EventRoute::create([
+            'simulation_event_id' => $event->id,
+            'start_row' => 1,
+            'start_col' => 1,
+            'end_row' => 1,
+            'end_col' => 3,
+            'end_function_id' => $mall->id,
+        ]);
+
+        GridCell::factory()->create(['row' => 1, 'col' => 1, 'function_id' => $road->id]);
+        GridCell::factory()->create(['row' => 1, 'col' => 2, 'function_id' => $gas->id]);
+        GridCell::factory()->create(['row' => 1, 'col' => 3, 'function_id' => $mall->id]);
+        GridCell::factory()->create(['row' => 2, 'col' => 1, 'function_id' => $cinema->id]);
+        GridCell::factory()->create(['row' => 2, 'col' => 2, 'function_id' => $park->id]);
+
+        $response = $this->actingAs($this->planner())
+            ->getJson('/event-routes');
+
+        $response->assertOk();
+        $response->assertJsonPath('routes.0.route_creation.can_draw', false);
+        $response->assertJsonPath('routes.0.route_creation.can_generate', false);
+    }
+
+    public function test_event_routes_index_blocks_draw_when_no_valid_occupied_route_exists(): void
+    {
+        $road = $this->createRoad();
+        $gas = CityFunction::factory()->create(['name' => 'Gas Station']);
+        $hospital = CityFunction::factory()->create(['name' => 'Hospital']);
+        $mall = CityFunction::factory()->create(['name' => 'Mall']);
+        $event = $this->createEventWithFunction($mall->id);
+
+        AdjacencyRule::create([
+            'function_a' => min($gas->id, $hospital->id),
+            'function_b' => max($gas->id, $hospital->id),
+            'type' => 'forbidden',
+            'value' => 0,
+        ]);
+
+        EventRoute::create([
+            'simulation_event_id' => $event->id,
+            'start_row' => 1,
+            'start_col' => 1,
+            'end_row' => 1,
+            'end_col' => 3,
+            'end_function_id' => $mall->id,
+        ]);
+
+        GridCell::factory()->create(['row' => 1, 'col' => 1, 'function_id' => $road->id]);
+        GridCell::factory()->create(['row' => 1, 'col' => 2, 'function_id' => $gas->id]);
+        GridCell::factory()->create(['row' => 1, 'col' => 3, 'function_id' => $mall->id]);
+
+        $response = $this->actingAs($this->planner())
+            ->getJson('/event-routes');
+
+        $response->assertOk();
+        $response->assertJsonPath('routes.0.route_creation.can_create', false);
+        $response->assertJsonPath('routes.0.route_creation.can_generate', false);
+        $response->assertJsonPath('routes.0.route_creation.can_draw', false);
+        $response->assertJsonPath('routes.0.route_creation.error', 'forbidden_on_route');
+    }
+
     public function test_event_routes_index_marks_unreachable_plans_as_not_creatable(): void
     {
         $road = $this->createRoad();
@@ -145,7 +224,376 @@ class EventRouteGenerationTest extends TestCase
 
         $response->assertOk();
         $response->assertJsonPath('routes.0.route_creation.can_create', false);
+        $response->assertJsonPath('routes.0.route_creation.can_generate', false);
+        $response->assertJsonPath('routes.0.route_creation.can_draw', false);
         $response->assertJsonPath('routes.0.route_creation.error', 'unreachable_event_location');
+    }
+
+    public function test_validate_path_cell_rejects_forbidden_function_on_route(): void
+    {
+        $road = $this->createRoad();
+        $gas = CityFunction::factory()->create(['name' => 'Gas Station']);
+        $hospital = CityFunction::factory()->create(['name' => 'Hospital']);
+        $store = CityFunction::factory()->create(['name' => 'Store']);
+        $event = $this->createEventWithFunction($store->id);
+
+        AdjacencyRule::create([
+            'function_a' => min($gas->id, $hospital->id),
+            'function_b' => max($gas->id, $hospital->id),
+            'type' => 'forbidden',
+            'value' => 0,
+        ]);
+
+        GridCell::factory()->create(['row' => 1, 'col' => 1, 'function_id' => $road->id]);
+        GridCell::factory()->create(['row' => 1, 'col' => 2, 'function_id' => $hospital->id]);
+        GridCell::factory()->create(['row' => 2, 'col' => 2, 'function_id' => $gas->id]);
+
+        $response = $this->actingAs($this->planner())
+            ->postJson("/event-routes/{$event->id}/validate-path-cell", [
+                'from_row' => 1,
+                'from_col' => 1,
+                'row' => 1,
+                'col' => 2,
+            ]);
+
+        $response->assertStatus(422);
+        $response->assertJsonPath('error', 'forbidden_on_route');
+    }
+
+    public function test_validate_path_cell_rejects_forbidden_function_with_neighbour_on_grid(): void
+    {
+        $road = $this->createRoad();
+        $gas = CityFunction::factory()->create(['name' => 'Gas Station']);
+        $hospital = CityFunction::factory()->create(['name' => 'Hospital']);
+        $event = $this->createEventWithFunction($hospital->id);
+
+        AdjacencyRule::create([
+            'function_a' => min($gas->id, $hospital->id),
+            'function_b' => max($gas->id, $hospital->id),
+            'type' => 'forbidden',
+            'value' => 0,
+        ]);
+
+        GridCell::factory()->create(['row' => 2, 'col' => 1, 'function_id' => $road->id]);
+        GridCell::factory()->create(['row' => 2, 'col' => 2, 'function_id' => $hospital->id]);
+        GridCell::factory()->create(['row' => 3, 'col' => 2, 'function_id' => $gas->id]);
+
+        $response = $this->actingAs($this->planner())
+            ->postJson("/event-routes/{$event->id}/validate-path-cell", [
+                'from_row' => 2,
+                'from_col' => 1,
+                'row' => 2,
+                'col' => 2,
+            ]);
+
+        $response->assertStatus(422);
+        $response->assertJsonPath('error', 'forbidden_on_route');
+    }
+
+    public function test_validate_path_cell_allows_park_when_forbidden_gas_is_only_a_neighbour(): void
+    {
+        $road = $this->createRoad();
+        $gas = CityFunction::factory()->create(['name' => 'Gas Station']);
+        $park = CityFunction::factory()->create(['name' => 'Park']);
+        $mall = CityFunction::factory()->create(['name' => 'Mall']);
+        $event = $this->createEventWithFunction($mall->id);
+
+        Condition::create([
+            'function_a' => $park->id,
+            'function_b' => $gas->id,
+            'type' => 'forbidden',
+            'value' => null,
+        ]);
+
+        GridCell::factory()->create(['row' => 1, 'col' => 1, 'function_id' => $road->id]);
+        GridCell::factory()->create(['row' => 1, 'col' => 2, 'function_id' => $park->id]);
+        GridCell::factory()->create(['row' => 2, 'col' => 2, 'function_id' => $gas->id]);
+
+        $response = $this->actingAs($this->planner())
+            ->postJson("/event-routes/{$event->id}/validate-path-cell", [
+                'from_row' => 1,
+                'from_col' => 1,
+                'row' => 1,
+                'col' => 2,
+            ]);
+
+        $response->assertOk();
+        $response->assertJsonPath('valid', true);
+    }
+
+    public function test_validate_path_cell_allows_function_in_forbidden_pair_without_neighbour_on_grid(): void
+    {
+        $road = $this->createRoad();
+        $gas = CityFunction::factory()->create(['name' => 'Gas Station']);
+        $park = CityFunction::factory()->create(['name' => 'Park']);
+        $mall = CityFunction::factory()->create(['name' => 'Mall']);
+        $event = $this->createEventWithFunction($mall->id);
+
+        Condition::create([
+            'function_a' => $park->id,
+            'function_b' => $gas->id,
+            'type' => 'forbidden',
+            'value' => null,
+        ]);
+
+        GridCell::factory()->create(['row' => 1, 'col' => 1, 'function_id' => $road->id]);
+        GridCell::factory()->create(['row' => 1, 'col' => 2, 'function_id' => $park->id]);
+
+        $response = $this->actingAs($this->planner())
+            ->postJson("/event-routes/{$event->id}/validate-path-cell", [
+                'from_row' => 1,
+                'from_col' => 1,
+                'row' => 1,
+                'col' => 2,
+            ]);
+
+        $response->assertOk();
+        $response->assertJsonPath('valid', true);
+    }
+
+    public function test_route_cannot_be_generated_when_only_hospital_is_between_start_and_end(): void
+    {
+        $road = $this->createRoad();
+        $gas = CityFunction::factory()->create(['name' => 'Gas Station']);
+        $hospital = CityFunction::factory()->create(['name' => 'Hospital']);
+        $mall = CityFunction::factory()->create(['name' => 'Mall']);
+        $event = $this->createEventWithFunction($mall->id);
+
+        AdjacencyRule::create([
+            'function_a' => min($gas->id, $hospital->id),
+            'function_b' => max($gas->id, $hospital->id),
+            'type' => 'forbidden',
+            'value' => 0,
+        ]);
+
+        EventRoute::create([
+            'simulation_event_id' => $event->id,
+            'start_row' => 1,
+            'start_col' => 1,
+            'end_row' => 1,
+            'end_col' => 3,
+            'end_function_id' => $mall->id,
+        ]);
+
+        GridCell::factory()->create(['row' => 1, 'col' => 1, 'function_id' => $road->id]);
+        GridCell::factory()->create(['row' => 1, 'col' => 2, 'function_id' => $hospital->id]);
+        GridCell::factory()->create(['row' => 1, 'col' => 3, 'function_id' => $mall->id]);
+        GridCell::factory()->create(['row' => 2, 'col' => 2, 'function_id' => $gas->id]);
+
+        $response = $this->actingAs($this->planner())
+            ->postJson("/event-routes/{$event->id}/generate");
+
+        $response->assertStatus(422);
+        $response->assertJsonPath('error', 'forbidden_on_route');
+    }
+
+    public function test_route_can_be_generated_through_park_even_when_gas_is_only_a_neighbour(): void
+    {
+        $road = $this->createRoad();
+        $gas = CityFunction::factory()->create(['name' => 'Gas Station']);
+        $park = CityFunction::factory()->create(['name' => 'Park']);
+        $mall = CityFunction::factory()->create(['name' => 'Mall']);
+        $event = $this->createEventWithFunction($mall->id);
+
+        Condition::create([
+            'function_a' => $park->id,
+            'function_b' => $gas->id,
+            'type' => 'forbidden',
+            'value' => null,
+        ]);
+
+        EventRoute::create([
+            'simulation_event_id' => $event->id,
+            'start_row' => 1,
+            'start_col' => 1,
+            'end_row' => 1,
+            'end_col' => 3,
+            'end_function_id' => $mall->id,
+        ]);
+
+        GridCell::factory()->create(['row' => 1, 'col' => 1, 'function_id' => $road->id]);
+        GridCell::factory()->create(['row' => 1, 'col' => 2, 'function_id' => $park->id]);
+        GridCell::factory()->create(['row' => 1, 'col' => 3, 'function_id' => $mall->id]);
+        GridCell::factory()->create(['row' => 2, 'col' => 2, 'function_id' => $gas->id]);
+
+        $response = $this->actingAs($this->planner())
+            ->postJson("/event-routes/{$event->id}/generate");
+
+        $response->assertOk();
+    }
+
+    public function test_validate_path_cell_rejects_forbidden_route_step(): void
+    {
+        $road = $this->createRoad();
+        $gas = CityFunction::factory()->create(['name' => 'Gas Station']);
+        $hospital = CityFunction::factory()->create(['name' => 'Hospital']);
+        $store = CityFunction::factory()->create(['name' => 'Store']);
+        $event = $this->createEventWithFunction($store->id);
+
+        AdjacencyRule::create([
+            'function_a' => min($gas->id, $hospital->id),
+            'function_b' => max($gas->id, $hospital->id),
+            'type' => 'forbidden',
+            'value' => 0,
+        ]);
+
+        GridCell::factory()->create(['row' => 2, 'col' => 1, 'function_id' => $road->id]);
+        GridCell::factory()->create(['row' => 2, 'col' => 2, 'function_id' => $gas->id]);
+        GridCell::factory()->create(['row' => 2, 'col' => 3, 'function_id' => $hospital->id]);
+
+        $response = $this->actingAs($this->planner())
+            ->postJson("/event-routes/{$event->id}/validate-path-cell", [
+                'from_row' => 2,
+                'from_col' => 2,
+                'row' => 2,
+                'col' => 3,
+            ]);
+
+        $response->assertStatus(422);
+        $response->assertJsonPath('error', 'forbidden_on_route');
+    }
+
+    public function test_validate_path_cell_allows_route_when_forbidden_functions_are_not_on_path(): void
+    {
+        $road = $this->createRoad();
+        $gas = CityFunction::factory()->create(['name' => 'Gas Station']);
+        $hospital = CityFunction::factory()->create(['name' => 'Hospital']);
+        $police = CityFunction::factory()->create(['name' => 'Police']);
+        $store = CityFunction::factory()->create(['name' => 'Store']);
+        $event = $this->createEventWithFunction($store->id);
+
+        AdjacencyRule::create([
+            'function_a' => min($gas->id, $hospital->id),
+            'function_b' => max($gas->id, $hospital->id),
+            'type' => 'forbidden',
+            'value' => 0,
+        ]);
+
+        GridCell::factory()->create(['row' => 2, 'col' => 1, 'function_id' => $road->id]);
+        GridCell::factory()->create(['row' => 2, 'col' => 2, 'function_id' => $police->id]);
+        GridCell::factory()->create(['row' => 2, 'col' => 3, 'function_id' => $gas->id]);
+        GridCell::factory()->create(['row' => 2, 'col' => 4, 'function_id' => $hospital->id]);
+
+        $response = $this->actingAs($this->planner())
+            ->postJson("/event-routes/{$event->id}/validate-path-cell", [
+                'from_row' => 2,
+                'from_col' => 1,
+                'row' => 2,
+                'col' => 2,
+            ]);
+
+        $response->assertOk();
+        $response->assertJsonPath('valid', true);
+    }
+
+    public function test_route_cannot_be_generated_through_hospital_between_start_and_end(): void
+    {
+        $road = $this->createRoad();
+        $gas = CityFunction::factory()->create(['name' => 'Gas Station']);
+        $hospital = CityFunction::factory()->create(['name' => 'Hospital']);
+        $mall = CityFunction::factory()->create(['name' => 'Mall']);
+        $event = $this->createEventWithFunction($mall->id);
+
+        AdjacencyRule::create([
+            'function_a' => min($gas->id, $hospital->id),
+            'function_b' => max($gas->id, $hospital->id),
+            'type' => 'forbidden',
+            'value' => 0,
+        ]);
+
+        EventRoute::create([
+            'simulation_event_id' => $event->id,
+            'start_row' => 1,
+            'start_col' => 1,
+            'end_row' => 1,
+            'end_col' => 3,
+            'end_function_id' => $mall->id,
+        ]);
+
+        GridCell::factory()->create(['row' => 1, 'col' => 1, 'function_id' => $road->id]);
+        GridCell::factory()->create(['row' => 1, 'col' => 2, 'function_id' => $hospital->id]);
+        GridCell::factory()->create(['row' => 1, 'col' => 3, 'function_id' => $mall->id]);
+        GridCell::factory()->create(['row' => 2, 'col' => 2, 'function_id' => $gas->id]);
+
+        $response = $this->actingAs($this->planner())
+            ->postJson("/event-routes/{$event->id}/generate");
+
+        $response->assertStatus(422);
+        $response->assertJsonPath('error', 'forbidden_on_route');
+    }
+
+    public function test_route_cannot_be_generated_when_only_path_uses_forbidden_step(): void
+    {
+        $road = $this->createRoad();
+        $gas = CityFunction::factory()->create(['name' => 'Gas Station']);
+        $hospital = CityFunction::factory()->create(['name' => 'Hospital']);
+        $store = CityFunction::factory()->create(['name' => 'Store']);
+        $event = $this->createEventWithFunction($store->id);
+
+        AdjacencyRule::create([
+            'function_a' => min($gas->id, $hospital->id),
+            'function_b' => max($gas->id, $hospital->id),
+            'type' => 'forbidden',
+            'value' => 0,
+        ]);
+
+        EventRoute::create([
+            'simulation_event_id' => $event->id,
+            'start_row' => 2,
+            'start_col' => 1,
+            'end_row' => 2,
+            'end_col' => 4,
+            'end_function_id' => $store->id,
+        ]);
+
+        GridCell::factory()->create(['row' => 2, 'col' => 1, 'function_id' => $road->id]);
+        GridCell::factory()->create(['row' => 2, 'col' => 2, 'function_id' => $gas->id]);
+        GridCell::factory()->create(['row' => 2, 'col' => 3, 'function_id' => $hospital->id]);
+        GridCell::factory()->create(['row' => 2, 'col' => 4, 'function_id' => $store->id]);
+
+        $response = $this->actingAs($this->planner())
+            ->postJson("/event-routes/{$event->id}/generate");
+
+        $response->assertStatus(422);
+        $response->assertJsonPath('error', 'forbidden_on_route');
+    }
+
+    public function test_route_can_be_generated_when_forbidden_functions_are_not_on_path(): void
+    {
+        $road = $this->createRoad();
+        $gas = CityFunction::factory()->create(['name' => 'Gas Station']);
+        $hospital = CityFunction::factory()->create(['name' => 'Hospital']);
+        $police = CityFunction::factory()->create(['name' => 'Police']);
+        $store = CityFunction::factory()->create(['name' => 'Store']);
+        $event = $this->createEventWithFunction($store->id);
+
+        AdjacencyRule::create([
+            'function_a' => min($gas->id, $hospital->id),
+            'function_b' => max($gas->id, $hospital->id),
+            'type' => 'forbidden',
+            'value' => 0,
+        ]);
+
+        EventRoute::create([
+            'simulation_event_id' => $event->id,
+            'start_row' => 2,
+            'start_col' => 1,
+            'end_row' => 2,
+            'end_col' => 4,
+            'end_function_id' => $store->id,
+        ]);
+
+        GridCell::factory()->create(['row' => 2, 'col' => 1, 'function_id' => $road->id]);
+        GridCell::factory()->create(['row' => 2, 'col' => 2, 'function_id' => $police->id]);
+        GridCell::factory()->create(['row' => 2, 'col' => 3, 'function_id' => $store->id]);
+        GridCell::factory()->create(['row' => 2, 'col' => 4, 'function_id' => $store->id]);
+        GridCell::factory()->create(['row' => 3, 'col' => 1, 'function_id' => $gas->id]);
+        GridCell::factory()->create(['row' => 3, 'col' => 2, 'function_id' => $hospital->id]);
+
+        $response = $this->actingAs($this->planner())
+            ->postJson("/event-routes/{$event->id}/generate");
+
+        $response->assertOk();
     }
 
     public function test_route_can_be_generated_through_non_road_functions(): void
@@ -178,17 +626,26 @@ class EventRouteGenerationTest extends TestCase
         $response->assertJsonPath('route.path_cells.3.col', 2);
     }
 
-    public function test_route_cannot_be_generated_when_event_location_has_forbidden_adjacency(): void
+    public function test_route_can_be_generated_when_endpoint_is_not_a_forbidden_function(): void
     {
         $road = $this->createRoad();
-        $store = CityFunction::factory()->create(['name' => 'Store']);
+        $park = CityFunction::factory()->create(['name' => 'Park']);
         $factory = CityFunction::factory()->create(['name' => 'Factory']);
-        $event = $this->createEventWithFunction($store->id);
-        $this->createPlannedRoute($event, $store);
+        $warehouse = CityFunction::factory()->create(['name' => 'Warehouse']);
+        $event = $this->createEventWithFunction($park->id);
+
+        EventRoute::create([
+            'simulation_event_id' => $event->id,
+            'start_row' => 2,
+            'start_col' => 1,
+            'end_row' => 2,
+            'end_col' => 4,
+            'end_function_id' => $park->id,
+        ]);
 
         AdjacencyRule::create([
-            'function_a' => min($store->id, $factory->id),
-            'function_b' => max($store->id, $factory->id),
+            'function_a' => min($factory->id, $warehouse->id),
+            'function_b' => max($factory->id, $warehouse->id),
             'type' => 'forbidden',
             'value' => 0,
         ]);
@@ -196,14 +653,13 @@ class EventRouteGenerationTest extends TestCase
         GridCell::factory()->create(['row' => 2, 'col' => 1, 'function_id' => $road->id]);
         GridCell::factory()->create(['row' => 2, 'col' => 2, 'function_id' => $road->id]);
         GridCell::factory()->create(['row' => 2, 'col' => 3, 'function_id' => $road->id]);
-        GridCell::factory()->create(['row' => 2, 'col' => 4, 'function_id' => $store->id]);
-        GridCell::factory()->create(['row' => 3, 'col' => 4, 'function_id' => $factory->id]);
+        GridCell::factory()->create(['row' => 2, 'col' => 4, 'function_id' => $park->id]);
+        GridCell::factory()->create(['row' => 3, 'col' => 1, 'function_id' => $factory->id]);
 
         $response = $this->actingAs($this->planner())
             ->postJson("/event-routes/{$event->id}/generate");
 
-        $response->assertStatus(422);
-        $response->assertJsonPath('error', 'invalid_event_location');
+        $response->assertOk();
     }
 
     public function test_city_planner_can_store_manual_path_and_clear_it(): void
