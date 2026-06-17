@@ -70,11 +70,13 @@ function restoreCellContent(cell, functionId, functionName, functionImage) {
 }
 
 function initGridPage() {
-    if (!document.querySelector('.city-grid')) return;
-
     const gridRoot = document.querySelector('.city-grid');
+    if (!gridRoot) return;
+    
+
     if (gridRoot.dataset.gridInitialized === 'true') return;
     gridRoot.dataset.gridInitialized = 'true';
+    
 
     // Initialize library UI (filter + preview) when grid and library DOM are present
     try { initLibraryFilter(); } catch (e) { /* ignore if not present */ }
@@ -90,6 +92,7 @@ function initGridPage() {
     let dropOccurred = false;
     let old_score;
     let lastAction = null;
+    let selectedTouchItem = null;
 
     let allEvents = [];
     let simulationReferenceDate = null;
@@ -1289,6 +1292,25 @@ function calculateTimeRemaining(startTime, currentTime) {
             draggedItem = { id: Number(item.dataset.functionId), name: item.dataset.functionName, image: item.dataset.image };
             e.dataTransfer.setDragImage(item.querySelector("img"), 16, 16);
         });
+
+        //  --- KLIK LOGICA VOOR MOBIEL ---
+        item.addEventListener("click", (e) => {
+
+            if (e.target.closest('.preview-info-btn')) return;
+            // 1. Verwijder de blauwe ring van álle library items
+            document.querySelectorAll(".library-item").forEach(el => el.classList.remove('ring-4', 'ring-blue-500'));
+
+            // 2. Als je op een item klikt dat al geselecteerd was, deselecteer hem dan
+            if (selectedTouchItem && selectedTouchItem.id === Number(item.dataset.functionId)) {
+                selectedTouchItem = null;
+                return;
+            }
+
+            // 3. Selecteer dit item: geef hem een blauwe rand en bewaar hem in het geheugen
+            item.classList.add('ring-4', 'ring-blue-500');
+            selectedTouchItem = { id: Number(item.dataset.functionId), name: item.dataset.functionName, image: item.dataset.image };
+        });
+        
     });
 
     document.querySelectorAll(".grid-cell").forEach(cell => {
@@ -1394,9 +1416,11 @@ function calculateTimeRemaining(startTime, currentTime) {
             updateQoL();
         });
 
-        cell.addEventListener("click", (e) => {
-            if (isDragging) return;
-            if (isLockedCell(cell) && !canSelectLockedCell(cell)) {
+// We maken de functie async zodat we kunnen opslaan naar de database
+cell.addEventListener("click", async (e) => {
+    if (isDragging) return;
+
+                if (isLockedCell(cell) && !canSelectLockedCell(cell)) {
                 e.preventDefault();
                 flashLockExplanation(cell);
                 return;
