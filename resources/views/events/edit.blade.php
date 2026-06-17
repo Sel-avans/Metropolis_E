@@ -10,7 +10,7 @@
             <div class="bg-white overflow-hidden shadow-sm sm:rounded-lg p-6">
                 
                 @if ($errors->any())
-                    <div class="bg-red-600 text-white p-4 mb-6 shadow-md rounded-md" role="alert">
+                    <div id="form_errors" class="bg-red-600 text-white p-4 mb-6 shadow-md rounded-md" role="alert">
                         <p class="font-bold text-lg mb-2">Please correct the following errors before proceeding:</p>
                         <ul class="list-disc list-inside font-medium space-y-1">
                             @foreach ($errors->all() as $error)
@@ -30,7 +30,7 @@
                                class="shadow appearance-none border rounded w-full py-2 px-3 text-gray-700 leading-tight focus:outline-none focus:shadow-outline @error('name') border-red-500 border-2 @enderror" 
                                required>
                         @error('name')
-                            <p class="text-red-500 text-xs italic mt-2">{{ $message }}</p>
+                            <p id="name_error" class="text-red-500 text-xs italic mt-2">{{ $message }}</p>
                         @enderror
                     </div>
 
@@ -159,11 +159,9 @@
             const type = document.getElementById('type').value;
             const oneOffFields = document.getElementById('one_off_fields');
             const recurringFields = document.getElementById('recurring_fields');
-            
-            // Get HTML inputs
+
             const startInput = document.getElementById('start_moment');
             const endInput = document.getElementById('end_moment');
-            
             const scheduleInput = document.getElementById('recurring_schedule');
             const recurringStartDateInput = document.getElementById('recurring_start_date');
             const recurringEndDateInput = document.getElementById('recurring_end_date');
@@ -173,51 +171,125 @@
             if (type === 'one-off') {
                 oneOffFields.style.display = 'block';
                 recurringFields.style.display = 'none';
-                
-                startInput.disabled = false;
-                endInput.disabled = false;
-                scheduleInput.disabled = true;
-                recurringStartDateInput.disabled = true;
-                recurringEndDateInput.disabled = true;
-                recurringStartTimeInput.disabled = true;
-                recurringEndTimeInput.disabled = true;
-                
-                // Set required attributes for one-off fields
-                startInput.setAttribute('required', 'required');
-                endInput.setAttribute('required', 'required');
-                
-                // Remove required attributes for recurring fields
-                scheduleInput.removeAttribute('required');
-                recurringStartDateInput.removeAttribute('required');
-                recurringStartTimeInput.removeAttribute('required');
-                recurringEndTimeInput.removeAttribute('required');
-                
+
+                if (startInput) startInput.disabled = false;
+                if (endInput) endInput.disabled = false;
+                if (scheduleInput) scheduleInput.disabled = true;
+                if (recurringStartDateInput) recurringStartDateInput.disabled = true;
+                if (recurringEndDateInput) recurringEndDateInput.disabled = true;
+                if (recurringStartTimeInput) recurringStartTimeInput.disabled = true;
+                if (recurringEndTimeInput) recurringEndTimeInput.disabled = true;
+
+                if (startInput) startInput.setAttribute('required', 'required');
+                if (endInput) endInput.setAttribute('required', 'required');
+
+                if (scheduleInput) scheduleInput.removeAttribute('required');
+                if (recurringStartDateInput) recurringStartDateInput.removeAttribute('required');
+                if (recurringStartTimeInput) recurringStartTimeInput.removeAttribute('required');
+                if (recurringEndTimeInput) recurringEndTimeInput.removeAttribute('required');
+
             } else {
                 oneOffFields.style.display = 'none';
                 recurringFields.style.display = 'block';
-                
-                startInput.disabled = true;
-                endInput.disabled = true;
-                scheduleInput.disabled = false;
-                recurringStartDateInput.disabled = false;
-                recurringEndDateInput.disabled = false;
-                recurringStartTimeInput.disabled = false;
-                recurringEndTimeInput.disabled = false;
-                
-                // Remove required attributes for one-off fields
-                startInput.removeAttribute('required');
-                endInput.removeAttribute('required');
-                
-                // Set required attributes for recurring fields
-                scheduleInput.setAttribute('required', 'required');
-                recurringStartDateInput.setAttribute('required', 'required');
-                recurringEndDateInput.setAttribute('required', 'required');
-                recurringStartTimeInput.setAttribute('required', 'required');
-                recurringEndTimeInput.setAttribute('required', 'required');
+
+                if (startInput) startInput.disabled = true;
+                if (endInput) endInput.disabled = true;
+                if (scheduleInput) scheduleInput.disabled = false;
+                if (recurringStartDateInput) recurringStartDateInput.disabled = false;
+                if (recurringEndDateInput) recurringEndDateInput.disabled = false;
+                if (recurringStartTimeInput) recurringStartTimeInput.disabled = false;
+                if (recurringEndTimeInput) recurringEndTimeInput.disabled = false;
+
+                if (startInput) startInput.removeAttribute('required');
+                if (endInput) endInput.removeAttribute('required');
+
+                if (scheduleInput) scheduleInput.setAttribute('required', 'required');
+                if (recurringStartDateInput) recurringStartDateInput.setAttribute('required', 'required');
+                if (recurringEndDateInput) recurringEndDateInput.setAttribute('required', 'required');
+                if (recurringStartTimeInput) recurringStartTimeInput.setAttribute('required', 'required');
+                if (recurringEndTimeInput) recurringEndTimeInput.setAttribute('required', 'required');
             }
         }
-        
+
+        function setupNameValidation() {
+            const input = document.getElementById('name');
+            if (!input) return;
+
+            const formErrors = document.getElementById('form_errors');
+
+            function handleName() {
+                const value = input.value.trim();
+                const nameError = document.getElementById('name_error');
+                if (value !== '') {
+                    if (nameError) nameError.remove();
+                    if (formErrors) {
+                        const ul = formErrors.querySelector('ul');
+                        if (ul) {
+                            Array.from(ul.children).forEach(li => {
+                                if (li.textContent.toLowerCase().includes('name')) li.remove();
+                            });
+                            if (ul.children.length === 0) formErrors.remove();
+                        }
+                    }
+                    input.classList.remove('border-red-500','border-2');
+                }
+            }
+
+            input.addEventListener('input', handleName);
+            handleName();
+        }
+
+        function clearFieldError(elem) {
+            if (!elem) return;
+            try {
+                const parent = elem.parentElement;
+                if (parent) parent.querySelectorAll('.text-red-500').forEach(e => e.remove());
+                const next = elem.nextElementSibling;
+                if (next && next.classList && next.classList.contains('text-red-500')) next.remove();
+            } catch (e) {
+                // ignore
+            }
+            elem.classList.remove('border-red-500', 'border-2');
+
+            const formErrors = document.getElementById('form_errors');
+            if (formErrors) {
+                const ul = formErrors.querySelector('ul');
+                if (ul) {
+                    const id = elem.id || '';
+                    const name = elem.name || '';
+                    Array.from(ul.children).forEach(li => {
+                        const txt = li.textContent.toLowerCase();
+                        if (id && txt.includes(id.replace(/_/g, ' '))) li.remove();
+                        if (name && txt.includes(name.replace(/_/g, ' '))) li.remove();
+                    });
+                    if (ul.children.length === 0) formErrors.remove();
+                }
+            }
+        }
+
+        function attachValidationClearers() {
+            const form = document.querySelector('form');
+            if (!form) return;
+            const fields = form.querySelectorAll('input, textarea, select');
+            fields.forEach(f => {
+                f.addEventListener('input', () => clearFieldError(f));
+                f.addEventListener('change', () => clearFieldError(f));
+            });
+        }
+
         // Initialize form view state on page load based on database data
-        document.addEventListener('DOMContentLoaded', toggleEventFields);
+        document.addEventListener('DOMContentLoaded', function() {
+            toggleEventFields();
+            setupNameValidation();
+            attachValidationClearers();
+
+            const start = document.getElementById('start_moment');
+            const end = document.getElementById('end_moment');
+            [start, end].forEach(el => {
+                if (!el) return;
+                el.addEventListener('input', () => clearFieldError(el));
+                el.addEventListener('change', () => clearFieldError(el));
+            });
+        });
     </script>
 </x-app-layout>
