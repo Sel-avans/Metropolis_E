@@ -166,6 +166,54 @@ class EventRouteController extends Controller
         ]);
     }
 
+    public function generate(SimulationEvent $event): JsonResponse
+    {
+        $result = $this->eventRouteService->generateRoute($event);
+
+        if (!$result['success']) {
+            return response()->json($result, 422);
+        }
+
+        return response()->json([
+            'success' => true,
+            'route' => $this->formatRoute($result['route']),
+        ]);
+    }
+
+    public function storePath(Request $request, SimulationEvent $event): JsonResponse
+    {
+        $validated = $request->validate([
+            'path_cells' => ['required', 'array', 'min:2'],
+            'path_cells.*.row' => ['required', 'integer', 'min:1', 'max:3'],
+            'path_cells.*.col' => ['required', 'integer', 'min:1', 'max:4'],
+        ]);
+
+        $result = $this->eventRouteService->storeManualPath($event, $validated['path_cells']);
+
+        if (!$result['success']) {
+            return response()->json($result, 422);
+        }
+
+        return response()->json([
+            'success' => true,
+            'route' => $this->formatRoute($result['route']),
+        ]);
+    }
+
+    public function destroyPath(SimulationEvent $event): JsonResponse
+    {
+        $result = $this->eventRouteService->clearPath($event);
+
+        if (!$result['success']) {
+            return response()->json($result, 422);
+        }
+
+        return response()->json([
+            'success' => true,
+            'route' => $this->formatRoute($result['route']),
+        ]);
+    }
+
     /**
      * @return array<string, mixed>
      */
@@ -183,6 +231,8 @@ class EventRouteController extends Controller
             'end_col' => $route->end_col,
             'end_function_id' => $route->end_function_id,
             'end_function_name' => $route->endFunction?->name,
+            'path_cells' => $route->path_cells,
+            'route_creation' => $this->eventRouteService->assessRouteCreation($route),
         ];
     }
 }

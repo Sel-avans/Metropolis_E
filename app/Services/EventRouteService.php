@@ -11,6 +11,10 @@ class EventRouteService
 {
     public const MAIN_ACCESS_ROAD_NAME = 'Road';
 
+    public function __construct(private GridPathfindingService $pathfindingService)
+    {
+    }
+
     public function isMainAccessRoadCell(GridCell $cell): bool
     {
         if (!$cell->function_id) {
@@ -68,6 +72,7 @@ class EventRouteService
                 'end_row' => null,
                 'end_col' => null,
                 'end_function_id' => null,
+                'path_cells' => null,
             ]
         );
 
@@ -190,7 +195,144 @@ class EventRouteService
             'end_row' => $row,
             'end_col' => $col,
             'end_function_id' => $functionId,
+            'path_cells' => null,
         ]);
+
+        return ['success' => true, 'route' => $route->fresh()->load('endFunction')];
+    }
+
+    /**
+     * @return array{success: bool, route?: EventRoute, error?: string, message?: string}
+     */
+    public function generateRoute(SimulationEvent $event): array
+    {
+        $route = EventRoute::where('simulation_event_id', $event->id)->first();
+
+        if (!$route || $route->start_row === null || $route->start_col === null) {
+            return [
+                'success' => false,
+                'error' => 'missing_start_point',
+                'message' => 'Set a start point on a Road cell before generating a route.',
+            ];
+        }
+
+        if ($route->end_row === null || $route->end_function_id === null) {
+            return [
+                'success' => false,
+                'error' => 'missing_endpoint',
+                'message' => 'Set an end point before generating a route.',
+            ];
+        }
+
+        $result = $this->pathfindingService->findPath(
+            (int) $route->start_row,
+            (int) $route->start_col,
+            (int) $route->end_row,
+            (int) $route->end_col,
+            (int) $route->end_function_id
+        );
+
+        if (!$result['success']) {
+            return $result;
+        }
+
+        $route->update(['path_cells' => $result['path']]);
+
+        return ['success' => true, 'route' => $route->fresh()->load('endFunction')];
+    }
+
+    /**
+     * @return array{can_create: bool, error?: string, message?: string}
+     */
+    public function assessRouteCreation(?EventRoute $route): array
+    {
+        if (
+            !$route
+            || $route->start_row === null
+            || $route->start_col === null
+            || $route->end_row === null
+            || $route->end_function_id === null
+        ) {
+            return ['can_create' => false];
+        }
+
+        $result = $this->pathfindingService->findPath(
+            (int) $route->start_row,
+            (int) $route->start_col,
+            (int) $route->end_row,
+            (int) $route->end_col,
+            (int) $route->end_function_id
+        );
+
+        if ($result['success']) {
+            return ['can_create' => true];
+        }
+
+        return [
+            'can_create' => false,
+            'error' => $result['error'] ?? 'route_blocked',
+            'message' => $result['message'] ?? 'The route cannot be created for this event.',
+        ];
+    }
+
+    /**
+     * @param list<array{row: int, col: int}> $pathCells
+     * @return array{success: bool, route?: EventRoute, error?: string, message?: string}
+     */
+    public function storeManualPath(SimulationEvent $event, array $pathCells): array
+    {
+        $route = EventRoute::where('simulation_event_id', $event->id)->first();
+
+        if (!$route || $route->start_row === null || $route->start_col === null) {
+            return [
+                'success' => false,
+                'error' => 'missing_start_point',
+                'message' => 'Set a start point on a Road cell before drawing a route.',
+            ];
+        }
+
+        if ($route->end_row === null || $route->end_function_id === null) {
+            return [
+                'success' => false,
+                'error' => 'missing_endpoint',
+                'message' => 'Set an end point before drawing a route.',
+            ];
+        }
+
+        $result = $this->pathfindingService->validateManualPath(
+            (int) $route->start_row,
+            (int) $route->start_col,
+            (int) $route->end_row,
+            (int) $route->end_col,
+            (int) $route->end_function_id,
+            $pathCells
+        );
+
+        if (!$result['success']) {
+            return $result;
+        }
+
+        $route->update(['path_cells' => $result['path']]);
+
+        return ['success' => true, 'route' => $route->fresh()->load('endFunction')];
+    }
+
+    /**
+     * @return array{success: bool, route?: EventRoute, error?: string, message?: string}
+     */
+    public function clearPath(SimulationEvent $event): array
+    {
+        $route = EventRoute::where('simulation_event_id', $event->id)->first();
+
+        if (!$route || $route->path_cells === null) {
+            return [
+                'success' => false,
+                'error' => 'missing_path',
+                'message' => 'This event has no route to remove.',
+            ];
+        }
+
+        $route->update(['path_cells' => null]);
 
         return ['success' => true, 'route' => $route->fresh()->load('endFunction')];
     }
@@ -282,6 +424,7 @@ class EventRouteService
             }
 
             if ($updates !== []) {
+                $updates['path_cells'] = null;
                 $route->update($updates);
             }
         }
@@ -315,6 +458,7 @@ class EventRouteService
             }
 
             if ($updates !== []) {
+                $updates['path_cells'] = null;
                 $route->update($updates);
             }
         }
@@ -423,6 +567,7 @@ class EventRouteService
             'end_row' => null,
             'end_col' => null,
             'end_function_id' => null,
+            'path_cells' => null,
         ];
     }
 
@@ -435,6 +580,7 @@ class EventRouteService
             'end_row' => null,
             'end_col' => null,
             'end_function_id' => null,
+            'path_cells' => null,
         ];
     }
 
@@ -457,6 +603,7 @@ class EventRouteService
         return [
             'start_row' => null,
             'start_col' => null,
+            'path_cells' => null,
         ];
     }
 
@@ -502,7 +649,30 @@ class EventRouteService
             ->first();
 
         if (!$endCell || (int) $endCell->function_id !== (int) $route->end_function_id) {
-            $route->update($this->clearEndpointCoordinates());
+            $route->update(array_merge($this->clearEndpointCoordinates(), ['path_cells' => null]));
+            return;
         }
+
+        if ($route->path_cells !== null && !$this->storedPathIsStillValid($route)) {
+            $route->update(['path_cells' => null]);
+        }
+    }
+
+    private function storedPathIsStillValid(EventRoute $route): bool
+    {
+        if (!is_array($route->path_cells) || $route->path_cells === []) {
+            return false;
+        }
+
+        $result = $this->pathfindingService->validateManualPath(
+            (int) $route->start_row,
+            (int) $route->start_col,
+            (int) $route->end_row,
+            (int) $route->end_col,
+            (int) $route->end_function_id,
+            $route->path_cells
+        );
+
+        return $result['success'];
     }
 }

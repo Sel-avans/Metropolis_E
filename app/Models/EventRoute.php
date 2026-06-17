@@ -14,6 +14,11 @@ class EventRoute extends Model
         'end_row',
         'end_col',
         'end_function_id',
+        'path_cells',
+    ];
+
+    protected $casts = [
+        'path_cells' => 'array',
     ];
 
     public function simulationEvent(): BelongsTo

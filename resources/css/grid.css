@@ -69,6 +69,82 @@
     box-shadow: inset 0 0 0 2px rgba(96, 165, 250, 0.35);
 }
 
+.city-grid-shell {
+    position: relative;
+}
+
+.city-grid {
+    position: relative;
+}
+
+.route-path-lines {
+    position: absolute;
+    top: 0;
+    left: 0;
+    width: 100%;
+    height: 100%;
+    pointer-events: none;
+    z-index: 20;
+    overflow: visible;
+}
+
+.route-path-line-outline {
+    fill: none;
+    stroke: #000;
+    stroke-width: 7;
+    stroke-linecap: round;
+    stroke-linejoin: round;
+}
+
+.route-path-line-outline-active {
+    stroke-width: 8;
+}
+
+.route-path-line-outline-draft {
+    stroke-width: 7;
+    stroke-dasharray: 8 6;
+    opacity: 0.75;
+}
+
+.route-path-line {
+    fill: none;
+    stroke: #0088ff;
+    stroke-width: 4;
+    stroke-linecap: round;
+    stroke-linejoin: round;
+}
+
+.route-path-line-active {
+    stroke: #00a8ff;
+    stroke-width: 5;
+}
+
+.route-path-line-draft {
+    stroke: #0088ff;
+    stroke-width: 4;
+    stroke-dasharray: 8 6;
+    opacity: 0.75;
+}
+
+.dark .route-path-line {
+    stroke: #38bdf8;
+}
+
+.dark .route-path-line-active {
+    stroke: #7dd3fc;
+}
+
+.grid-cell.route-path-draw-position {
+    outline: 3px solid #a78bfa;
+    outline-offset: 2px;
+}
+
+#route-draw-btn[aria-pressed="true"] {
+    outline: 3px solid #a78bfa;
+    outline-offset: 2px;
+    box-shadow: 0 0 0 1px #6d28d9;
+}
+
 #route-set-start-btn[aria-pressed="true"] {
     outline: 3px solid #34d399;
     outline-offset: 2px;

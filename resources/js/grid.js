@@ -22,7 +22,7 @@ import {
 } from './regulation.js';
 import { resetDayNightIndicatorState } from './day-night-indicator.js';
 import { initLibraryPreview, closePreview } from './library-preview.js';
-import { initRoutePlanner, handleRouteCellClick, handleGridFunctionPlaced, handleGridFunctionMoved, handleGridFunctionRemoved, syncRoutePlannerEvents, canDragRouteCell, canDragLibraryFunction, canDropOnRouteCell, shouldBlockGridCellDrag, handleInvalidLibraryDrag, handleInvalidRouteCellDrop, canRemoveGridFunction, handleBlockedRoutePointRemoval, setRouteGridRenderCallback } from './route-planner.js';
+import { initRoutePlanner, handleRouteCellClick, handleGridFunctionPlaced, handleGridFunctionMoved, handleGridFunctionRemoved, syncRoutePlannerEvents, refreshRouteActivationDisplay, canDragRouteCell, canDragLibraryFunction, canDropOnRouteCell, shouldBlockGridCellDrag, handleInvalidLibraryDrag, handleInvalidRouteCellDrop, canRemoveGridFunction, handleBlockedRoutePointRemoval, setRouteGridRenderCallback } from './route-planner.js';
 
 const SIM_STATE_KEY = 'metropolis_simulation_state';
 
@@ -153,6 +153,7 @@ function initGridPage() {
                 activatedEarly: Boolean(e.activatedEarly),
                 activatedForCycle: Boolean(e.activatedForCycle),
                 cycleActivationStart: e.cycleActivationStart ?? null,
+                deactivatedManually: Boolean(e.deactivatedManually),
             })),
         }));
     }
@@ -310,6 +311,7 @@ function initGridPage() {
                 id: e.id,
                 active: e.isActive ?? false,
                 contributing: isEventContributingToQoL(e, simTime),
+                highlight: isEventActiveForGridHighlight(e, simTime),
                 early: e.activatedEarly ?? false,
                 cycle: e.activatedForCycle ?? false,
             }))
@@ -432,12 +434,25 @@ function initGridPage() {
             if (hasEventEnded(event, simTime)) {
                 if (event.activatedEarly) { event.activatedEarly = false; changed = true; }
                 if (event.isActive) { event.isActive = false; changed = true; }
+                if (event.deactivatedManually) { event.deactivatedManually = false; changed = true; }
                 return;
             }
 
+            // Only honour manual deactivation during the event's scheduled window.
+            if (event.deactivatedManually && isScheduledEventActive(event, simTime)) {
+                if (event.isActive) { event.isActive = false; changed = true; }
+                return;
+            }
+
+            if (event.deactivatedManually && isBeforeEventStart(event, simTime)) {
+                event.deactivatedManually = false;
+                changed = true;
+            }
+
             const scheduledActive = isScheduledEventActive(event, simTime);
-            const earlyActive = event.activatedEarly && isBeforeEventStart(event, simTime);
-            const shouldBeActive = !isSimulationAtDayStart(simTime) && (scheduledActive || earlyActive);
+            const shouldBeActive = !isSimulationAtDayStart(simTime) && (
+                scheduledActive || (event.activatedEarly && !isBeforeEventStart(event, simTime))
+            );
 
             if (event.isActive !== shouldBeActive) { event.isActive = shouldBeActive; changed = true; }
         });
@@ -446,13 +461,17 @@ function initGridPage() {
     }
 
     function toggleEventEarlyActivation(event, simTime) {
-        if (hasEventEnded(event, simTime) || !isBeforeEventStart(event, simTime)) return;
-        if (event.activatedEarly) {
+        if (hasEventEnded(event, simTime)) return;
+
+        if (event.isActive || event.activatedEarly) {
             event.activatedEarly = false;
             event.isActive = false;
+            event.deactivatedManually = isScheduledEventActive(event, simTime);
             return;
         }
+
         event.activatedEarly = true;
+        event.deactivatedManually = false;
     }
 
     function toggleLongEventCycleActivation(event, simTime) {
@@ -472,6 +491,7 @@ function initGridPage() {
         renderActiveEventsPanel();
         renderAllEventsPanel();
         updateCellHighlights();
+        refreshRouteActivationDisplay(allEvents);
         updateQoL({ immediate: true }).then(() => {
             lastQoLEventIdsKey = buildQoLActiveIdsKey(getCurrentTime());
         });
@@ -479,7 +499,7 @@ function initGridPage() {
     }
 
     function applySimulationTime(simTime) {
-        syncEventActiveStates(simTime);
+        const statesChanged = syncEventActiveStates(simTime);
 
         if (!allEvents.length) return;
 
@@ -488,13 +508,14 @@ function initGridPage() {
         const uiChanged  = signature !== lastActiveEventSignature;
         const qolChanged = lastQoLEventIdsKey === null || idsKey !== lastQoLEventIdsKey;
 
-        if (!uiChanged && !qolChanged) return;
+        if (!uiChanged && !qolChanged && !statesChanged) return;
 
-        if (uiChanged) {
+        if (uiChanged || statesChanged) {
             lastActiveEventSignature = signature;
             renderActiveEventsPanel();
             renderAllEventsPanel();
             updateCellHighlights();
+            refreshRouteActivationDisplay(allEvents);
         }
 
         if (qolChanged) {
@@ -764,7 +785,47 @@ function initGridPage() {
     // HIGHLIGHT LOGICA
     // =========================================================
 
+    function isEventActiveForGridHighlight(event, simTime = getCurrentTime()) {
+        if (event.deactivatedManually) {
+            return false;
+        }
+
+        if (!event.fitsInCycle) {
+            if (!event.activatedForCycle) {
+                return false;
+            }
+
+            const activationStart = Number(event.cycleActivationStart);
+            if (Number.isNaN(activationStart) || simTime < activationStart || simTime >= getMaxTime()) {
+                return false;
+            }
+
+            return true;
+        }
+
+        if (hasEventEnded(event, simTime)) {
+            return false;
+        }
+
+        // Manual activation — show assigned functions immediately, even at paused day start.
+        if (event.activatedEarly) {
+            return true;
+        }
+
+        if (event.isActive) {
+            return true;
+        }
+
+        if (!isSimulationAtDayStart(simTime) && isScheduledEventActive(event, simTime)) {
+            return true;
+        }
+
+        return false;
+    }
+
     function updateCellHighlights() {
+        const simTime = getCurrentTime();
+
         document.querySelectorAll('.grid-cell').forEach(cell => {
             const functionImg = cell.querySelector('.grid-function-icon');
             if (!functionImg) { cell.classList.remove('event-highlight'); return; }
@@ -777,7 +838,7 @@ function initGridPage() {
                 .filter(Boolean);
 
             const isHighlighted = allEvents.some(event => {
-                if (!event.isActive) return false;
+                if (!isEventActiveForGridHighlight(event, simTime)) return false;
 
                 const functionIds = (event.affectedFunctionIds || [])
                     .map(Number)
@@ -806,6 +867,7 @@ function initGridPage() {
     function onSimulationCycleComplete() {
         allEvents.forEach(event => {
             event.activatedEarly = false;
+            event.deactivatedManually = false;
             if (event.activatedForCycle) resetLongEventCycleActivation(event);
         });
         lastQoLEventIdsKey = null;
@@ -853,10 +915,19 @@ function initGridPage() {
         } else if (isLongEvent && panel === 'all') {
             toggleButton = renderToggleButton(event, { showDeactivate: false });
         } else if (!isLongEvent) {
-            const canToggleEarly = isBeforeEventStart(event, simTime) && !hasEventEnded(event, simTime);
-            const showDeactivate = event.activatedEarly && isBeforeEventStart(event, simTime);
-            if (canToggleEarly) {
-                toggleButton = renderToggleButton(event, { showDeactivate });
+            const notEnded = !hasEventEnded(event, simTime);
+            const waitingForStart = event.activatedEarly && isBeforeEventStart(event, simTime);
+            const showDeactivate = notEnded && (isActive || waitingForStart);
+            const showActivate = notEnded && !showDeactivate && (
+                isBeforeEventStart(event, simTime)
+                || event.deactivatedManually
+                || isScheduledEventActive(event, simTime)
+            );
+
+            if (showDeactivate) {
+                toggleButton = renderToggleButton(event, { showDeactivate: true });
+            } else if (showActivate) {
+                toggleButton = renderToggleButton(event, { showDeactivate: false });
             }
         }
 
@@ -986,6 +1057,7 @@ function initGridPage() {
     document.getElementById('replayBtn')?.addEventListener('click', () => {
         allEvents.forEach(event => {
             event.activatedEarly = false;
+            event.deactivatedManually = false;
             if (event.activatedForCycle) resetLongEventCycleActivation(event);
         });
         clearSimulationState();
@@ -1106,6 +1178,7 @@ function initGridPage() {
                     activatedEarly: e.activatedEarly,
                     activatedForCycle: e.activatedForCycle,
                     cycleActivationStart: e.cycleActivationStart,
+                    deactivatedManually: e.deactivatedManually,
                 };
             });
 
@@ -1128,10 +1201,14 @@ function initGridPage() {
                     calendarDurationMinutes: e.calendar_duration_minutes ?? e.duration_minutes ?? 0,
                     fitsInCycle:           e.fits_in_cycle ?? true,
                     isActive:              false,
+                    deactivatedManually: false,
                 };
                 const configKey = buildEventConfigFingerprint(draft);
                 const configChanged = storedConfigs[e.id] != null && storedConfigs[e.id] !== configKey;
 
+                draft.deactivatedManually = configChanged
+                    ? false
+                    : Boolean(stored?.deactivatedManually ?? memory?.deactivatedManually ?? false);
                 draft.activatedEarly = configChanged
                     ? false
                     : (stored?.activatedEarly ?? memory?.activatedEarly ?? false);

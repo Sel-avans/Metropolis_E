@@ -2,6 +2,8 @@
     {{-- Highlight stijl voor event-beïnvloede cellen --}}
     <style>
         .event-highlight {
+            outline: 3px solid #f59e0b !important;
+            outline-offset: -2px;
             border-color: #f59e0b !important;
             box-shadow: 0 0 0 2px #f59e0b66;
         }
@@ -198,6 +200,39 @@
                         <option value="">— Select assigned function —</option>
                     </select>
                 </div>
+                <div id="route-path-controls" class="hidden mt-3 grid grid-cols-1 sm:grid-cols-2 gap-2">
+                    <button type="button" id="route-generate-btn" disabled
+                        class="w-full px-2 py-1.5 bg-amber-600 text-white text-xs font-semibold rounded shadow hover:bg-amber-700 transition focus:outline-none focus:ring-2 focus:ring-amber-400 disabled:opacity-50 disabled:cursor-not-allowed whitespace-nowrap"
+                        aria-describedby="route-planner-status"
+                        aria-label="Generate a route automatically from the access road to the event location">
+                        Generate route
+                    </button>
+                    <button type="button" id="route-draw-btn" disabled
+                        class="w-full px-2 py-1.5 bg-violet-600 text-white text-xs font-semibold rounded shadow hover:bg-violet-700 transition focus:outline-none focus:ring-2 focus:ring-violet-400 disabled:opacity-50 disabled:cursor-not-allowed whitespace-nowrap"
+                        aria-describedby="route-planner-status"
+                        aria-pressed="false"
+                        aria-label="Draw a route manually on the City Grid, starting from the access road">
+                        Draw route
+                    </button>
+                    <button type="button" id="route-save-path-btn" disabled
+                        class="hidden w-full px-2 py-1.5 bg-violet-700 text-white text-xs font-semibold rounded shadow hover:bg-violet-800 transition focus:outline-none focus:ring-2 focus:ring-violet-400 disabled:opacity-50 disabled:cursor-not-allowed whitespace-nowrap sm:col-span-2"
+                        aria-describedby="route-planner-status"
+                        aria-label="Save the drawn route on the City Grid">
+                        Save route
+                    </button>
+                    <button type="button" id="route-cancel-draw-btn" disabled
+                        class="hidden w-full px-2 py-1.5 bg-gray-500 text-white text-xs font-semibold rounded shadow hover:bg-gray-600 transition focus:outline-none focus:ring-2 focus:ring-gray-400 disabled:opacity-50 disabled:cursor-not-allowed whitespace-nowrap sm:col-span-2"
+                        aria-describedby="route-planner-status"
+                        aria-label="Cancel drawing the route on the City Grid">
+                        Cancel drawing
+                    </button>
+                    <button type="button" id="route-remove-path-btn" disabled
+                        class="w-full px-2 py-1.5 bg-gray-600 text-white text-xs font-semibold rounded shadow hover:bg-gray-700 transition focus:outline-none focus:ring-2 focus:ring-gray-500 disabled:opacity-50 disabled:cursor-not-allowed whitespace-nowrap sm:col-span-2"
+                        aria-describedby="route-planner-status"
+                        aria-label="Remove the visitor route for the selected event">
+                        Remove route
+                    </button>
+                </div>
                 <p id="route-planner-status" class="mt-3 text-sm !text-white" aria-live="off">
                     Choose an event from the list above to plan a visitor route.
                 </p>
@@ -209,7 +244,8 @@
             <div class="justify-center">
                 <h1 class="text-2xl text-center font-bold mb-2 dark:text-teal-300">City Grid</h1>
 
-                <div class="city-grid grid grid-flow-col grid-rows-3 gap-3 w-min mx-auto"
+                <div class="city-grid-shell relative w-min mx-auto">
+                <div class="city-grid grid grid-flow-col grid-rows-3 gap-3 w-min"
                 aria-label="City planning grid">
                     @for($col = 1; $col <= 4; $col++)
                         @for($row = 1; $row <= 3; $row++)
@@ -250,6 +286,7 @@
                                         class="grid-function-icon object-contain relative z-0 {{ $isApproved ? 'pointer-events-none select-none' : '' }}"
                                         data-function-id="{{ $cell->function->id }}"
                                         data-function-name="{{ $cell->function->name }}"
+                                        data-categories="{{ strtolower($cell->function->category ?? '') }}"
                                         draggable="{{ $isApproved ? 'false' : 'true' }}"
                                         ondragstart="{{ $isApproved ? 'return false;' : '' }}">
                                     @if(auth()->user() && (auth()->user()->role->name === 'City_planner' || auth()->user()->role->name === 'Administrator'))
@@ -261,6 +298,7 @@
                             </div>
                         @endfor
                     @endfor
+                </div>
                 </div>
             </div>
 
