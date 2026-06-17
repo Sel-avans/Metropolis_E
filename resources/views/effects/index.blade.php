@@ -5,7 +5,7 @@
     <a href="{{ url('/grid') }}"
        class="inline-flex items-center gap-1 mb-4 px-3 py-1.5 bg-blue-600 hover:bg-blue-700 text-white text-sm rounded-md transition">
         <span class="text-lg">←</span>
-        <span>Back</span>
+        <span>Back to grid</span>
     </a>
 
     <p class="mb-4 dark:text-white">Manage here how each function effects the QoL-categories.</p>

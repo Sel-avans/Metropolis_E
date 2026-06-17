@@ -37,7 +37,7 @@
                 </nav>
             </div>
 
-            <section id="library-filters" class="shrink-0 mb-3" >
+            <section id="library-filters" class="shrink-0 mb-3">
                 <label for="library-search" class="sr-only">Search destinations by name</label>
                 <input
                     type="search"
@@ -63,11 +63,11 @@
                         <h2 class="text-xl dark:text-teal-600 font-semibold mt-2 mb-2">{{ ucfirst($category) }}</h2>
                         <ul class="space-y-2 dark:text-white" role="list">
                             @foreach($items as $function)
-                                {{-- HERSTELD: 'tabindex="0"' en 'role="button"' toegevoegd voor Keyboard Toegankelijkheid --}}
                                 <li class="library-item flex items-center gap-3 px-4 py-3 border border-gray-400 dark:border-gray-600 rounded cursor-pointer hover:border-blue-500 transition focus:outline-none focus:ring-2 focus:ring-blue-500"
                                     draggable="{{ (auth()->user() && (auth()->user()->role->name === 'City_planner' || auth()->user()->role->name === 'Administrator')) ? 'true' : 'false' }}"
                                     tabindex="0"
                                     role="button"
+                                    aria-pressed="false"
                                     data-function-id="{{ $function->id }}"
                                     data-function-name="{{ $function->name }}"
                                     data-category="{{ $function->category }}"
@@ -85,36 +85,36 @@
                 @endforelse
             </div>
 
+            {{-- Library preview panel: pointer-events-none verwijderd zodat scrollen werkt --}}
             <div id="library-preview-panel"
-            class="hidden absolute inset-x-0 bottom-0 z-10 flex flex-col w-full overflow-hidden bg-slate-900/95 border-t border-slate-600 rounded-t-lg shadow-xl text-white pointer-events-none library-preview-panel"
-            role="dialog"
-            aria-live="polite"
-            aria-hidden="true"
-            aria-labelledby="library-preview-title">
-            <div id="library-preview-header" class="library-preview-header shrink-0 flex items-start justify-between gap-3 px-4 pt-4 pb-2 border-b border-slate-600 bg-slate-900/95">
-                <div class="flex items-center gap-3 min-w-0">
-                    <img id="library-preview-icon" src="" alt="" class="w-10 h-10 object-contain hidden">
-                    <div class="min-w-0">
-                        <h3 id="library-preview-title" class="text-base font-bold text-white truncate">—</h3>
-                        <p id="library-preview-category" class="text-xs uppercase tracking-wide text-white/80">—</p>
+                class="hidden absolute inset-x-0 bottom-0 z-10 flex flex-col w-full bg-slate-900/95 border-t border-slate-600 rounded-t-lg shadow-xl text-white library-preview-panel"
+                role="dialog"
+                aria-live="polite"
+                aria-hidden="true"
+                aria-labelledby="library-preview-title">
+                <div id="library-preview-header" class="library-preview-header shrink-0 flex items-start justify-between gap-3 px-4 pt-4 pb-2 border-b border-slate-600 bg-slate-900/95">
+                    <div class="flex items-center gap-3 min-w-0">
+                        <img id="library-preview-icon" src="" alt="" class="w-10 h-10 object-contain hidden">
+                        <div class="min-w-0">
+                            <h3 id="library-preview-title" class="text-base font-bold text-white truncate">—</h3>
+                            <p id="library-preview-category" class="text-xs uppercase tracking-wide text-white/80">—</p>
+                        </div>
                     </div>
+                    <button id="library-preview-close" type="button"
+                        class="hidden shrink-0 w-7 h-7 rounded-full border border-slate-500 text-white hover:border-white focus:outline-none focus:ring-2 focus:ring-blue-500"
+                        aria-label="Close destination preview">
+                        <span aria-hidden="true">&times;</span>
+                    </button>
                 </div>
-                <button id="library-preview-close" type="button"
-                    class="hidden shrink-0 w-7 h-7 rounded-full border border-slate-500 text-white hover:border-white focus:outline-none focus:ring-2 focus:ring-blue-500"
-                    aria-label="Close destination preview">
-                    <span aria-hidden="true">&times;</span>
-                </button>
+                {{-- overflow-y: auto + max-height zodat de body scrollt --}}
+                <div id="library-preview-body" class="library-preview-body p-4 overflow-y-auto max-h-[60vh]">
+                    <div id="library-preview-status" class="text-xs text-amber-400 mb-2"></div>
+                    <div id="library-preview-effects" class="mb-3"></div>
+                    <div id="library-preview-conditions" class="text-xs"></div>
+                </div>
             </div>
-            <div id="library-preview-body" class="library-preview-body p-4 overflow-hidden">
-                <div id="library-preview-status" class="text-xs text-amber-400 mb-2"></div>
-                <div id="library-preview-effects" class="mb-3"></div>
-                <div id="library-preview-conditions" class="text-xs"></div>
-            </div>
-        </div>
 
         </div>
-
-        
 
         {{-- MIDDLE: QoL + Undo + Grid + Simulation Controls --}}
         <div class="flex flex-col flex-1 min-w-0 py-2">
@@ -151,17 +151,23 @@
                 aria-label="City planning grid">
                     @for($col = 1; $col <= 4; $col++)
                         @for($row = 1; $row <= 3; $row++)
-@php
+                            @php
                                 $cell = $grid->first(fn($c) => $c->row == $row && $c->col == $col);
                                 $isApproved = $cell && $cell->is_approved;
                                 $isCityPlanner = auth()->user() && auth()->user()->role->name === 'City_planner';
-                                
-                                // Define the classes for the cell based on its state
+
                                 $cellClasses = $isApproved
                                     ? 'is-locked bg-stripes opacity-60 border-red-600 ' . ($isCityPlanner ? 'cursor-pointer' : 'cursor-not-allowed')
                                     : 'bg-gray-300 border-gray-800 dark:bg-blue-950 dark:border-gray-300 hover:bg-gray-400 hover:dark:bg-gray-100 cursor-pointer';
+
+                                // Aria-label voor lege vs gevulde vs goedgekeurde cellen
+                                $ariaLabel = $isApproved
+                                    ? "Approved area row {$row}, column {$col}"
+                                    : ($cell && $cell->function
+                                        ? "Cell {$row},{$col} contains {$cell->function->name}. Press Enter to select."
+                                        : "Empty cell {$row},{$col}. Press Enter to select.");
                             @endphp
-            
+
                             <div class="grid-cell relative flex border-2 w-32 h-32 items-center justify-center transition focus:outline-none focus:ring-2 focus:ring-blue-500 {{ $cellClasses }}"
                                 data-row="{{ $row }}"
                                 data-col="{{ $col }}"
@@ -169,8 +175,8 @@
                                 draggable="{{ $cell && !$isApproved ? 'true' : 'false' }}"
                                 role="button"
                                 tabindex="0"
-                                @if($isApproved) aria-label="Approved area row {{ $row }}, column {{ $col }}" @endif>
-                                
+                                aria-label="{{ $ariaLabel }}">
+
                                 <div class="lock-indicator absolute z-50 top-1 left-1 bg-red-600 text-white text-[10px] font-bold px-1 rounded flex items-center gap-0.5 shadow {{ $isApproved ? '' : 'hidden' }}"
                                     aria-hidden="{{ $isApproved ? 'false' : 'true' }}">
                                     🔒 <span class="uppercase text-[9px]">Locked</span>
@@ -191,7 +197,12 @@
                                         ondragstart="{{ $isApproved ? 'return false;' : '' }}">
                                     @if(auth()->user() && (auth()->user()->role->name === 'City_planner' || auth()->user()->role->name === 'Administrator'))
                                         @if(!$isApproved)
-                                            <button type="button" class="delete-btn absolute z-10 top-[2px] right-[2px] bg-red-600/80 text-white w-5 h-5 text-[14px] rounded cursor-pointer flex items-center justify-center">✖</button>
+                                            <button type="button"
+                                                tabindex="0"
+                                                class="delete-btn absolute z-10 top-[2px] right-[2px] bg-red-600/80 text-white w-5 h-5 text-[14px] rounded cursor-pointer flex items-center justify-center"
+                                                aria-label="Remove {{ $cell->function->name }} from cell {{ $row }},{{ $col }}">
+                                                <span aria-hidden="true">✖</span>
+                                            </button>
                                         @endif
                                     @endif
                                 @endif
@@ -281,8 +292,7 @@
                     {{-- Speed --}}
                     <div class="flex flex-col items-center gap-2">
                         <fieldset>
-                            <legend
-                                class="text-xs font-bold text-gray-500 uppercase tracking-wider dark:text-gray-400 mb-2">
+                            <legend class="text-xs font-bold text-gray-500 uppercase tracking-wider dark:text-gray-400 mb-2">
                                 Simulation Speed
                             </legend>
                             <div class="flex gap-2 bg-gray-100 dark:bg-gray-800 p-2 rounded-lg border border-gray-200 dark:border-gray-700"
@@ -304,8 +314,7 @@
                     {{-- Playback --}}
                     <div class="flex flex-col items-center gap-2">
                         <fieldset>
-                            <legend
-                                class="text-xs font-bold text-gray-500 uppercase tracking-wider dark:text-gray-400 mb-2">
+                            <legend class="text-xs font-bold text-gray-500 uppercase tracking-wider dark:text-gray-400 mb-2">
                                 Animation Play
                             </legend>
                             <div class="flex gap-2 bg-gray-100 dark:bg-gray-800 p-2 rounded-lg border border-gray-200 dark:border-gray-700"
@@ -331,8 +340,7 @@
                     </div>
 
                     {{-- Active Events --}}
-                    <div
-                        class="flex-1 min-w-[200px] bg-gray-50 dark:bg-gray-800 p-4 rounded-md border border-gray-200 dark:border-gray-600">
+                    <div class="flex-1 min-w-[200px] bg-gray-50 dark:bg-gray-800 p-4 rounded-md border border-gray-200 dark:border-gray-600">
                         <h3 class="text-sm font-semibold text-sky-500 dark:text-teal-500 mb-2">Active Events</h3>
                         <ul id="active-events-list" class="text-xs text-gray-700 dark:text-gray-300 space-y-1"
                             aria-live="polite" aria-label="Active simulation events">
@@ -347,7 +355,7 @@
 
         {{-- RIGHT: QoL Breakdown + Events panel --}}
         <div class="border-l border-gray-400 dark:border-gray-700 w-64 flex-shrink-0 p-3 flex flex-col gap-4 max-h-[73vh] overflow-y-auto">
-            
+
             {{-- QoL Score --}}
             <div class="border-4 border-gray-400 dark:bg-indigo-900 dark:border-teal-600 rounded-md p-4">
                 <span id="qol-score" class="text-xl font-semibold dark:text-teal-300">
@@ -374,6 +382,9 @@
         <h3 class="text-xs font-bold text-slate-400 uppercase tracking-wider mb-2">Cell QoL Influence</h3>
         <ul id="popup-neighbors-list" class="space-y-1"></ul>
     </div>
+
+    {{-- Screen reader live region voor keyboard acties --}}
+    <div id="sr-live-region" aria-live="assertive" aria-atomic="true" class="sr-only"></div>
 
     <style>
         .bg-stripes {

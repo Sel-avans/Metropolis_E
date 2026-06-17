@@ -425,18 +425,11 @@ export function initLibraryPreview() {
         openPreview(item, true, event);
     });
 
-    libraryList.addEventListener('keydown', (event) => {
-        const item = resolveLibraryItem(event.target);
-        if (!isVisibleLibraryItem(item)) return;
-
-        if (event.key !== 'Enter' && event.key !== ' ') return;
-
-        event.preventDefault();
-        // keyboard: position based on item bounding box
-        const rect = item.getBoundingClientRect();
-        const fakeEvent = { clientX: rect.left + rect.width / 2, clientY: rect.top + rect.height + 4 };
-        openPreview(item, true, fakeEvent);
-    });
+    // NB: er is hier bewust GEEN keydown-listener voor Enter/Space op
+    // libraryList. Het selecteren/plaatsen van een item met Enter/Space
+    // wordt afgehandeld in grid.js. De preview mag alleen openen via
+    // klikken, of via de "i"-toets (die in grid.js item.click() aanroept,
+    // wat hierboven door de click-listener wordt opgepakt).
 
     panel.addEventListener('mouseenter', () => {
         cancelHoverPreview();
