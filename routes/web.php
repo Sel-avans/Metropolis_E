@@ -12,6 +12,7 @@ use App\Http\Controllers\UndoController;
 use App\Policies\PagePolicy;
 use App\Http\Controllers\SimulationEventController;
 use App\Http\Controllers\FunctionPreviewController; 
+use App\Http\Controllers\EventController; 
 
 // Publieke route
 Route::get('/', function () {
