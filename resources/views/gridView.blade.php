@@ -156,7 +156,8 @@
                     <span id="route-end-label" class="route-point-col route-end-col hidden col-start-3 row-start-1 text-xs font-semibold text-gray-700 dark:text-gray-300">End point</span>
 
                     <select id="route-event-select"
-                        class="col-start-1 row-start-2 w-full min-w-0 px-2 py-1.5 text-xs rounded-md border border-gray-300 dark:border-gray-600 bg-white dark:bg-gray-900 text-gray-900 dark:text-white focus:outline-none focus:ring-2 focus:ring-emerald-500">
+                        class="col-start-1 row-start-2 w-full min-w-0 px-2 py-1.5 text-xs rounded-md border border-gray-300 dark:border-gray-600 bg-white dark:bg-gray-900 text-gray-900 dark:text-white focus:outline-none focus:ring-2 focus:ring-emerald-500"
+                        aria-label="Select an event to plan a route for.">
                         <option value="">— Event —</option>
                     </select>
 
