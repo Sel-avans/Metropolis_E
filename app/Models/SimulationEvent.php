@@ -4,6 +4,7 @@ namespace App\Models;
 
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\Database\Eloquent\Relations\HasMany;
+use Illuminate\Database\Eloquent\Relations\HasOne;
 
 class SimulationEvent extends Model
 {
@@ -36,5 +37,10 @@ class SimulationEvent extends Model
     public function categoryEffects(): HasMany
     {
         return $this->hasMany(Effect::class, 'simulation_event_id');
+    }
+
+    public function route(): HasOne
+    {
+        return $this->hasOne(EventRoute::class);
     }
 }

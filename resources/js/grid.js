@@ -22,6 +22,7 @@ import {
 } from './regulation.js';
 import { resetDayNightIndicatorState } from './day-night-indicator.js';
 import { initLibraryPreview, closePreview } from './library-preview.js';
+import { initRoutePlanner, handleRouteCellClick, handleRouteCellKeydown, handleGridFunctionPlaced, handleGridFunctionMoved, handleGridFunctionRemoved, syncRoutePlannerEvents, refreshRouteActivationDisplay, canDragRouteCell, canDragLibraryFunction, canDropOnRouteCell, shouldBlockGridCellDrag, handleInvalidLibraryDrag, handleInvalidRouteCellDrop, canRemoveGridFunction, handleBlockedRoutePointRemoval, setRouteGridRenderCallback } from './route-planner.js';
 
 const SIM_STATE_KEY = 'metropolis_simulation_state';
 
@@ -39,6 +40,30 @@ function createDeleteBtn(functionName, row = '', col = '') {
     return btn;
 }
 
+function syncGridCellDeleteButtons() {
+    document.querySelectorAll('.grid-cell').forEach((cell) => {
+        const img = cell.querySelector('.grid-function-icon');
+        if (!img || cell.classList.contains('is-locked')) {
+            return;
+        }
+
+        const deleteBtn = cell.querySelector('.delete-btn');
+        if (!canRemoveGridFunction(cell)) {
+            deleteBtn?.remove();
+            return;
+        }
+
+        if (!deleteBtn) {
+            cell.appendChild(createDeleteBtn(img.alt, cell.dataset.row, cell.dataset.col));
+        }
+    });
+}
+
+// =========================================================
+// HULPFUNCTIE: herstel een cel met functie-inhoud
+// Gecentraliseerd zodat alle restore-paden (undo, conflict-fallback)
+// altijd dezelfde toegankelijke markup genereren.
+// =========================================================
 function restoreCellContent(cell, functionId, functionName, functionImage) {
     cell.innerHTML = '';
 
@@ -46,12 +71,15 @@ function restoreCellContent(cell, functionId, functionName, functionImage) {
     img.src = functionImage;
     img.alt = functionName;
     img.dataset.functionId = functionId;
+    img.dataset.functionName = functionName;
     img.classList.add('grid-function-icon', 'object-contain');
     cell.appendChild(img);
 
     const row = cell.dataset.row ?? '';
     const col = cell.dataset.col ?? '';
-    cell.appendChild(createDeleteBtn(functionName, row, col));
+    if (canRemoveGridFunction(cell)) {
+        cell.appendChild(createDeleteBtn(functionName, row, col));
+    }
     cell.setAttribute('draggable', 'true');
 
     cell.setAttribute('aria-label', `Cell ${row},${col} contains ${functionName}. Press Enter to select.`);
@@ -66,6 +94,8 @@ function initGridPage() {
 
     try { initLibraryFilter(); } catch (e) { /* ignore if not present */ }
     try { initLibraryPreview(); } catch (e) { /* ignore if not present */ }
+    try { initRoutePlanner(); } catch (e) { /* ignore if not present */ }
+    try { setRouteGridRenderCallback(syncGridCellDeleteButtons); } catch (e) { /* ignore if not present */ }
 
     // =========================================================
     // VARIABELEN
@@ -75,6 +105,7 @@ function initGridPage() {
     let isDragging = false;
     let sourceCell = null;
     let dropOccurred = false;
+    let blockedRouteDropTarget = null;
     let old_score;
     let lastAction = null;
 
@@ -114,6 +145,7 @@ function initGridPage() {
                 activatedEarly: Boolean(e.activatedEarly),
                 activatedForCycle: Boolean(e.activatedForCycle),
                 cycleActivationStart: e.cycleActivationStart ?? null,
+                deactivatedManually: Boolean(e.deactivatedManually),
             })),
         }));
     }
@@ -262,7 +294,7 @@ function initGridPage() {
         lockIndicator.setAttribute('aria-hidden', 'true');
         lockExplanation.classList.add('hidden');
 
-        if (img && !cell.querySelector('.delete-btn')) {
+        if (img && !cell.querySelector('.delete-btn') && canRemoveGridFunction(cell)) {
             const deleteBtn = createDeleteBtn(img.alt, cell.dataset.row, cell.dataset.col);
             cell.appendChild(deleteBtn);
         }
@@ -286,6 +318,7 @@ function initGridPage() {
                 id: e.id,
                 active: e.isActive ?? false,
                 contributing: isEventContributingToQoL(e, simTime),
+                highlight: isEventActiveForGridHighlight(e, simTime),
                 early: e.activatedEarly ?? false,
                 cycle: e.activatedForCycle ?? false,
             }))
@@ -401,12 +434,25 @@ function initGridPage() {
             if (hasEventEnded(event, simTime)) {
                 if (event.activatedEarly) { event.activatedEarly = false; changed = true; }
                 if (event.isActive) { event.isActive = false; changed = true; }
+                if (event.deactivatedManually) { event.deactivatedManually = false; changed = true; }
                 return;
             }
 
+            // Only honour manual deactivation during the event's scheduled window.
+            if (event.deactivatedManually && isScheduledEventActive(event, simTime)) {
+                if (event.isActive) { event.isActive = false; changed = true; }
+                return;
+            }
+
+            if (event.deactivatedManually && isBeforeEventStart(event, simTime)) {
+                event.deactivatedManually = false;
+                changed = true;
+            }
+
             const scheduledActive = isScheduledEventActive(event, simTime);
-            const earlyActive = event.activatedEarly && isBeforeEventStart(event, simTime);
-            const shouldBeActive = !isSimulationAtDayStart(simTime) && (scheduledActive || earlyActive);
+            const shouldBeActive = !isSimulationAtDayStart(simTime) && (
+                scheduledActive || (event.activatedEarly && !isBeforeEventStart(event, simTime))
+            );
 
             if (event.isActive !== shouldBeActive) { event.isActive = shouldBeActive; changed = true; }
         });
@@ -415,13 +461,17 @@ function initGridPage() {
     }
 
     function toggleEventEarlyActivation(event, simTime) {
-        if (hasEventEnded(event, simTime) || !isBeforeEventStart(event, simTime)) return;
-        if (event.activatedEarly) {
+        if (hasEventEnded(event, simTime)) return;
+
+        if (event.isActive || event.activatedEarly) {
             event.activatedEarly = false;
             event.isActive = false;
+            event.deactivatedManually = isScheduledEventActive(event, simTime);
             return;
         }
+
         event.activatedEarly = true;
+        event.deactivatedManually = false;
     }
 
     function toggleLongEventCycleActivation(event, simTime) {
@@ -441,6 +491,7 @@ function initGridPage() {
         renderActiveEventsPanel();
         renderAllEventsPanel();
         updateCellHighlights();
+        refreshRouteActivationDisplay(allEvents);
         updateQoL({ immediate: true }).then(() => {
             lastQoLEventIdsKey = buildQoLActiveIdsKey(getCurrentTime());
         });
@@ -448,7 +499,7 @@ function initGridPage() {
     }
 
     function applySimulationTime(simTime) {
-        syncEventActiveStates(simTime);
+        const statesChanged = syncEventActiveStates(simTime);
 
         if (!allEvents.length) return;
 
@@ -457,13 +508,14 @@ function initGridPage() {
         const uiChanged = signature !== lastActiveEventSignature;
         const qolChanged = lastQoLEventIdsKey === null || idsKey !== lastQoLEventIdsKey;
 
-        if (!uiChanged && !qolChanged) return;
+        if (!uiChanged && !qolChanged && !statesChanged) return;
 
-        if (uiChanged) {
+        if (uiChanged || statesChanged) {
             lastActiveEventSignature = signature;
             renderActiveEventsPanel();
             renderAllEventsPanel();
             updateCellHighlights();
+            refreshRouteActivationDisplay(allEvents);
         }
 
         if (qolChanged) {
@@ -837,7 +889,47 @@ function initGridPage() {
     // HIGHLIGHT LOGICA
     // =========================================================
 
+    function isEventActiveForGridHighlight(event, simTime = getCurrentTime()) {
+        if (event.deactivatedManually) {
+            return false;
+        }
+
+        if (!event.fitsInCycle) {
+            if (!event.activatedForCycle) {
+                return false;
+            }
+
+            const activationStart = Number(event.cycleActivationStart);
+            if (Number.isNaN(activationStart) || simTime < activationStart || simTime >= getMaxTime()) {
+                return false;
+            }
+
+            return true;
+        }
+
+        if (hasEventEnded(event, simTime)) {
+            return false;
+        }
+
+        // Manual activation — show assigned functions immediately, even at paused day start.
+        if (event.activatedEarly) {
+            return true;
+        }
+
+        if (event.isActive) {
+            return true;
+        }
+
+        if (!isSimulationAtDayStart(simTime) && isScheduledEventActive(event, simTime)) {
+            return true;
+        }
+
+        return false;
+    }
+
     function updateCellHighlights() {
+        const simTime = getCurrentTime();
+
         document.querySelectorAll('.grid-cell').forEach(cell => {
             const functionImg = cell.querySelector('.grid-function-icon');
             if (!functionImg) { cell.classList.remove('event-highlight'); return; }
@@ -850,7 +942,7 @@ function initGridPage() {
                 .filter(Boolean);
 
             const isHighlighted = allEvents.some(event => {
-                if (!event.isActive) return false;
+                if (!isEventActiveForGridHighlight(event, simTime)) return false;
 
                 const functionIds = (event.affectedFunctionIds || [])
                     .map(Number)
@@ -879,6 +971,7 @@ function initGridPage() {
     function onSimulationCycleComplete() {
         allEvents.forEach(event => {
             event.activatedEarly = false;
+            event.deactivatedManually = false;
             if (event.activatedForCycle) resetLongEventCycleActivation(event);
         });
         lastQoLEventIdsKey = null;
@@ -932,10 +1025,19 @@ function initGridPage() {
         } else if (isLongEvent && panel === 'all') {
             toggleButton = renderToggleButton(event, { showDeactivate: false });
         } else if (!isLongEvent) {
-            const canToggleEarly = isBeforeEventStart(event, simTime) && !hasEventEnded(event, simTime);
-            const showDeactivate = event.activatedEarly && isBeforeEventStart(event, simTime);
-            if (canToggleEarly) {
-                toggleButton = renderToggleButton(event, { showDeactivate });
+            const notEnded = !hasEventEnded(event, simTime);
+            const waitingForStart = event.activatedEarly && isBeforeEventStart(event, simTime);
+            const showDeactivate = notEnded && (isActive || waitingForStart);
+            const showActivate = notEnded && !showDeactivate && (
+                isBeforeEventStart(event, simTime)
+                || event.deactivatedManually
+                || isScheduledEventActive(event, simTime)
+            );
+
+            if (showDeactivate) {
+                toggleButton = renderToggleButton(event, { showDeactivate: true });
+            } else if (showActivate) {
+                toggleButton = renderToggleButton(event, { showDeactivate: false });
             }
         }
 
@@ -1078,6 +1180,7 @@ function initGridPage() {
     document.getElementById('replayBtn')?.addEventListener('click', () => {
         allEvents.forEach(event => {
             event.activatedEarly = false;
+            event.deactivatedManually = false;
             if (event.activatedForCycle) resetLongEventCycleActivation(event);
         });
         clearSimulationState();
@@ -1192,6 +1295,7 @@ function initGridPage() {
                     activatedEarly: e.activatedEarly,
                     activatedForCycle: e.activatedForCycle,
                     cycleActivationStart: e.cycleActivationStart,
+                    deactivatedManually: e.deactivatedManually,
                 };
             });
 
@@ -1212,12 +1316,16 @@ function initGridPage() {
                     end_minutes: e.end_minutes ?? datetimeToSimMinutes(e.end_at),
                     durationMinutes: e.duration_minutes ?? 0,
                     calendarDurationMinutes: e.calendar_duration_minutes ?? e.duration_minutes ?? 0,
-                    fitsInCycle: e.fits_in_cycle ?? true,
-                    isActive: false,
+                    fitsInCycle:           e.fits_in_cycle ?? true,
+                    isActive:              false,
+                    deactivatedManually: false,
                 };
                 const configKey = buildEventConfigFingerprint(draft);
                 const configChanged = storedConfigs[e.id] != null && storedConfigs[e.id] !== configKey;
 
+                draft.deactivatedManually = configChanged
+                    ? false
+                    : Boolean(stored?.deactivatedManually ?? memory?.deactivatedManually ?? false);
                 draft.activatedEarly = configChanged
                     ? false
                     : (stored?.activatedEarly ?? memory?.activatedEarly ?? false);
@@ -1259,7 +1367,7 @@ function initGridPage() {
             lastQoLEventIdsKey = null;
             applySimulationTime(getCurrentTime());
             updateQoL({ immediate: true });
-            updateUpcomingEventsDisplay(allEvents, getCurrentTime());
+            syncRoutePlannerEvents(allEvents);
             saveSimulationState();
 
         } catch (err) {
@@ -1382,8 +1490,18 @@ function calculateTimeRemaining(startTime, currentTime) {
 
     document.querySelectorAll(".library-item").forEach(item => {
         item.addEventListener("dragstart", e => {
+            const nextDraggedItem = {
+                id: Number(item.dataset.functionId),
+                name: item.dataset.functionName,
+                image: item.dataset.image,
+            };
+            if (!canDragLibraryFunction(nextDraggedItem)) {
+                e.preventDefault();
+                handleInvalidLibraryDrag(nextDraggedItem);
+                return;
+            }
             isDragging = true; dropOccurred = false;
-            draggedItem = { id: Number(item.dataset.functionId), name: item.dataset.functionName, image: item.dataset.image };
+            draggedItem = nextDraggedItem;
             e.dataTransfer.setDragImage(item.querySelector("img"), 16, 16);
         });
 
@@ -1434,19 +1552,40 @@ function calculateTimeRemaining(startTime, currentTime) {
                 e.preventDefault();
                 return;
             }
+            if (shouldBlockGridCellDrag()) {
+                e.preventDefault();
+                return;
+            }
+            if (!canDragRouteCell(cell)) {
+                e.preventDefault();
+                return;
+            }
             const img = cell.querySelector(".grid-function-icon");
             if (!img) return;
             isDragging = true; dropOccurred = false;
+            blockedRouteDropTarget = null;
             draggedItem = { id: Number(img.dataset.functionId), name: img.alt, image: img.src };
             e.dataTransfer.setDragImage(img, 16, 16);
             sourceCell = cell; cell.classList.add("drag-source");
         });
 
-        cell.addEventListener("dragover", e => { e.preventDefault(); cell.classList.add("drag-over"); });
+        cell.addEventListener("dragover", e => {
+            if (isLockedCell(cell)) {
+                return;
+            }
+            if (!canDropOnRouteCell(cell, draggedItem, Boolean(sourceCell))) {
+                e.preventDefault();
+                blockedRouteDropTarget = cell;
+                return;
+            }
+            blockedRouteDropTarget = null;
+            e.preventDefault();
+            cell.classList.add("drag-over");
+        });
         cell.addEventListener("dragleave", () => cell.classList.remove("drag-over"));
 
         cell.addEventListener("drop", async e => {
-            e.preventDefault(); isDragging = false; dropOccurred = true;
+            e.preventDefault();
             cell.classList.remove("drag-over");
 
             if (isLockedCell(cell)) {
@@ -1457,7 +1596,24 @@ function calculateTimeRemaining(startTime, currentTime) {
                 return;
             }
 
-            if (cell.querySelector("img") && !window.confirm("Are you sure you want to replace this feature?")) {
+            if (!canDropOnRouteCell(cell, draggedItem, Boolean(sourceCell))) {
+                isDragging = false;
+                dropOccurred = true;
+                if (sourceCell) sourceCell.classList.remove('drag-source');
+                handleInvalidRouteCellDrop(cell, draggedItem, Boolean(sourceCell));
+                draggedItem = null;
+                sourceCell = null;
+                blockedRouteDropTarget = null;
+                return;
+            }
+
+            isDragging = false;
+            dropOccurred = true;
+
+            const targetImg = cell.querySelector('.grid-function-icon');
+            const isGridSwap = Boolean(sourceCell && targetImg);
+
+            if (targetImg && !window.confirm("Are you sure you want to replace this feature?")) {
                 if (sourceCell) sourceCell.classList.remove("drag-source");
                 return;
             }
@@ -1465,17 +1621,44 @@ function calculateTimeRemaining(startTime, currentTime) {
             const newRow = cell.dataset.row, newCol = cell.dataset.col;
             let oldRow = null, oldCol = null;
             const originalSourceCell = sourceCell;
+            const displacedItem = isGridSwap
+                ? {
+                    id: Number(targetImg.dataset.functionId),
+                    name: targetImg.dataset.functionName || targetImg.alt,
+                    image: targetImg.src,
+                }
+                : null;
+
+            const restoreSwapCells = () => {
+                if (originalSourceCell && draggedItem) {
+                    restoreCellContent(
+                        originalSourceCell,
+                        draggedItem.id,
+                        draggedItem.name,
+                        draggedItem.image
+                    );
+                }
+                if (displacedItem) {
+                    restoreCellContent(cell, displacedItem.id, displacedItem.name, displacedItem.image);
+                } else {
+                    cell.innerHTML = "";
+                    cell.removeAttribute('draggable');
+                }
+            };
 
             if (sourceCell) {
                 oldRow = sourceCell.dataset.row; oldCol = sourceCell.dataset.col;
-                sourceCell.innerHTML = ""; sourceCell.removeAttribute("draggable");
+                sourceCell.innerHTML = "";
+                sourceCell.removeAttribute("draggable");
                 sourceCell.classList.remove("drag-source");
             }
 
-            sourceCell = null; cell.innerHTML = "";
+            sourceCell = null;
+            cell.innerHTML = "";
             const img = document.createElement("img");
             img.src = draggedItem.image; img.alt = draggedItem.name;
             img.dataset.functionId = draggedItem.id;
+            img.dataset.functionName = draggedItem.name;
             img.classList.add("grid-function-icon", "object-contain");
             cell.appendChild(img);
 
@@ -1486,6 +1669,19 @@ function calculateTimeRemaining(startTime, currentTime) {
             deleteBtn.append("✖");
             cell.appendChild(deleteBtn);
             cell.setAttribute("draggable", "true");
+            if (!canRemoveGridFunction(cell)) {
+                deleteBtn.remove();
+            }
+
+            if (displacedItem && originalSourceCell) {
+                restoreCellContent(
+                    originalSourceCell,
+                    displacedItem.id,
+                    displacedItem.name,
+                    displacedItem.image
+                );
+            }
+
             activateCell(cell);
 
             lastAction = { oldRow, oldCol, newRow, newCol, functionId: draggedItem.id };
@@ -1505,27 +1701,35 @@ function calculateTimeRemaining(startTime, currentTime) {
                 if (window.confirm("Placement is forbidden by adjacency rules. Force placement anyway?")) {
                     const res2 = await saveMove(oldRow, oldCol, newRow, newCol, true);
                     if (!res2 || !res2.ok) {
-                        if (originalSourceCell) {
-                            originalSourceCell.innerHTML = `<img src="${draggedItem.image}" alt="${draggedItem.name}" data-function-id="${draggedItem.id}" class="grid-function-icon object-contain"><button class="delete-btn absolute top-[2px] right-[2px] bg-red-600/80 text-white w-5 h-5 text-[14px] rounded cursor-pointer flex items-center justify-center">✖</button>`;
-                            originalSourceCell.setAttribute('draggable', 'true');
-                        }
-                        cell.innerHTML = ""; cell.removeAttribute('draggable'); updateQoL(); return;
+                        restoreSwapCells();
+                        updateQoL();
+                        return;
                     }
                 } else {
-                    if (originalSourceCell) {
-                        originalSourceCell.innerHTML = `<img src="${draggedItem.image}" alt="${draggedItem.name}" data-function-id="${draggedItem.id}" class="grid-function-icon object-contain"><button class="delete-btn absolute top-[2px] right-[2px] bg-red-600/80 text-white w-5 h-5 text-[14px] rounded cursor-pointer flex items-center justify-center">✖</button>`;
-                        originalSourceCell.setAttribute('draggable', 'true');
-                    }
-                    cell.innerHTML = ""; cell.removeAttribute('draggable'); updateQoL(); return;
+                    restoreSwapCells();
+                    updateQoL();
+                    return;
                 }
             }
 
             updateCellHighlights();
             updateQoL();
+            await handleGridFunctionMoved(oldRow, oldCol, newRow, newCol, draggedItem.id);
+            if (displacedItem) {
+                await handleGridFunctionMoved(newRow, newCol, oldRow, oldCol, displacedItem.id);
+            }
+            await handleGridFunctionPlaced(cell, draggedItem.id);
         });
 
         cell.addEventListener("click", async (e) => {
             if (isDragging) return;
+
+            if (e.target.closest('.delete-btn')) return;
+            if (handleRouteCellClick(cell)) {
+                e.preventDefault();
+                e.stopPropagation();
+                return;
+            }
 
             // ── Mobiele touch: functie binnen grid verplaatsen ──
             // Fase 2: er is al een broncel geselecteerd → verplaats naar deze cel
@@ -1690,6 +1894,17 @@ function calculateTimeRemaining(startTime, currentTime) {
             } else {
                 activateCell(cell, false);
             }
+        });
+        cell.addEventListener("keydown", e => {
+            if (isDragging) return;
+            if (handleRouteCellKeydown(cell, e)) {
+                return;
+            }
+            if ((e.key === "Enter" || e.key === " ") && handleRouteCellClick(cell)) {
+                e.preventDefault();
+                return;
+            }
+            if (e.key === "Enter" || e.key === " ") activateCell(cell);
         });
         cell.addEventListener('mouseenter', (event) => {
             if (isTouchDevice()) return; // geen hover-popup op touch
@@ -1968,19 +2183,55 @@ function calculateTimeRemaining(startTime, currentTime) {
         if (isLockedCell(cell)) {
             return;
         }
+        if (!canRemoveGridFunction(cell)) {
+            e.preventDefault();
+            e.stopPropagation();
+            handleBlockedRoutePointRemoval(cell);
+            return;
+        }
         const row = cell.dataset.row;
         const col = cell.dataset.col;
+        const img = cell.querySelector('.grid-function-icon');
+        const functionId = img?.dataset.functionId ?? null;
+        const functionName = img?.dataset.functionName || img?.alt || 'function';
+        const functionImage = img?.src ?? '';
         cell.innerHTML = "";
         cell.removeAttribute("draggable");
         cell.setAttribute('aria-label', `Empty cell ${row},${col}. Press Enter to select.`);
         activateCell(cell);
 
         try {
-            await fetch(`/grid/cell/${cell.dataset.id}/function`, {
+            const response = await fetch(`/grid/cell/${cell.dataset.id}/function`, {
                 method: "DELETE",
                 headers: { "X-CSRF-TOKEN": document.querySelector('meta[name="csrf-token"]').content }
             });
-        } catch (err) { console.error("Fout bij verwijderen functie:", err); }
+
+            if (!response.ok) {
+                if (functionId && functionImage) {
+                    restoreCellContent(cell, functionId, functionName, functionImage);
+                }
+
+                if (response.status === 422) {
+                    const data = await response.json().catch(() => ({}));
+                    if (!canRemoveGridFunction(cell)) {
+                        handleBlockedRoutePointRemoval(cell);
+                    } else if (data.message) {
+                        alert(data.message);
+                    }
+                }
+
+                updateCellHighlights();
+                return;
+            }
+        } catch (err) {
+            console.error("Fout bij verwijderen functie:", err);
+            if (functionId && functionImage) {
+                restoreCellContent(cell, functionId, functionName, functionImage);
+            }
+            updateCellHighlights();
+            return;
+        }
+        await handleGridFunctionRemoved(row, col, functionId);
         updateCellHighlights();
         setTimeout(() => updateQoL(), 10);
     });
@@ -2029,17 +2280,59 @@ function calculateTimeRemaining(startTime, currentTime) {
     // =========================================================
 
     document.addEventListener("dragend", async (e) => {
-        if (!draggedItem || !sourceCell) return;
-        if (dropOccurred) { dropOccurred = false; return; }
+        const activeSourceCell = sourceCell;
+        const activeDraggedItem = draggedItem;
+
+        if (!activeDraggedItem || !activeSourceCell) {
+            blockedRouteDropTarget = null;
+            return;
+        }
+
+        if (dropOccurred) {
+            dropOccurred = false;
+            blockedRouteDropTarget = null;
+            return;
+        }
+
         const rect = document.querySelector(".city-grid").getBoundingClientRect();
-        if (e.pageX >= rect.left && e.pageX <= rect.right && e.pageY >= rect.top && e.pageY <= rect.bottom) return;
-        sourceCell.innerHTML = ""; sourceCell.removeAttribute("draggable"); activateCell(sourceCell);
+        const insideGrid = e.pageX >= rect.left && e.pageX <= rect.right
+            && e.pageY >= rect.top && e.pageY <= rect.bottom;
+
+        if (insideGrid) {
+            if (blockedRouteDropTarget && !canDropOnRouteCell(blockedRouteDropTarget, activeDraggedItem, Boolean(activeSourceCell))) {
+                handleInvalidRouteCellDrop(blockedRouteDropTarget, activeDraggedItem, Boolean(activeSourceCell));
+            }
+            activeSourceCell.classList.remove('drag-source');
+            draggedItem = null;
+            sourceCell = null;
+            blockedRouteDropTarget = null;
+            isDragging = false;
+            return;
+        }
+
+        if (!canRemoveGridFunction(activeSourceCell)) {
+            handleBlockedRoutePointRemoval(activeSourceCell);
+            activeSourceCell.classList.remove('drag-source');
+            draggedItem = null;
+            sourceCell = null;
+            blockedRouteDropTarget = null;
+            isDragging = false;
+            return;
+        }
+
+        const removedRow = activeSourceCell.dataset.row;
+        const removedCol = activeSourceCell.dataset.col;
+        const removedFunctionId = activeDraggedItem?.id ?? null;
+        activeSourceCell.innerHTML = "";
+        activeSourceCell.removeAttribute("draggable");
+        activateCell(activeSourceCell);
         try {
-            await fetch(`/grid/cell/${sourceCell.dataset.id}/function`, {
+            await fetch(`/grid/cell/${activeSourceCell.dataset.id}/function`, {
                 method: "DELETE",
                 headers: { "X-CSRF-TOKEN": document.querySelector('meta[name="csrf-token"]').content }
             });
         } catch (err) { console.error("Fout bij drag-off delete:", err); }
+        await handleGridFunctionRemoved(removedRow, removedCol, removedFunctionId);
         draggedItem = null; sourceCell = null;
         updateCellHighlights(); setTimeout(() => updateQoL(), 10);
     });

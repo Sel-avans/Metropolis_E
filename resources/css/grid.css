@@ -1,3 +1,162 @@
+.grid-cell.route-end-point {
+    outline: 3px solid #2563eb;
+    outline-offset: -3px;
+    box-shadow: inset 0 0 0 2px rgba(37, 99, 235, 0.35);
+}
+
+.grid-cell.route-endpoint-option {
+    position: relative;
+    z-index: 2;
+    cursor: pointer;
+}
+
+.grid-cell.route-endpoint-option::before {
+    content: '';
+    position: absolute;
+    inset: 2px;
+    border: 3px dashed #2563eb;
+    pointer-events: none;
+    z-index: 15;
+    box-sizing: border-box;
+}
+
+.grid-cell.route-startpoint-option {
+    position: relative;
+    z-index: 2;
+    cursor: pointer;
+}
+
+.grid-cell.route-startpoint-option::before {
+    content: '';
+    position: absolute;
+    inset: 2px;
+    border: 3px dashed #34d399;
+    pointer-events: none;
+    z-index: 15;
+    box-sizing: border-box;
+}
+
+.dark .grid-cell.route-endpoint-option::before {
+    border-color: #60a5fa;
+}
+
+.dark .grid-cell.route-startpoint-option::before {
+    border-color: #6ee7b7;
+}
+
+.grid-cell.route-start-point {
+    outline: 3px solid #059669;
+    outline-offset: -3px;
+    box-shadow: inset 0 0 0 2px rgba(5, 150, 105, 0.35);
+}
+
+.grid-cell.route-start-point[draggable="false"],
+.grid-cell.route-end-point[draggable="false"] {
+    cursor: not-allowed;
+}
+
+.grid-cell.route-end-point[draggable="true"] {
+    cursor: grab;
+}
+
+.dark .grid-cell.route-start-point {
+    outline-color: #34d399;
+    box-shadow: inset 0 0 0 2px rgba(52, 211, 153, 0.35);
+}
+
+.dark .grid-cell.route-end-point {
+    outline-color: #60a5fa;
+    box-shadow: inset 0 0 0 2px rgba(96, 165, 250, 0.35);
+}
+
+.city-grid-shell {
+    position: relative;
+}
+
+.city-grid {
+    position: relative;
+}
+
+.route-path-lines {
+    position: absolute;
+    top: 0;
+    left: 0;
+    width: 100%;
+    height: 100%;
+    pointer-events: none;
+    z-index: 20;
+    overflow: visible;
+}
+
+.route-path-line-outline {
+    fill: none;
+    stroke: #000;
+    stroke-width: 7;
+    stroke-linecap: round;
+    stroke-linejoin: round;
+}
+
+.route-path-line-outline-active {
+    stroke-width: 8;
+}
+
+.route-path-line-outline-draft {
+    stroke-width: 7;
+    stroke-dasharray: 8 6;
+    opacity: 0.75;
+}
+
+.route-path-line {
+    fill: none;
+    stroke: #0088ff;
+    stroke-width: 4;
+    stroke-linecap: round;
+    stroke-linejoin: round;
+}
+
+.route-path-line-active {
+    stroke: #00a8ff;
+    stroke-width: 5;
+}
+
+.route-path-line-draft {
+    stroke: #0088ff;
+    stroke-width: 4;
+    stroke-dasharray: 8 6;
+    opacity: 0.75;
+}
+
+.dark .route-path-line {
+    stroke: #38bdf8;
+}
+
+.dark .route-path-line-active {
+    stroke: #7dd3fc;
+}
+
+.grid-cell.route-path-draw-position {
+    outline: 3px solid #a78bfa;
+    outline-offset: 2px;
+}
+
+#route-draw-btn[aria-pressed="true"] {
+    outline: 3px solid #a78bfa;
+    outline-offset: 2px;
+    box-shadow: 0 0 0 1px #6d28d9;
+}
+
+#route-set-start-btn[aria-pressed="true"] {
+    outline: 3px solid #34d399;
+    outline-offset: 2px;
+    box-shadow: 0 0 0 1px #047857;
+}
+
+#route-set-end-btn[aria-pressed="true"] {
+    outline: 3px solid #38bdf8;
+    outline-offset: 2px;
+    box-shadow: 0 0 0 1px #0369a1;
+}
+
 .grid-cell.selected {
     outline: 3px solid #b34848;
     outline-offset: -3px;

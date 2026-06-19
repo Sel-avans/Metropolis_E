@@ -11,7 +11,8 @@ use App\Http\Controllers\ConditionsController;
 use App\Http\Controllers\UndoController;
 use App\Policies\PagePolicy;
 use App\Http\Controllers\SimulationEventController;
-use App\Http\Controllers\FunctionPreviewController; 
+use App\Http\Controllers\FunctionPreviewController;
+use App\Http\Controllers\EventRouteController;
 
 // Publieke route
 Route::get('/', function () {
@@ -44,6 +45,21 @@ Route::middleware('auth')->group(function () {
         Route::post('/grid/update', [GridController::class, 'update'])->middleware('can:CanPlaceFunctions,' . PagePolicy::class);
         Route::post('/undo', [UndoController::class, 'undo'])->middleware('can:CanPlaceFunctions,' . PagePolicy::class);
         Route::delete('/grid/cell/{cell}/function', [GridController::class, 'removeFunction'])->middleware('can:CanPlaceFunctions,' . PagePolicy::class);
+
+        Route::middleware('can:CanManageEventRoutes,' . PagePolicy::class)->group(function () {
+            Route::post('/event-routes/sync-grid-move', [EventRouteController::class, 'syncGridMove'])->name('event-routes.sync-grid-move');
+            Route::post('/event-routes/sync-grid-remove', [EventRouteController::class, 'syncGridRemove'])->name('event-routes.sync-grid-remove');
+            Route::get('/event-routes', [EventRouteController::class, 'index'])->name('event-routes.index');
+            Route::post('/event-routes/start-point', [EventRouteController::class, 'store'])->name('event-routes.start-point');
+            Route::get('/event-routes/{event}/endpoint-context', [EventRouteController::class, 'endpointContext'])->name('event-routes.endpoint-context');
+            Route::post('/event-routes/{event}/endpoint', [EventRouteController::class, 'setEndpoint'])->name('event-routes.endpoint');
+            Route::delete('/event-routes/{event}/endpoint', [EventRouteController::class, 'destroyEndpoint'])->name('event-routes.endpoint.destroy');
+            Route::post('/event-routes/{event}/validate-path-cell', [EventRouteController::class, 'validatePathCell'])->name('event-routes.validate-path-cell');
+            Route::post('/event-routes/{event}/generate', [EventRouteController::class, 'generate'])->name('event-routes.generate');
+            Route::post('/event-routes/{event}/path', [EventRouteController::class, 'storePath'])->name('event-routes.path.store');
+            Route::delete('/event-routes/{event}/path', [EventRouteController::class, 'destroyPath'])->name('event-routes.path.destroy');
+            Route::delete('/event-routes/{event}', [EventRouteController::class, 'destroy'])->name('event-routes.destroy');
+        });
     });
 
     // === FUNCTIONS / FUNCTIEBEHEER ===

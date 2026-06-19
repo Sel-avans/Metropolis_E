@@ -2,6 +2,8 @@
     {{-- Highlight stijl voor event-beïnvloede cellen --}}
     <style>
         .event-highlight {
+            outline: 3px solid #f59e0b !important;
+            outline-offset: -2px;
             border-color: #f59e0b !important;
             box-shadow: 0 0 0 2px #f59e0b66;
         }
@@ -143,11 +145,108 @@
                 @endif
             </div>
 
+            @if(auth()->user() && in_array(auth()->user()->role->name, ['City_planner', 'Administrator']))
+            <section id="route-planner-panel" class="mb-4 p-4 rounded-lg border border-emerald-300 dark:border-emerald-700 bg-emerald-50 dark:bg-emerald-950/30"
+                aria-label="Visitor route planning">
+                <h2 class="text-sm font-bold uppercase tracking-wider text-emerald-800 dark:text-emerald-300 mb-3">Route Planning</h2>
+                <div id="route-planner-toolbar"
+                    class="grid grid-cols-1 gap-x-3 gap-y-1 w-full">
+                    <label for="route-event-select" class="col-start-1 row-start-1 text-xs font-semibold text-gray-700 dark:text-gray-300">Event</label>
+                    <span id="route-start-label" class="route-point-col hidden col-start-2 row-start-1 text-xs font-semibold text-gray-700 dark:text-gray-300">Start point</span>
+                    <span id="route-end-label" class="route-point-col route-end-col hidden col-start-3 row-start-1 text-xs font-semibold text-gray-700 dark:text-gray-300">End point</span>
+
+                    <select id="route-event-select"
+                        class="col-start-1 row-start-2 w-full min-w-0 px-2 py-1.5 text-xs rounded-md border border-gray-300 dark:border-gray-600 bg-white dark:bg-gray-900 text-gray-900 dark:text-white focus:outline-none focus:ring-2 focus:ring-emerald-500"
+                        aria-label="Select an event to plan a route for.">
+                        <option value="">— Event —</option>
+                    </select>
+
+                    <div id="route-start-controls" class="route-point-col hidden col-start-2 row-start-2 flex flex-col gap-1 min-w-[9.5rem]">
+                        <button type="button" id="route-set-start-btn" disabled
+                            class="w-full px-2 py-1.5 bg-emerald-600 text-white text-xs font-semibold rounded shadow hover:bg-emerald-700 transition focus:outline-none focus:ring-2 focus:ring-emerald-400 disabled:opacity-50 disabled:cursor-not-allowed whitespace-nowrap"
+                            aria-pressed="false"
+                            aria-describedby="route-planner-status"
+                            aria-label="Set start point on a Road cell in the City Grid">
+                            Set start point
+                        </button>
+                        <button type="button" id="route-remove-start-btn" disabled
+                            class="w-full px-2 py-1.5 bg-gray-500 text-white text-xs font-semibold rounded shadow hover:bg-gray-600 transition focus:outline-none focus:ring-2 focus:ring-gray-400 disabled:opacity-50 disabled:cursor-not-allowed whitespace-nowrap"
+                            aria-describedby="route-planner-status"
+                            aria-label="Delete the start point for the selected event">
+                            Delete start point
+                        </button>
+                    </div>
+
+                    <div id="route-end-controls" class="route-point-col route-end-col hidden col-start-3 row-start-2 flex flex-col gap-1 min-w-[9.5rem]">
+                        <button type="button" id="route-set-end-btn" disabled
+                            class="w-full px-2 py-1.5 bg-sky-600 text-white text-xs font-semibold rounded shadow hover:bg-sky-700 transition focus:outline-none focus:ring-2 focus:ring-sky-400 disabled:opacity-50 disabled:cursor-not-allowed whitespace-nowrap"
+                            aria-pressed="false"
+                            aria-describedby="route-planner-status route-endpoint-controls"
+                            aria-label="Set end point for the selected event">
+                            Set end point
+                        </button>
+                        <button type="button" id="route-remove-end-btn" disabled
+                            class="w-full px-2 py-1.5 bg-gray-500 text-white text-xs font-semibold rounded shadow hover:bg-gray-600 transition focus:outline-none focus:ring-2 focus:ring-gray-400 disabled:opacity-50 disabled:cursor-not-allowed whitespace-nowrap"
+                            aria-describedby="route-planner-status"
+                            aria-label="Delete the end point for the selected event">
+                            Delete end point
+                        </button>
+                    </div>
+                </div>
+                <div id="route-endpoint-controls" class="hidden mt-2">
+                    <label for="route-endpoint-function-select" class="text-xs font-semibold text-gray-700 dark:text-gray-300">Endpoint function</label>
+                    <select id="route-endpoint-function-select"
+                        class="mt-1 w-full px-2 py-1.5 text-xs rounded-md border border-gray-300 dark:border-gray-600 bg-white dark:bg-gray-900 text-gray-900 dark:text-white focus:outline-none focus:ring-2 focus:ring-sky-500"
+                        aria-describedby="route-planner-status">
+                        <option value="">— Select assigned function —</option>
+                    </select>
+                </div>
+                <div id="route-path-controls" class="hidden mt-3 grid grid-cols-1 sm:grid-cols-2 gap-2">
+                    <button type="button" id="route-generate-btn" disabled
+                        class="w-full px-2 py-1.5 bg-amber-600 text-white text-xs font-semibold rounded shadow hover:bg-amber-700 transition focus:outline-none focus:ring-2 focus:ring-amber-400 disabled:opacity-50 disabled:cursor-not-allowed whitespace-nowrap"
+                        aria-describedby="route-planner-status"
+                        aria-label="Generate a route automatically from the access road to the event location">
+                        Generate route
+                    </button>
+                    <button type="button" id="route-draw-btn" disabled
+                        class="w-full px-2 py-1.5 bg-violet-600 text-white text-xs font-semibold rounded shadow hover:bg-violet-700 transition focus:outline-none focus:ring-2 focus:ring-violet-400 disabled:opacity-50 disabled:cursor-not-allowed whitespace-nowrap"
+                        aria-describedby="route-planner-status"
+                        aria-pressed="false"
+                        aria-label="Draw a route manually on the City Grid, starting from the access road">
+                        Draw route
+                    </button>
+                    <button type="button" id="route-save-path-btn" disabled
+                        class="hidden w-full px-2 py-1.5 bg-violet-700 text-white text-xs font-semibold rounded shadow hover:bg-violet-800 transition focus:outline-none focus:ring-2 focus:ring-violet-400 disabled:opacity-50 disabled:cursor-not-allowed whitespace-nowrap sm:col-span-2"
+                        aria-describedby="route-planner-status"
+                        aria-label="Save the drawn route on the City Grid">
+                        Save route
+                    </button>
+                    <button type="button" id="route-cancel-draw-btn" disabled
+                        class="hidden w-full px-2 py-1.5 bg-gray-500 text-white text-xs font-semibold rounded shadow hover:bg-gray-600 transition focus:outline-none focus:ring-2 focus:ring-gray-400 disabled:opacity-50 disabled:cursor-not-allowed whitespace-nowrap sm:col-span-2"
+                        aria-describedby="route-planner-status"
+                        aria-label="Cancel drawing the route on the City Grid">
+                        Cancel drawing
+                    </button>
+                    <button type="button" id="route-remove-path-btn" disabled
+                        class="w-full px-2 py-1.5 bg-gray-600 text-white text-xs font-semibold rounded shadow hover:bg-gray-700 transition focus:outline-none focus:ring-2 focus:ring-gray-500 disabled:opacity-50 disabled:cursor-not-allowed whitespace-nowrap sm:col-span-2"
+                        aria-describedby="route-planner-status"
+                        aria-label="Remove the visitor route for the selected event">
+                        Remove route
+                    </button>
+                </div>
+                <p id="route-planner-status" class="mt-3 text-sm !text-white" aria-live="off">
+                    Choose an event from the list above to plan a visitor route.
+                </p>
+                <p id="route-planner-announcements" class="sr-only" role="status" aria-live="polite" aria-atomic="true"></p>
+            </section>
+            @endif
+
             {{-- City Grid --}}
             <div class="justify-center">
                 <h1 class="text-2xl text-center font-bold mb-2 dark:text-teal-300">City Grid</h1>
 
-                <div class="city-grid grid grid-flow-col grid-rows-3 gap-3 w-min mx-auto"
+                <div class="city-grid-shell relative w-min mx-auto">
+                <div class="city-grid grid grid-flow-col grid-rows-3 gap-3 w-min"
                 aria-label="City planning grid">
                     @for($col = 1; $col <= 4; $col++)
                         @for($row = 1; $row <= 3; $row++)
@@ -193,6 +292,8 @@
                                         alt="{{ $cell->function->name }}"
                                         class="grid-function-icon object-contain relative z-0 {{ $isApproved ? 'pointer-events-none select-none' : '' }}"
                                         data-function-id="{{ $cell->function->id }}"
+                                        data-function-name="{{ $cell->function->name }}"
+                                        data-categories="{{ strtolower($cell->function->category ?? '') }}"
                                         draggable="{{ $isApproved ? 'false' : 'true' }}"
                                         ondragstart="{{ $isApproved ? 'return false;' : '' }}">
                                     @if(auth()->user() && (auth()->user()->role->name === 'City_planner' || auth()->user()->role->name === 'Administrator'))
@@ -209,6 +310,7 @@
                             </div>
                         @endfor
                     @endfor
+                </div>
                 </div>
             </div>
 

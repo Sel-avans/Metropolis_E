@@ -132,6 +132,13 @@ class PagePolicy
         UserRole::Municipal_Policy_Maker
     ]);
 }
-    
+
+    public function CanManageEventRoutes(User $user): bool
+    {
+        return in_array($user->role, [
+            UserRole::City_planner,
+            UserRole::Administrator,
+        ]);
+    }
 
 }
