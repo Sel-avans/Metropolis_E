@@ -7,10 +7,10 @@
         }
     </style>
 
-    <div class="flex flex-col lg:flex-row gap-4 h-full overflow-x-hidden w-full">
+<div class="flex flex-col xl:flex-row gap-4 w-full h-auto xl:h-full xl:overflow-hidden">
 
         {{-- LEFT: Function Library --}}
-        <div id="library-column" class="library-sidebar relative w-full lg:w-auto p-4 lg:p-6 lg:max-h-[73vh] overflow-y-auto flex-shrink-0 flex flex-col min-h-0 order-2 lg:order-1">
+        <div id="library-column" class="library-sidebar relative w-full xl:w-auto p-4 xl:p-6 flex flex-col order-2 xl:order-1 xl:max-h-[73vh] xl:overflow-y-auto xl:overscroll-contain xl:flex-none xl:min-h-0">
             <div class="flex flex-col mb-4 gap-3 shrink-0">
                 <h1 class="text-2xl dark:text-teal-500 font-bold mb-4">Function Library</h1>
                 <nav aria-label="Management navigation">
@@ -123,9 +123,9 @@
         
 
         {{-- MIDDLE: QoL + Undo + Grid + Simulation Controls --}}
-        <div class="flex flex-col flex-1 min-w-0 py-2 w-full order-1 lg:order-2 overflow-x-hidden">
+        <div class="flex flex-col w-full py-2 order-1 xl:order-2 overflow-x-hidden xl:flex-1 xl:min-h-0 xl:overflow-y-auto xl:overscroll-contain">
             {{-- Undo and Export Buttons --}}
-            <div class="flex flex-wrap gap-2 mb-4">
+            <div class="grid grid-cols-2 xl:flex xl:flex-row gap-2 mb-4">
 
                 @if(auth()->user() && (auth()->user()->role->name === 'Municipal_Policy_Maker' || auth()->user()->role->name === 'Administrator'))
                 <button type="button" id="approve-btn"
@@ -351,8 +351,11 @@
         </div>
         {{-- END MIDDLE --}}
 
+        
+        
+        
         {{-- RIGHT: QoL Breakdown + Events panel --}}
-        <div class="border-t lg:border-t-0 lg:border-l border-gray-400 dark:border-gray-700 w-full lg:w-64 flex-shrink-0 p-3 flex flex-col gap-4 lg:max-h-[73vh] overflow-y-auto order-3">
+        <div class="border-t xl:border-t-0 xl:border-l border-gray-400 dark:border-gray-700 w-full xl:w-64 p-3 flex flex-col gap-4 order-3 xl:overflow-y-auto xl:max-h-[73vh] xl:min-h-0">
             
             {{-- QoL Score --}}
             <div class="border-4 border-gray-400 dark:bg-indigo-900 dark:border-teal-600 rounded-md p-4">
