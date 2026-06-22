@@ -13,13 +13,38 @@
                         {{ __('Dashboard') }}
                     </x-nav-link>
                 </div>
+
                 <div class="hidden space-x-8 sm:-my-px sm:ms-10 sm:flex">
                     <x-nav-link :href="route('grid')" :active="request()->routeIs('grid')">
                         {{ __('Grid') }}
                     </x-nav-link>
                 </div>
+
+                @auth
+                    @if(auth()->user()->role && auth()->user()->role->name === 'Administrator')
+                        <div class="hidden space-x-8 sm:-my-px sm:ms-10 sm:flex">
+                            <x-nav-link :href="route('functions.index')" :active="request()->routeIs('functions.*')">
+                                {{ __('Functions') }}
+                            </x-nav-link>
+                        </div>
+                        <div class="hidden space-x-8 sm:-my-px sm:ms-10 sm:flex">
+                            <x-nav-link :href="route('effects.index')" :active="request()->routeIs('effects.*')">
+                                {{ __('Effects') }}
+                            </x-nav-link>
+                        </div>
+                        <div class="hidden space-x-8 sm:-my-px sm:ms-10 sm:flex">
+                            <x-nav-link :href="route('conditions.index')" :active="request()->routeIs('conditions.*')">
+                                {{ __('Conditions') }}
+                            </x-nav-link>
+                        </div>
+                        <div class="hidden space-x-8 sm:-my-px sm:ms-10 sm:flex">
+                            <x-nav-link :href="route('events.index')" :active="request()->routeIs('events.*')">
+                                {{ __('Events') }}
+                            </x-nav-link>
+                        </div>
+                    @endif
+                @endauth
             </div>
-            
 
             <div class="hidden sm:flex sm:items-center sm:ms-6">
                 @auth
@@ -76,11 +101,27 @@
             <x-responsive-nav-link :href="route('dashboard')" :active="request()->routeIs('dashboard')">
                 {{ __('Dashboard') }}
             </x-responsive-nav-link>
-            
-            {{-- FIX: De "Grid" link was vergeten voor mobiel! Nu staat hij erbij. --}}
+
             <x-responsive-nav-link :href="route('grid')" :active="request()->routeIs('grid')">
                 {{ __('Grid') }}
             </x-responsive-nav-link>
+
+            @auth
+                @if(auth()->user()->role && auth()->user()->role->name === 'Administrator')
+                    <x-responsive-nav-link :href="route('functions.index')" :active="request()->routeIs('functions.*')">
+                        {{ __('Functions') }}
+                    </x-responsive-nav-link>
+                    <x-responsive-nav-link :href="route('effects.index')" :active="request()->routeIs('effects.*')">
+                        {{ __('Effects') }}
+                    </x-responsive-nav-link>
+                    <x-responsive-nav-link :href="route('conditions.index')" :active="request()->routeIs('conditions.*')">
+                        {{ __('Conditions') }}
+                    </x-responsive-nav-link>
+                    <x-responsive-nav-link :href="route('events.index')" :active="request()->routeIs('events.*')">
+                        {{ __('Events') }}
+                    </x-responsive-nav-link>
+                @endif
+            @endauth
         </div>
 
         <div class="pt-4 pb-1 border-t border-gray-200 dark:border-gray-600">

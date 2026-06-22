@@ -9,14 +9,15 @@
 
         <link rel="preconnect" href="https://fonts.bunny.net">
         <link href="https://fonts.bunny.net/css?family=figtree:400,500,600&display=swap" rel="stylesheet" />
-
+        
         @vite(['resources/css/grid.css', 'resources/css/app.css', 'resources/js/effects.js', 'resources/js/app.js', 'resources/js/grid.js'])
         <script defer src="https://cdn.jsdelivr.net/npm/alpinejs@3.x.x/dist/cdn.min.js"></script>
+        
     </head>
     
-    <body class="font-sans antialiased bg-gray-100 dark:bg-gray-900 xl:h-screen xl:overflow-hidden">
+    <body class="font-sans antialiased bg-gray-100 dark:bg-gray-900 {{ request()->routeIs('grid') ? 'xl:h-screen xl:overflow-hidden' : '' }}">
         
-        <div class="flex flex-col min-h-screen xl:h-full">
+        <div class="flex flex-col {{ request()->routeIs('grid') ? 'min-h-screen xl:h-full' : 'min-h-screen' }}">
             
             <div class="shrink-0">
                 @include('layouts.navigation')
@@ -30,7 +31,7 @@
                 </header>
             @endisset
 
-            <main class="flex-1 flex flex-col w-full xl:overflow-hidden">
+            <main class="flex-1 flex flex-col w-full {{ request()->routeIs('grid') ? 'xl:overflow-hidden' : '' }}">
                 {{ $slot }}
             </main>
         </div>
