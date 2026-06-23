@@ -554,7 +554,7 @@ function initGridPage() {
         const total = Number(data.total_score);
         const tcls = total > 0 ? 'text-green-600' : total < 0 ? 'text-red-600' : 'text-slate-400';
         const tsign = total > 0 ? '+' : '';
-        html += `<p class="font-bold mt-4 dark:text-teal-600">Total QoL: <span class="${tcls}">${tsign}${total}</span></p>`;
+        // html += `<p class="font-bold mt-4 dark:text-teal-600">Total QoL: <span class="${tcls}">${tsign}${total}</span></p>`;
         return html;
     }
 

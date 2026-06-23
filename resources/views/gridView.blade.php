@@ -127,8 +127,8 @@
                                     : 'bg-gray-300 border-gray-800 dark:bg-blue-950 dark:border-gray-300 hover:bg-gray-400 hover:dark:bg-gray-100 cursor-pointer';
                             @endphp
                             <div class="grid-cell relative flex border-2 items-center justify-center transition focus:outline-none focus:ring-2 focus:ring-blue-500 {{ $cellClasses }}"
-                                style="width: clamp(50px, 10vw, 100px); height: clamp(60px, 10vw, 100px);""
-                                        data-row=" {{ $row }}" data-col="{{ $col }}" data-id="{{ $cell ? $cell->id : '' }}"
+                                style="width: clamp(50px, 10vw, 100px); height: clamp(60px, 10vw, 100px);"
+                                data-row="{{ $row }}" data-col="{{ $col }}" data-id="{{ $cell ? $cell->id : '' }}"
                                 draggable="{{ $cell && !$isApproved ? 'true' : 'false' }}" role="button" tabindex="0"
                                 @if($isApproved) aria-label="Approved area row {{ $row }}, column {{ $col }}" @endif>
 
@@ -391,6 +391,9 @@
         <div
             class="border-t xl:border-t-0 xl:border-l border-gray-400 dark:border-gray-700 w-full xl:w-64 p-3 flex flex-col gap-4 order-3 xl:overflow-y-auto xl:max-h-[73vh] xl:min-h-0">
 
+            {{-- QoL Breakdown --}}
+            <div id="breakdown-qol-score" aria-live="polite" aria-atomic="true"></div>
+
             {{-- QoL Score --}}
             <div class="border-4 border-gray-400 dark:bg-indigo-900 dark:border-teal-600 rounded-md p-4">
                 <span id="qol-score" class="text-xl font-semibold dark:text-teal-300">
@@ -398,9 +401,6 @@
                 </span>
                 <span id="old-qol-score" class="float-right text-gray-500"></span>
             </div>
-
-            {{-- QoL Breakdown --}}
-            <div id="breakdown-qol-score" aria-live="polite" aria-atomic="true"></div>
 
             {{-- Active Events --}}
             <div
