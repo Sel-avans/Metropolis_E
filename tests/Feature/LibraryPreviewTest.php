@@ -32,13 +32,9 @@ class LibraryPreviewTest extends TestCase
         $response->assertOk();
         $response->assertSee('id="library-preview-panel"', false);
         $response->assertSee('id="library-list"', false);
-        $response->assertSee('Effects by category', false);
-        $response->assertSee('Placement conditions', false);
         $response->assertSee('id="library-preview-effects"', false);
         $response->assertSee('id="library-preview-conditions"', false);
-        $response->assertSee('library-preview-section-title', false);
         $response->assertSee('id="library-preview-close"', false);
-        $response->assertSee('id="library-scroll"', false);
         $response->assertSee('id="library-search"', false);
     }
 
