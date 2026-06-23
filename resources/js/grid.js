@@ -86,11 +86,13 @@ function restoreCellContent(cell, functionId, functionName, functionImage) {
 }
 
 function initGridPage() {
-    if (!document.querySelector('.city-grid')) return;
-
     const gridRoot = document.querySelector('.city-grid');
+    if (!gridRoot) return;
+    
+
     if (gridRoot.dataset.gridInitialized === 'true') return;
     gridRoot.dataset.gridInitialized = 'true';
+    
 
     try { initLibraryFilter(); } catch (e) { /* ignore if not present */ }
     try { initLibraryPreview(); } catch (e) { /* ignore if not present */ }
@@ -108,6 +110,7 @@ function initGridPage() {
     let blockedRouteDropTarget = null;
     let old_score;
     let lastAction = null;
+    let selectedTouchItem = null;
 
     let allEvents = [];
     let simulationReferenceDate = null;

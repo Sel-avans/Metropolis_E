@@ -9,14 +9,14 @@
         }
     </style>
 
-    <div class="flex gap-4 h-full">
+    <div class="flex flex-col lg:flex-row gap-4 h-full overflow-x-hidden w-full">
 
         {{-- LEFT: Function Library --}}
-        <div id="library-column" class="library-sidebar relative w-auto p-6 max-h-[73vh] overflow-y-auto flex-shrink-0 flex flex-col min-h-0">
+        <div id="library-column" class="library-sidebar relative w-full lg:w-auto p-4 lg:p-6 lg:max-h-[73vh] overflow-y-auto flex-shrink-0 flex flex-col min-h-0 order-2 lg:order-1">
             <div class="flex flex-col mb-4 gap-3 shrink-0">
                 <h1 class="text-2xl dark:text-teal-500 font-bold mb-4">Function Library</h1>
                 <nav aria-label="Management navigation">
-                    <div class="grid grid-cols-2 gap-3 w-full">
+                    <div class="grid grid-cols-1 sm:grid-cols-2 gap-3 w-full">
                         @if(auth()->user() && auth()->user()->role->name === 'Administrator')
                         <a href="{{ route('functions.index') }}"
                             class="px-3 py-2 bg-blue-600 text-white rounded hover:bg-blue-700 text-sm shadow text-center focus:outline-none focus:ring-2 focus:ring-blue-500">
@@ -77,7 +77,13 @@
                                     aria-label="{{ $function->name }}">
                                     <img src="{{ asset($function->image) }}" alt="{{ $function->name }}"
                                         class="w-8 h-8 object-contain pointer-events-none">
-                                    <span class="text-sm font-medium">{{ $function->name }}</span>
+                                        <span class="text-sm font-medium flex-1">{{ $function->name }}</span>
+
+                                        <button type="button" class="preview-info-btn p-2 text-slate-400 hover:text-sky-500 transition-colors z-10" aria-label="View Details">
+        <svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke-width="2" stroke="currentColor" class="w-5 h-5 pointer-events-none">
+            <path stroke-linecap="round" stroke-linejoin="round" d="M11.25 11.25l.041-.02a.75.75 0 011.063.852l-.708 2.836a.75.75 0 001.063.853l.041-.021M21 12a9 9 0 11-18 0 9 9 0 0118 0zm-9-3.75h.008v.008H12V8.25z" />
+        </svg>
+    </button>
                                 </li>
                             @endforeach
                         </ul>
@@ -119,9 +125,9 @@
         </div>
 
         {{-- MIDDLE: QoL + Undo + Grid + Simulation Controls --}}
-        <div class="flex flex-col flex-1 min-w-0 py-2">
+        <div class="flex flex-col flex-1 min-w-0 py-2 w-full order-1 lg:order-2 overflow-x-hidden">
             {{-- Undo and Export Buttons --}}
-            <div class="flex gap-2 mb-4">
+            <div class="flex flex-wrap gap-2 mb-4">
 
                 @if(auth()->user() && (auth()->user()->role->name === 'Municipal_Policy_Maker' || auth()->user()->role->name === 'Administrator'))
                 <button type="button" id="approve-btn"
@@ -242,7 +248,7 @@
             @endif
 
             {{-- City Grid --}}
-            <div class="justify-center">
+            <div class="justify-center w-full overflow-x-auto pb-4">
                 <h1 class="text-2xl text-center font-bold mb-2 dark:text-teal-300">City Grid</h1>
 
                 <div class="city-grid-shell relative w-min mx-auto">
@@ -364,7 +370,7 @@
                                 </button>
 
                                 {{-- Cycle Duration inline --}}
-                                <div class="flex items-center gap-2 bg-gray-100 dark:bg-gray-800 px-3 py-1 rounded-lg border border-gray-200 dark:border-gray-700">
+                                <div class="flex items-center gap-2 bg-gray-100 dark:bg-gray-800 px-3 py-1 rounded-lg border border-gray-200 dark:border-gray-700 mt-2 sm:mt-0">
                                     <span class="text-xs font-semibold text-gray-500 dark:text-gray-400 uppercase tracking-wider">Cycle</span>
                                     <span class="text-sm leading-none" aria-hidden="true">☀️</span>
                                     <input type="number" id="day-hours-input" min="1" max="23" value="18" step="1"
@@ -378,7 +384,7 @@
                                         aria-label="Night duration in hours (1–23)">
                                     <span class="text-xs text-gray-500 dark:text-gray-400">h</span>
                                 </div>
-                                <p id="duration-validation-msg" class="hidden text-xs text-red-500 dark:text-red-400">
+                                <p id="duration-validation-msg" class="hidden text-xs text-red-500 dark:text-red-400 w-full text-center mt-1">
                                     Day + night must total 24 h
                                 </p>
                             </div>
@@ -389,7 +395,7 @@
                 </div>
 
                 {{-- Speed + Playback + Active Events --}}
-                <div class="flex flex-wrap gap-8 items-start">
+                <div class="flex flex-col sm:flex-row flex-wrap gap-4 sm:gap-8 items-center sm:items-start w-full">
 
                     {{-- Speed --}}
                     <div class="flex flex-col items-center gap-2">
@@ -442,7 +448,8 @@
                     </div>
 
                     {{-- Active Events --}}
-                    <div class="flex-1 min-w-[200px] bg-gray-50 dark:bg-gray-800 p-4 rounded-md border border-gray-200 dark:border-gray-600">
+                    <div
+                        class="w-full sm:w-auto flex-1 min-w-[200px] bg-gray-50 dark:bg-gray-800 p-4 rounded-md border border-gray-200 dark:border-gray-600">
                         <h3 class="text-sm font-semibold text-sky-500 dark:text-teal-500 mb-2">Active Events</h3>
                         <ul id="active-events-list" class="text-xs text-gray-700 dark:text-gray-300 space-y-1"
                             aria-live="polite" aria-label="Active simulation events">
@@ -456,8 +463,8 @@
         {{-- END MIDDLE --}}
 
         {{-- RIGHT: QoL Breakdown + Events panel --}}
-        <div class="border-l border-gray-400 dark:border-gray-700 w-64 flex-shrink-0 p-3 flex flex-col gap-4 max-h-[73vh] overflow-y-auto">
-
+        <div class="border-t lg:border-t-0 lg:border-l border-gray-400 dark:border-gray-700 w-full lg:w-64 flex-shrink-0 p-3 flex flex-col gap-4 lg:max-h-[73vh] overflow-y-auto order-3">
+            
             {{-- QoL Score --}}
             <div class="border-4 border-gray-400 dark:bg-indigo-900 dark:border-teal-600 rounded-md p-4">
                 <span id="qol-score" class="text-xl font-semibold dark:text-teal-300">
