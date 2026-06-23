@@ -8001,6 +8001,7 @@ class ComposerStaticInit448b506834890d3a66187c46e76fc183
         'Termwind\\ValueObjects\\Node' => __DIR__ . '/..' . '/nunomaduro/termwind/src/ValueObjects/Node.php',
         'Termwind\\ValueObjects\\Style' => __DIR__ . '/..' . '/nunomaduro/termwind/src/ValueObjects/Style.php',
         'Termwind\\ValueObjects\\Styles' => __DIR__ . '/..' . '/nunomaduro/termwind/src/ValueObjects/Styles.php',
+        'Tests\\Browser\\EffectManagementTest' => __DIR__ . '/../..' . '/tests/Browser/EffectManagementTest.php',
         'Tests\\Browser\\ExampleTest' => __DIR__ . '/../..' . '/tests/Browser/ExampleTest.php',
         'Tests\\Browser\\GridPlaceFunctionE2ETest' => __DIR__ . '/../..' . '/tests/Browser/GridPlaceFunctionE2ETest.php',
         'Tests\\Browser\\LoginTest' => __DIR__ . '/../..' . '/tests/Browser/LoginTest.php',

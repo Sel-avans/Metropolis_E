@@ -7333,6 +7333,7 @@ return array(
     'Termwind\\ValueObjects\\Node' => $vendorDir . '/nunomaduro/termwind/src/ValueObjects/Node.php',
     'Termwind\\ValueObjects\\Style' => $vendorDir . '/nunomaduro/termwind/src/ValueObjects/Style.php',
     'Termwind\\ValueObjects\\Styles' => $vendorDir . '/nunomaduro/termwind/src/ValueObjects/Styles.php',
+    'Tests\\Browser\\EffectManagementTest' => $baseDir . '/tests/Browser/EffectManagementTest.php',
     'Tests\\Browser\\ExampleTest' => $baseDir . '/tests/Browser/ExampleTest.php',
     'Tests\\Browser\\GridPlaceFunctionE2ETest' => $baseDir . '/tests/Browser/GridPlaceFunctionE2ETest.php',
     'Tests\\Browser\\LoginTest' => $baseDir . '/tests/Browser/LoginTest.php',
