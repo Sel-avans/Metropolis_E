@@ -1,3 +1,40 @@
 @tailwind base;
 @tailwind components;
 @tailwind utilities;
+
+/* Navbar: always dark (Effects page look), protected from Bootstrap on Conditions */
+.app-navbar {
+    background-color: rgb(31 41 55) !important;
+    border-bottom-color: rgb(55 65 81) !important;
+}
+
+.app-navbar .app-navbar-link {
+    text-decoration: none !important;
+}
+
+.app-navbar .app-navbar-link:not(.is-active) {
+    color: rgb(156 163 175) !important;
+}
+
+.app-navbar .app-navbar-link.is-active {
+    color: rgb(243 244 246) !important;
+    border-bottom-color: rgb(79 70 229) !important;
+}
+
+.app-navbar .app-navbar-link:not(.is-active):hover,
+.app-navbar .app-navbar-link:not(.is-active):focus {
+    color: rgb(209 213 219) !important;
+}
+
+.app-navbar .app-navbar-logo {
+    color: rgb(229 231 235) !important;
+}
+
+.app-navbar .app-navbar-user {
+    color: rgb(156 163 175) !important;
+    background-color: transparent !important;
+}
+
+.app-navbar .app-navbar-user:hover {
+    color: rgb(209 213 219) !important;
+}
