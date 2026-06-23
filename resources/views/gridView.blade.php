@@ -389,7 +389,7 @@
 
         {{-- RIGHT: QoL Breakdown + Events panel --}}
         <div
-            class="border-t xl:border-t-0 xl:border-l border-gray-400 dark:border-gray-700 w-full xl:w-64 p-3 flex flex-col gap-4 order-3 xl:overflow-y-auto xl:max-h-[73vh] xl:min-h-0">
+            class="border-t xl:border-t-0 xl:border-l border-gray-400 dark:border-gray-700 w-full xl:flex-none xl:w-72 p-3 flex flex-col gap-4 order-3 xl:overflow-y-auto xl:max-h-[73vh] xl:min-h-0">
 
             {{-- QoL Breakdown --}}
             <div id="breakdown-qol-score" aria-live="polite" aria-atomic="true"></div>
