@@ -83,12 +83,6 @@ var e=null;function t(t){e=t}async function n(t,n){let r=e?e():[],i=r.length?`?a
                     <div class="flex justify-between items-start">
                         <div class="font-semibold text-slate-200 truncate">${e.name||`Nameless Event`}</div>
                         
-                        ${a&&!o?`
-                            <button onclick="console.log('De-activate'); return false;" 
-                                    class="px-2 py-0.5 bg-red-600 hover:bg-red-700 text-white text-[9px] font-bold uppercase rounded shadow shrink-0 ml-2">
-                                De-activate
-                            </button>
-                        `:``}
                     </div>
 
                     ${a&&!o?`<div class="status-active-label mt-1 inline-block">Active now</div>`:``}

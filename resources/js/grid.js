@@ -1057,12 +1057,6 @@ function initGridPage() {
                     <div class="flex justify-between items-start">
                         <div class="font-semibold text-slate-200 truncate">${event.name || 'Nameless Event'}</div>
                         
-                        ${isActive && !isWaiting ? `
-                            <button onclick="console.log('De-activate'); return false;" 
-                                    class="px-2 py-0.5 bg-red-600 hover:bg-red-700 text-white text-[9px] font-bold uppercase rounded shadow shrink-0 ml-2">
-                                De-activate
-                            </button>
-                        ` : ''}
                     </div>
 
                     ${isActive && !isWaiting ? '<div class="status-active-label mt-1 inline-block">Active now</div>' : ''}
