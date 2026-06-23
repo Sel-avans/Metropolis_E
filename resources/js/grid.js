@@ -1361,6 +1361,7 @@ function initGridPage() {
             lastQoLEventIdsKey = null;
             applySimulationTime(getCurrentTime());
             updateQoL({ immediate: true });
+            updateUpcomingEventsDisplay(allEvents, getCurrentTime());
             syncRoutePlannerEvents(allEvents);
             saveSimulationState();
 
