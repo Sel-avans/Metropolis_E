@@ -86,11 +86,13 @@ function restoreCellContent(cell, functionId, functionName, functionImage) {
 }
 
 function initGridPage() {
-    if (!document.querySelector('.city-grid')) return;
-
     const gridRoot = document.querySelector('.city-grid');
+    if (!gridRoot) return;
+    
+
     if (gridRoot.dataset.gridInitialized === 'true') return;
     gridRoot.dataset.gridInitialized = 'true';
+    
 
     try { initLibraryFilter(); } catch (e) { /* ignore if not present */ }
     try { initLibraryPreview(); } catch (e) { /* ignore if not present */ }
@@ -108,6 +110,7 @@ function initGridPage() {
     let blockedRouteDropTarget = null;
     let old_score;
     let lastAction = null;
+    let selectedTouchItem = null;
 
     let allEvents = [];
     let simulationReferenceDate = null;
@@ -551,7 +554,7 @@ function initGridPage() {
         const total = Number(data.total_score);
         const tcls = total > 0 ? 'text-green-600' : total < 0 ? 'text-red-600' : 'text-slate-400';
         const tsign = total > 0 ? '+' : '';
-        html += `<p class="font-bold mt-4 dark:text-teal-600">Total QoL: <span class="${tcls}">${tsign}${total}</span></p>`;
+        // html += `<p class="font-bold mt-4 dark:text-teal-600">Total QoL: <span class="${tcls}">${tsign}${total}</span></p>`;
         return html;
     }
 
@@ -997,10 +1000,7 @@ function initGridPage() {
         return `
         <button
             type="button"
-            class="event-toggle-btn flex-shrink-0 px-2 py-1 text-xs font-semibold rounded transition
-                ${showDeactivate
-                ? 'bg-amber-500 hover:bg-amber-600 text-white'
-                : 'bg-slate-600 hover:bg-teal-600 hover:text-white text-slate-200'}"
+            class="event-toggle-btn flex-shrink-0 px-2 py-1 text-xs font-semibold rounded transition ${btnClass}"
             data-event-id="${event.id}">
             ${showDeactivate ? 'Deactivate' : 'Activate'}
         </button>
@@ -1057,12 +1057,6 @@ function initGridPage() {
                     <div class="flex justify-between items-start">
                         <div class="font-semibold text-slate-200 truncate">${event.name || 'Nameless Event'}</div>
                         
-                        ${isActive && !isWaiting ? `
-                            <button onclick="console.log('De-activate'); return false;" 
-                                    class="px-2 py-0.5 bg-red-600 hover:bg-red-700 text-white text-[9px] font-bold uppercase rounded shadow shrink-0 ml-2">
-                                De-activate
-                            </button>
-                        ` : ''}
                     </div>
 
                     ${isActive && !isWaiting ? '<div class="status-active-label mt-1 inline-block">Active now</div>' : ''}
@@ -1367,6 +1361,7 @@ function initGridPage() {
             lastQoLEventIdsKey = null;
             applySimulationTime(getCurrentTime());
             updateQoL({ immediate: true });
+            updateUpcomingEventsDisplay(allEvents, getCurrentTime());
             syncRoutePlannerEvents(allEvents);
             saveSimulationState();
 

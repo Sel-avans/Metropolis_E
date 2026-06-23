@@ -26,7 +26,7 @@ class FunctionCreationE2ETest extends DuskTestCase
                     ->waitForLocation('/grid', 200);
 
             // Click function management link
-            $browser->clickLink('Function Management')
+            $browser->clickLink('Functions')
                     ->waitForLocation('/functions', 200);
 
             // Click "new function" link by href

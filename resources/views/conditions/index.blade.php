@@ -1,19 +1,20 @@
 <x-app-layout>
 
-<link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.2/dist/css/bootstrap.min.css" rel="stylesheet">
+<div class="container py-5 px-3">
 
-<div class="container py-5">
-
-<div class="d-flex justify-content-between align-items-center mb-4">
+{{-- FIX: d-flex flex-wrap en gap-3 toegevoegd zodat de knoppen mooi schalen op mobiel --}}
+<div class="d-flex flex-wrap justify-content-between align-items-center mb-4 gap-3">
     <h1 class="fw-bold" style="color:#2563eb;">Conditions Management</h1>
 
-    <a href="/grid" class="btn btn-light text-secondary border shadow-sm text-decoration-none">
-        ← Back to grid
-    </a>
+    <div class="d-flex gap-2 w-100 w-sm-auto justify-content-between justify-content-sm-end">
+        <a href="/grid" class="btn btn-light text-secondary border shadow-sm text-decoration-none">
+            ← Back to grid
+        </a>
 
-    <button class="btn btn-primary btn-lg shadow-sm" data-bs-toggle="modal" data-bs-target="#createModal">
-        + New rule
-    </button>
+        <button class="btn btn-primary btn-lg shadow-sm" data-bs-toggle="modal" data-bs-target="#createModal">
+            + New rule
+        </button>
+    </div>
 </div>
 
     {{-- Toont de groene succesmeldingen bovenaan de pagina --}}
@@ -29,10 +30,12 @@
             <h5 class="mb-0 fw-semibold text-white">All adjacency rules</h5>
         </div>
 
-        <div class="card-body p-0">
-            <div class="max-h-[70vh] overflow-y-auto">
+        {{-- FIX: table-responsive toegevoegd voor horizontaal scrollen op kleine schermen --}}
+        <div class="card-body p-0 table-responsive">
+            <div style="max-height: 70vh; overflow-y: auto;">
 
-                <table class="table table-hover align-middle mb-0" style="font-size: 1.1rem;">
+                {{-- FIX: min-width: 700px toegevoegd zodat de kolommen niet worden samengedrukt --}}
+                <table class="table table-hover align-middle mb-0" style="font-size: 1.1rem; min-width: 700px;">
                     <thead class="sticky-top" style="background:#f1f5f9;">
                         <tr style="height: 45px;">
                             <th class="ps-4">Function A</th>
@@ -93,8 +96,9 @@
     @endphp
 
     <div class="modal fade" id="editModal{{ $condition->id }}" tabindex="-1" aria-hidden="true" aria-labelledby="editModal{{ $condition->id }}Label">
-        <div class="modal-dialog modal-dialog-centered" style="min-height: calc(100% - 3.5rem); display: flex; align-items: center;">
-            <form method="POST" action="{{ route('conditions.update', $condition->id) }}" class="edit-form">
+        {{-- FIX: modal-dialog-scrollable toegevoegd zodat lange forms scrollbaar zijn op mobiel --}}
+        <div class="modal-dialog modal-dialog-centered modal-dialog-scrollable" style="min-height: calc(100% - 3.5rem); display: flex; align-items: center;">
+            <form method="POST" action="{{ route('conditions.update', $condition->id) }}" class="edit-form w-100">
                 @csrf
                 @method('PUT')
 
@@ -164,8 +168,9 @@
     @endphp
 
     <div class="modal fade" id="createModal" tabindex="-1" aria-hidden="true" aria-labelledby="createModalLabel">
-        <div class="modal-dialog modal-dialog-centered" style="min-height: calc(100% - 3.5rem); display: flex; align-items: center;">
-            <form method="POST" action="{{ route('conditions.store') }}">
+        {{-- FIX: modal-dialog-scrollable toegevoegd --}}
+        <div class="modal-dialog modal-dialog-centered modal-dialog-scrollable" style="min-height: calc(100% - 3.5rem); display: flex; align-items: center;">
+            <form method="POST" action="{{ route('conditions.store') }}" class="w-100">
                 @csrf
 
                 <div class="modal-content shadow-lg" style="border-radius: 14px;">

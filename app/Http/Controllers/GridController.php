@@ -67,6 +67,19 @@ class GridController extends Controller
             ->where('col', $newCol)
             ->first();
 
+        // Prevent changes to approved (locked) cells
+        if ($targetCell && $targetCell->is_approved) {
+            $message = $targetCell->function_id
+                ? "You can't replace the function in this area"
+                : "You can't add a function in this area";
+
+            return response()->json([
+                'success' => false,
+                'error' => 'cell_locked',
+                'message' => $message,
+            ], 403);
+        }
+
         $displacedFunctionId = $targetCell?->function_id;
         $isSwap = $oldRow !== null
             && $oldCol !== null

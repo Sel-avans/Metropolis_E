@@ -7,30 +7,36 @@
 
         <title>{{ config('app.name', 'Laravel') }}</title>
 
-        <!-- Fonts -->
         <link rel="preconnect" href="https://fonts.bunny.net">
         <link href="https://fonts.bunny.net/css?family=figtree:400,500,600&display=swap" rel="stylesheet" />
-
-        <!-- Scripts -->
+        
         @vite(['resources/css/grid.css', 'resources/css/app.css', 'resources/js/effects.js', 'resources/js/app.js', 'resources/js/grid.js'])
+        @if(request()->routeIs('conditions.*'))
+            <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.2/dist/css/bootstrap.min.css">
+        @endif
+        @stack('styles')
+        <script defer src="https://cdn.jsdelivr.net/npm/alpinejs@3.x.x/dist/cdn.min.js"></script>
+        
     </head>
-    <body class="font-sans antialiased">
-        <div class="min-h-screen bg-gray-100 dark:bg-gray-900">
-            @include('layouts.navigation')
+    
+    <body class="font-sans antialiased bg-gray-100 dark:bg-gray-900 {{ request()->routeIs('grid') ? 'xl:h-screen xl:overflow-hidden' : '' }}">
+        
+        <div class="flex flex-col {{ request()->routeIs('grid') ? 'min-h-screen xl:h-full' : 'min-h-screen' }}">
+            
+            <div class="shrink-0">
+                @include('layouts.navigation')
+            </div>
 
-            <!-- Page Heading -->
             @isset($header)
-                <header class="bg-white dark:bg-gray-800 shadow">
+                <header class="bg-white dark:bg-gray-800 shadow shrink-0">
                     <div class="max-w-7xl mx-auto py-6 px-4 sm:px-6 lg:px-8">
                         {{ $header }}
                     </div>
                 </header>
             @endisset
 
-            <!-- Page Content -->
-            <main>
+            <main class="flex-1 flex flex-col w-full {{ request()->routeIs('grid') ? 'xl:overflow-hidden' : '' }}">
                 {{ $slot }}
             </main>
         </div>
     </body>
-</html>

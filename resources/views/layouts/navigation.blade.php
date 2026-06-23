@@ -1,29 +1,51 @@
-<nav aria-label="Main navigation" x-data="{ open: false }" class="sticky top-0 bg-white dark:bg-gray-800 border-b border-gray-100 dark:border-gray-700">
-    <!-- Primary Navigation Menu -->
+<nav x-data="{ open: false }" class="app-navbar !bg-gray-800 border-b !border-gray-700">
     <div class="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
         <div class="flex justify-between h-16">
             <div class="flex">
-                <!-- Logo -->
                 <div class="shrink-0 flex items-center">
                     <a href="{{ route('dashboard') }}" aria-label="Go to dashboard">
-                        <x-application-logo class="block h-9 w-auto fill-current text-gray-800 dark:text-gray-200" />
+                        <x-application-logo class="app-navbar-logo block h-9 w-auto fill-current !text-gray-200" />
                     </a>
                 </div>
 
-                <!-- Navigation Links -->
                 <div class="hidden space-x-8 sm:-my-px sm:ms-10 sm:flex">
                     <x-nav-link :href="route('dashboard')" :active="request()->routeIs('dashboard')">
                         {{ __('Dashboard') }}
                     </x-nav-link>
                 </div>
+
                 <div class="hidden space-x-8 sm:-my-px sm:ms-10 sm:flex">
                     <x-nav-link :href="route('grid')" :active="request()->routeIs('grid')">
                         {{ __('Grid') }}
                     </x-nav-link>
                 </div>
+
+                @auth
+                    @if(auth()->user()->role && auth()->user()->role->name === 'Administrator')
+                        <div class="hidden space-x-8 sm:-my-px sm:ms-10 sm:flex">
+                            <x-nav-link :href="route('functions.index')" :active="request()->routeIs('functions.*')">
+                                {{ __('Functions') }}
+                            </x-nav-link>
+                        </div>
+                        <div class="hidden space-x-8 sm:-my-px sm:ms-10 sm:flex">
+                            <x-nav-link :href="route('effects.index')" :active="request()->routeIs('effects.*')">
+                                {{ __('Effects') }}
+                            </x-nav-link>
+                        </div>
+                        <div class="hidden space-x-8 sm:-my-px sm:ms-10 sm:flex">
+                            <x-nav-link :href="route('conditions.index')" :active="request()->routeIs('conditions.*')">
+                                {{ __('Conditions') }}
+                            </x-nav-link>
+                        </div>
+                        <div class="hidden space-x-8 sm:-my-px sm:ms-10 sm:flex">
+                            <x-nav-link :href="route('events.index')" :active="request()->routeIs('events.*')">
+                                {{ __('Events') }}
+                            </x-nav-link>
+                        </div>
+                    @endif
+                @endauth
             </div>
 
-            <!-- Settings Dropdown -->
             <div class="hidden sm:flex sm:items-center sm:ms-6">
                 @auth
                 <x-dropdown align="right" width="48">
@@ -53,29 +75,25 @@
                                 </x-dropdown-link>
                             </div>
 
-                            <!-- Authentication -->
-                            <form method="POST" action="{{ route('logout') }}">
-                                @csrf
-                                <div role="menuitem">
-                                    <button
-                                        type="submit"
-                                        class="w-full text-left px-4 py-2 text-sm text-gray-700 dark:text-gray-300 hover:bg-gray-100 dark:hover:bg-gray-700 focus:outline-none focus:ring-2 focus:ring-inset focus:ring-teal-500">
-                                        {{ __('Log Out') }}
-                                    </button>
-                                </div>
-                            </form>
-                        </div>
+                        <form method="POST" action="{{ route('logout') }}">
+                            @csrf
+
+                            <x-dropdown-link :href="route('logout')"
+                                    onclick="event.preventDefault();
+                                                this.closest('form').submit();">
+                                {{ __('Log Out') }}
+                            </x-dropdown-link>
+                        </form>
                     </x-slot>
                 </x-dropdown>
                 @endauth
                 @guest
-                <a href="{{ route('login') }}" class="text-sm font-medium text-gray-500 dark:text-gray-400 hover:text-gray-700 dark:hover:text-gray-300">
+                <a href="{{ route('login') }}" class="text-sm font-medium !text-gray-400 hover:!text-gray-300 no-underline">
                     {{ __('Log In') }}
                 </a>
                 @endguest
             </div>
 
-            <!-- Hamburger -->
             <div class="-me-2 flex items-center sm:hidden">
                 <button
                     @click="open = ! open"
@@ -92,28 +110,39 @@
         </div>
     </div>
 
-    <!-- Responsive Navigation Menu -->
-    <div
-        id="mobile-menu"
-        :class="{'block': open, 'hidden': ! open}"
-        class="hidden sm:hidden"
-        aria-label="Mobile navigation">
-
+    <div :class="{'block': open, 'hidden': ! open}" class="hidden sm:hidden !bg-gray-800 border-t !border-gray-700">
         <div class="pt-2 pb-3 space-y-1">
             <x-responsive-nav-link :href="route('dashboard')" :active="request()->routeIs('dashboard')">
                 {{ __('Dashboard') }}
             </x-responsive-nav-link>
+
             <x-responsive-nav-link :href="route('grid')" :active="request()->routeIs('grid')">
                 {{ __('Grid') }}
             </x-responsive-nav-link>
+
+            @auth
+                @if(auth()->user()->role && auth()->user()->role->name === 'Administrator')
+                    <x-responsive-nav-link :href="route('functions.index')" :active="request()->routeIs('functions.*')">
+                        {{ __('Functions') }}
+                    </x-responsive-nav-link>
+                    <x-responsive-nav-link :href="route('effects.index')" :active="request()->routeIs('effects.*')">
+                        {{ __('Effects') }}
+                    </x-responsive-nav-link>
+                    <x-responsive-nav-link :href="route('conditions.index')" :active="request()->routeIs('conditions.*')">
+                        {{ __('Conditions') }}
+                    </x-responsive-nav-link>
+                    <x-responsive-nav-link :href="route('events.index')" :active="request()->routeIs('events.*')">
+                        {{ __('Events') }}
+                    </x-responsive-nav-link>
+                @endif
+            @endauth
         </div>
 
-        <!-- Responsive Settings Options -->
-        <div class="pt-4 pb-1 border-t border-gray-200 dark:border-gray-600">
+        <div class="pt-4 pb-1 border-t !border-gray-700">
             @auth
             <div class="px-4">
-                <div class="font-medium text-base text-gray-800 dark:text-gray-200">{{ Auth::user()->name }}</div>
-                <div class="font-medium text-sm text-gray-500">{{ Auth::user()->email }}</div>
+                <div class="font-medium text-base !text-gray-200">{{ Auth::user()->name }}</div>
+                <div class="font-medium text-sm !text-gray-400">{{ Auth::user()->email }}</div>
             </div>
 
             <div class="mt-3 space-y-1">
@@ -121,7 +150,6 @@
                     {{ __('Profile') }}
                 </x-responsive-nav-link>
 
-                <!-- Authentication -->
                 <form method="POST" action="{{ route('logout') }}">
                     @csrf
                     <button
@@ -134,7 +162,7 @@
             @endauth
             @guest
             <div class="px-4 space-y-1">
-                <a href="{{ route('login') }}" class="block px-4 py-2 text-base font-medium text-gray-500 dark:text-gray-400 hover:text-gray-700 dark:hover:text-gray-300">
+                <a href="{{ route('login') }}" class="block px-4 py-2 text-base font-medium !text-gray-400 hover:!text-gray-300 no-underline">
                     {{ __('Log In') }}
                 </a>
             </div>

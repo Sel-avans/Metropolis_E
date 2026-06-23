@@ -386,6 +386,10 @@ export function initLibraryPreview() {
     });
 
     libraryList.addEventListener('mouseover', (event) => {
+        // --- MOBIELE FIX: Negeer hover (mouseover) op touchscreens! ---
+        // Als het apparaat geen echte muis heeft (zoals een telefoon), doen we geen hover-previews.
+        if (window.matchMedia("(hover: none)").matches) return;
+
         const item = resolveLibraryItem(event.target);
         if (!isVisibleLibraryItem(item)) return;
         if (pinnedFunctionId && Number(item.dataset.functionId) !== pinnedFunctionId) return;
@@ -417,6 +421,13 @@ export function initLibraryPreview() {
     });
 
     libraryList.addEventListener('click', (event) => {
+        // --- DE KNOP FIX: Controleer of we op de info-knop hebben geklikt ---
+        const infoBtn = event.target.closest('.preview-info-btn');
+        
+        // Klikten we NIET op de info knop? Doe dan he-le-maal niks en stop deze functie.
+        // Zo kan je grid.js de tap rustig oppakken om te gaan bouwen.
+        if (!infoBtn) return;
+
         const item = resolveLibraryItem(event.target);
         if (!isVisibleLibraryItem(item) || suppressClickAfterDrag) return;
 

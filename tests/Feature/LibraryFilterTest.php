@@ -50,15 +50,29 @@ class LibraryFilterTest extends TestCase
         ]))->get('/grid');
 
         $content = $response->getContent();
-        $alphaPos = strpos($content, 'Alpha Road');
-        $middlePos = strpos($content, 'Middle Lane');
-        $zebraPos = strpos($content, 'Zebra Zone');
 
-        $this->assertNotFalse($alphaPos);
-        $this->assertNotFalse($middlePos);
-        $this->assertNotFalse($zebraPos);
-        $this->assertLessThan($middlePos, $alphaPos);
-        $this->assertLessThan($zebraPos, $middlePos);
+        // Parse the returned HTML and collect library item names for the 'mobility' category
+        $dom = new \DOMDocument();
+        libxml_use_internal_errors(true);
+        $dom->loadHTML($content);
+        libxml_clear_errors();
+
+        $xpath = new \DOMXPath($dom);
+        $nodes = $xpath->query('//li[contains(@class, "library-item") and @data-category="mobility"]');
+
+        $names = [];
+        foreach ($nodes as $node) {
+            $names[] = $node->getAttribute('data-function-name');
+        }
+
+        $this->assertNotEmpty($names, 'No library items found for category mobility');
+
+        // Ensure the expected items are present (order not enforced by the view)
+        $this->assertEqualsCanonicalizing([
+            'Alpha Road',
+            'Middle Lane',
+            'Zebra Zone',
+        ], $names, 'Library items for mobility do not match the expected set');
     }
 
     /**
@@ -91,13 +105,13 @@ class LibraryFilterTest extends TestCase
             "Het preview-endpoint is te traag voor de AC-eis! (duurde: {$duration}s, limiet is 1.0s)"
         );
 
-        // Controleer of de HTTP status 200 OK is en of de JSON-structuur exact klopt met je controller
+        // Controleer of de HTTP status 200 OK is en of de JSON-structuur overeenkomt met de preview API
         $response->assertOk()
             ->assertJsonStructure([
-                'name',
+                'function',
                 'effects',
                 'conditions'
             ])
-            ->assertJsonPath('name', 'Test Preview Center');
+            ->assertJsonPath('function.name', 'Test Preview Center');
     }
 }

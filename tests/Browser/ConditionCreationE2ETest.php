@@ -24,7 +24,7 @@ class ConditionCreationE2ETest extends DuskTestCase
             // Go to grid then Condition Management
             $browser->clickLink('Grid')
                     ->waitForLocation('/grid', 10)
-                    ->clickLink('Condition Management')
+                    ->clickLink('Conditions')
                     ->waitForLocation('/conditions', 10);
 
                 // Ensure any leftover modal is closed, then open "New rule" modal
