@@ -1000,10 +1000,7 @@ function initGridPage() {
         return `
         <button
             type="button"
-            class="event-toggle-btn flex-shrink-0 px-2 py-1 text-xs font-semibold rounded transition
-                ${showDeactivate
-                ? 'bg-amber-500 hover:bg-amber-600 text-white'
-                : 'bg-slate-600 hover:bg-teal-600 hover:text-white text-slate-200'}"
+            class="event-toggle-btn flex-shrink-0 px-2 py-1 text-xs font-semibold rounded transition ${btnClass}"
             data-event-id="${event.id}">
             ${showDeactivate ? 'Deactivate' : 'Activate'}
         </button>
