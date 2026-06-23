@@ -163,8 +163,8 @@
 
             {{-- Simulation Controls --}}
             <section id="simulation-controls" aria-label="Simulation controls"
-                class="mt-2 p-3 border-t border-gray-300 dark:border-gray-700 bg-white dark:bg-gray-900 rounded-b-lg overflow-y-auto shrink-0"
-                style="max-height: 35vh;">
+                class="mt-2 p-3 border-t border-gray-300 dark:border-gray-700 bg-white dark:bg-gray-900 rounded-b-lg shrink-0"
+                style="max-height: 45vh;">
                 {{-- Timeline --}}
                 <div class="mb-4">
                     <label for="simulation-timeline" class="sr-only">Simulation timeline</label>
