@@ -328,8 +328,25 @@ function initGridPage() {
         );
     }
 
+    function isWithinNext24Hours(event) {
+        if (!event.start_date) return true;
+
+        const safeDateString = event.start_date.replace(' ', 'T');
+        const startTime = new Date(safeDateString).getTime();
+        if (Number.isNaN(startTime)) return true;
+
+        const now = Date.now();
+        const twentyFourHoursMs = 24 * 60 * 60 * 1000;
+        return startTime <= now + twentyFourHoursMs;
+    }
+
     function cycleEvents() {
-        return allEvents.filter(e => e.fitsInCycle || e.activatedForCycle);
+        return allEvents.filter(e => {
+            if (e.activatedForCycle || e.activatedEarly) {
+                return true;
+            }
+            return e.fitsInCycle && isWithinNext24Hours(e);
+        });
     }
 
     function longEvents() {
@@ -1306,6 +1323,8 @@ function initGridPage() {
                     modifiers: e.modifiers ?? {},
                     affected_categories: e.affected_categories ?? [],
                     affectedFunctionIds: e.affected_function_ids ?? [],
+                    start_date: e.start_at ?? null,
+                    end_date: e.end_at ?? null,
                     start_minutes: e.start_minutes ?? datetimeToSimMinutes(e.start_at),
                     end_minutes: e.end_minutes ?? datetimeToSimMinutes(e.end_at),
                     durationMinutes: e.duration_minutes ?? 0,
